@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import NuevoReporteModal from '../components/modals/NuevoReporteModal';
@@ -173,9 +173,13 @@ export default function Dashboard() {
                           <td className="px-6 py-4 text-slate-500">{orden.descripcion || 'Sin servicio específico'}</td>
                           <td className="px-6 py-4">
                             <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                              orden.estado === 'Urgente' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                              orden.estado === 'En revisión' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                              orden.estado === 'Pendiente de firma' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
                               orden.estado === 'Pendiente' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-500' :
                               orden.estado === 'En Curso' ? 'bg-primary/10 text-primary' :
-                              'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-500'
+                              orden.estado === 'Finalizada' ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-500' :
+                              'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                             }`}>
                               {orden.estado}
                             </span>

@@ -8,6 +8,8 @@ const MobileOrdenes = () => {
     const [loading, setLoading] = useState(true);
     const [currentUserName, setCurrentUserName] = useState<string>('');
     const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
+    const [currentUserRole, setCurrentUserRole] = useState<string>('');
+    const [lastActiveId, setLastActiveId] = useState<string | null>(null);
 
     useEffect(() => {
         const init = async () => {
@@ -16,26 +18,38 @@ const MobileOrdenes = () => {
             const userId = userData?.user?.id || null;
             setCurrentUserEmail(userData?.user?.email || '');
 
-            if (userId) {
-                const { data: trabData } = await supabase
-                    .from('trabajadores')
-                    .select('nombre, apellidos')
-                    .eq('auth_user_id', userId)
-                    .maybeSingle();
-                if (trabData) {
-                    setCurrentUserName(`${trabData.nombre} ${trabData.apellidos}`.trim());
-                }
+            if (!userId) {
+                navigate('/m/login');
+                return;
             }
 
-            // Fetch all relevant orders
-            const { data, error } = await supabase
-                .from('ordenes')
-                .select('*')
-                .order('creado_en', { ascending: false });
+            // Fetch User Profile and Role
+            const { data: profile } = await supabase
+                .from('perfiles')
+                .select('nombre_completo, roles(nombre)')
+                .eq('id', userId)
+                .maybeSingle();
+            
+            const roleName = (profile?.roles as any)?.nombre || 'Trabajador';
+            setCurrentUserRole(roleName);
+            setCurrentUserName(profile?.nombre_completo || userData?.user?.email?.split('@')[0] || 'Usuario');
+
+            // Fetch all relevant orders based on role
+            let query = supabase.from('ordenes').select('*');
+            
+            // Only Technicians (Trabajadores) are restricted to their own orders
+            if (roleName === 'Trabajador') {
+                query = query.eq('tecnico_id', userId);
+            }
+
+            const { data, error } = await query.order('creado_en', { ascending: false });
             
             if (!error && data) {
                 setOrdenes(data);
             }
+            
+            // Get last active order from localStorage
+            setLastActiveId(localStorage.getItem('last_active_order'));
             setLoading(false);
         };
         init();
@@ -58,9 +72,9 @@ const MobileOrdenes = () => {
                     </div>
                     <div>
                         <p className="text-sm font-bold text-slate-800 leading-tight">
-                            {currentUserName || currentUserEmail || 'Técnico'}
+                            {currentUserName}
                         </p>
-                        <p className="text-[10px] text-slate-400 font-medium">Técnico de Campo</p>
+                        <p className="text-[10px] text-primary font-bold uppercase tracking-wider">{currentUserRole}</p>
                     </div>
                 </div>
                 <button
@@ -82,27 +96,46 @@ const MobileOrdenes = () => {
                         No tienes órdenes asignadas.
                     </div>
                 ) : (
-                    ordenes.map(orden => (
-                        <Link to={`/m/ordenes/${orden.id}`} key={orden.id} className="block bg-white rounded-xl shadow-sm border border-slate-200 p-4 active:scale-[0.98] transition-all">
-                            <div className="flex justify-between items-start mb-2">
-                                <span className="font-bold text-primary">{orden.id_legible}</span>
-                                <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${orden.estado === 'En Curso' ? 'bg-primary/10 text-primary' : orden.estado === 'Pendiente' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
-                                    {orden.estado}
-                                </span>
-                            </div>
-                            <h3 className="font-semibold text-slate-800">{orden.cliente}</h3>
-                            {orden.direccion && (
-                                <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-[13px]">location_on</span>
-                                    {orden.direccion}
+                    ordenes.map(orden => {
+                        const isLastActive = orden.id === lastActiveId;
+                        return (
+                            <Link 
+                                to={`/m/ordenes/${orden.id}`} 
+                                key={orden.id} 
+                                className={`block bg-white rounded-xl shadow-sm border p-4 active:scale-[0.98] transition-all relative overflow-hidden ${isLastActive ? 'border-primary border-l-[6px] ring-2 ring-primary/5 shadow-md' : 'border-slate-200'}`}
+                            >
+                                {isLastActive && (
+                                    <div className="absolute top-0 right-0 bg-primary text-white text-[8px] font-black px-2 py-0.5 rounded-bl uppercase tracking-tighter">
+                                        RECIENTE
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="font-bold text-primary">{orden.id_legible}</span>
+                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${
+                                        orden.estado === 'Urgente' ? 'bg-red-100 text-red-700' :
+                                        orden.estado === 'En revisión' ? 'bg-purple-100 text-purple-700' :
+                                        orden.estado === 'Pendiente de firma' ? 'bg-orange-100 text-orange-700' :
+                                        orden.estado === 'En Curso' ? 'bg-primary/10 text-primary' : 
+                                        orden.estado === 'Pendiente' ? 'bg-amber-100 text-amber-700' : 
+                                        'bg-green-100 text-green-700'
+                                    }`}>
+                                        {orden.estado}
+                                    </span>
+                                </div>
+                                <h3 className="font-semibold text-slate-800">{orden.cliente}</h3>
+                                {orden.direccion && (
+                                    <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[13px]">location_on</span>
+                                        {orden.direccion}
+                                    </p>
+                                )}
+                                <p className="text-[10px] text-slate-400 mt-3 pt-2 border-t border-slate-100 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[14px]">schedule</span> 
+                                    {new Date(orden.creado_en).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                 </p>
-                            )}
-                            <p className="text-[10px] text-slate-400 mt-3 pt-2 border-t border-slate-100 flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[14px]">schedule</span> 
-                                {new Date(orden.creado_en).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                        </Link>
-                    ))
+                            </Link>
+                        );
+                    })
                 )}
             </div>
         </div>

@@ -84,7 +84,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated }: Props)
          direccion: formData.direccion,
          otras_ordenes: formData.otras_ordenes,
          descripcion: formData.observaciones,
-         estado: formData.tecnico ? 'En Curso' : 'Pendiente',
+         estado: formData.esUrgente ? 'Urgente' : (formData.tecnico ? 'En Curso' : 'Pendiente'),
          tecnico_id: formData.tecnico || null,
          creado_en: createdAt
       });

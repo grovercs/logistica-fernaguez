@@ -198,7 +198,10 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
                   onChange={(e) => setFormData({...formData, estado: e.target.value})}
                 >
                   <option value="Pendiente">Pendiente</option>
+                  <option value="Urgente">Urgente</option>
                   <option value="En Curso">En Curso</option>
+                  <option value="En revisión">En revisión</option>
+                  <option value="Pendiente de firma">Pendiente de firma</option>
                   <option value="Finalizada">Finalizada</option>
                   <option value="Cancelada">Cancelada</option>
                 </select>

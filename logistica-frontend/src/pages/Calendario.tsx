@@ -92,11 +92,14 @@ export default function Calendario() {
 
   const getBadgeTheme = (estado: string) => {
     switch(estado) {
+      case 'Urgente': return 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 border-red-500';
+      case 'En revisión': return 'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200 border-purple-500';
+      case 'Pendiente de firma': return 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200 border-orange-500';
       case 'Pendiente': return 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 border-amber-500';
       case 'En Curso': return 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 border-blue-500';
       case 'Finalizada': 
       case 'Finalizado': return 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 border-green-500';
-      case 'Cancelada': return 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 border-red-500';
+      case 'Cancelada': return 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-300';
       default: return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-500';
     }
   };
@@ -217,10 +220,14 @@ export default function Calendario() {
                value={estadoFilter}
                onChange={(e) => setEstadoFilter(e.target.value)}
              >
-               <option value="">Cualquier Estado</option>
-               <option value="Pendiente">Pendiente</option>
-               <option value="En Curso">En Curso</option>
-               <option value="Finalizada">Finalizada</option>
+                <option value="">Todos los Estados</option>
+                <option value="Urgente">🔴 Urgente</option>
+                <option value="Pendiente">🟡 Pendiente</option>
+                <option value="En Curso">🔵 En Curso</option>
+                <option value="En revisión">🟣 En revisión</option>
+                <option value="Pendiente de firma">🟠 Firma Pendiente</option>
+                <option value="Finalizada">🟢 Finalizada</option>
+                <option value="Cancelada">⚪ Cancelada</option>
              </select>
           </div>
         </div>
@@ -285,22 +292,40 @@ export default function Calendario() {
           </div>
           
           {/* Legend */}
-          <div className="flex items-center gap-6 p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Urgente</span>
+            </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Pendiente</span>
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Pendiente</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">En Curso</span>
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-400">En Curso</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-400">En revisión</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Firma Pendiente</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Finalizada</span>
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Finalizada</span>
             </div>
-            <div className="ml-auto flex items-center gap-2 text-slate-400 text-xs">
-              <span className="material-symbols-outlined text-[14px]">engineering</span>
-              <span>= Intervención registrada por técnico</span>
+            <div className="ml-auto flex items-center gap-4 text-slate-400 text-[10px] sm:text-xs">
+              <div className="flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">engineering</span>
+                <span>Intervención (Técnico)</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">folder_open</span>
+                <span>Alta de Orden</span>
+              </div>
             </div>
           </div>
         </div>

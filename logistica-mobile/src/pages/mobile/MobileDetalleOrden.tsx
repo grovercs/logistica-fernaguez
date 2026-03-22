@@ -8,10 +8,12 @@ const MobileDetalleOrden = () => {
     const navigate = useNavigate();
     
     const [orden, setOrden] = useState<any>(null);
-    const [reporte, setReporte] = useState<any>(null);
+    const [reportes, setReportes] = useState<any[]>([]); // List of all reports
+    const [reporte, setReporte] = useState<any>(null); // Current report being edited
     const [loading, setLoading] = useState(true);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [currentUserName, setCurrentUserName] = useState<string>('');
+    const [currentUserRole, setCurrentUserRole] = useState<string>('');
     
     // Form state corresponding to the design
     const [fecha, setFecha] = useState('');
@@ -37,9 +39,23 @@ const MobileDetalleOrden = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [hasSignature, setHasSignature] = useState(false);
+    const [showForm, setShowForm] = useState(false); // Modal control
 
     useEffect(() => {
-        if (id) fetchOrden();
+        if (showForm) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => { document.body.style.overflow = 'unset'; };
+    }, [showForm]);
+
+    useEffect(() => {
+        if (id) {
+            fetchOrden();
+            // Store this as the last active order
+            localStorage.setItem('last_active_order', id);
+        }
     }, [id]);
 
     const fetchOrden = async () => {
@@ -48,56 +64,125 @@ const MobileDetalleOrden = () => {
         const userId = userData?.user?.id || null;
         setCurrentUserId(userId);
 
-        // Get the technician's name from the trabajadores table
-        if (userId) {
-            const { data: trabData } = await supabase
-                .from('trabajadores')
-                .select('nombre, apellidos')
-                .eq('auth_user_id', userId)
-                .maybeSingle();
-            if (trabData) {
-                setCurrentUserName(`${trabData.nombre} ${trabData.apellidos}`.trim());
-            } else {
-                // Fallback to email
-                setCurrentUserName(userData?.user?.email || 'Técnico');
-            }
-        }
+        if (!userId) return;
 
-        const [ordenReq, reporteReq] = await Promise.all([
+        // Get User Profile and Role
+        const { data: profile } = await supabase
+            .from('perfiles')
+            .select('nombre_completo, roles(nombre)')
+            .eq('id', userId)
+            .maybeSingle();
+
+        const roleName = (profile?.roles as any)?.nombre || 'Trabajador';
+        setCurrentUserRole(roleName);
+        setCurrentUserName(profile?.nombre_completo || userData?.user?.email?.split('@')[0] || 'Trabajador');
+
+        const [ordenReq, reportesReq] = await Promise.all([
             supabase.from('ordenes').select('*').eq('id', id).single(),
-            userId ? supabase.from('reportes').select('*').eq('orden_id', id).eq('tecnico_id', userId).maybeSingle() : Promise.resolve({ data: null, error: null })
+            (() => {
+                let query = supabase.from('reportes').select('*, perfiles(nombre_completo)').eq('orden_id', id);
+                // Technicians (Trabajadores) only see their own reports
+                if (roleName === 'Trabajador') {
+                    query = query.eq('tecnico_id', userId);
+                }
+                return query.order('creado_en', { ascending: false });
+            })()
         ]);
         
         if (!ordenReq.error && ordenReq.data) {
             setOrden(ordenReq.data);
-            setTrabajoRealizado(ordenReq.data.descripcion || '');
             if (ordenReq.data.creado_en) {
                 setFecha(new Date(ordenReq.data.creado_en).toISOString().split('T')[0]);
             }
         }
         
-        if (!reporteReq.error && reporteReq.data) {
-            setReporte(reporteReq.data);
-            setMaterialUtilizado(reporteReq.data.notas || '');
-            if (reporteReq.data.firma_url) setHasSignature(true);
-            
-            // Load previously saved hours
-            const totalHours = reporteReq.data.horas_trabajadas || 0;
-            setSelectedHora(Math.floor(totalHours));
-            setSelectedMinuto(Math.round((totalHours % 1) * 60));
-
-            // Restore previously uploaded photos
-            if (reporteReq.data.fotos_urls?.length > 0) {
-                setFotos(reporteReq.data.fotos_urls);
-                setFotoPreviews(reporteReq.data.fotos_urls);
-            }
-            // Restore previously uploaded invoices
-            if (reporteReq.data.facturas_urls?.length > 0) {
-                setFacturas(reporteReq.data.facturas_urls);
-                setFacturaPreviews(reporteReq.data.facturas_urls);
-            }
+        if (!reportesReq.error && reportesReq.data) {
+            setReportes(reportesReq.data);
         }
         setLoading(false);
+    };
+
+    const handleDeleteReport = async (reportId: string) => {
+        if (currentUserRole !== 'Administrador') return;
+        if (!window.confirm('¿Estás seguro de que deseas eliminar este reporte técnico? Esta acción no se puede deshacer.')) return;
+
+        setLoading(true);
+        const { error } = await supabase.from('reportes').delete().eq('id', reportId);
+        
+        if (error) {
+            alert('Error al eliminar el reporte: ' + error.message);
+        } else {
+            alert('Reporte eliminado correctamente.');
+            fetchOrden();
+        }
+        setLoading(false);
+    };
+
+    const resetForm = () => {
+        setReporte(null);
+        setTrabajoRealizado('');
+        setMaterialUtilizado('');
+        setFotos([]);
+        setFotoPreviews([]);
+        setFacturas([]);
+        setFacturaPreviews([]);
+        setHasSignature(false);
+        setSelectedHora(0);
+        setSelectedMinuto(0);
+        
+        // Reset canvas
+        const ctx = canvasRef.current?.getContext('2d');
+        ctx?.clearRect(0, 0, canvasRef.current?.width || 0, canvasRef.current?.height || 0);
+
+        // Reset date to today
+        setFecha(new Date().toISOString().split('T')[0]);
+
+        // Open Modal
+        setShowForm(true);
+    };
+
+    const loadReportData = (rep: any) => {
+        setReporte(rep);
+        
+        // Robust split: handles '\n\nMATERIALES:\n', '\nMATERIALES:\n', ' MATERIALES: ', etc.
+        const notes = rep.notas || '';
+        const splitter = /[ \t\n]*(?:MATERIALES:?)[ \t\n]*/i;
+        const parts = notes.split(splitter);
+        
+        const descFallback = parts[0] || '';
+        const matFallback = parts[1] || '';
+        
+        setTrabajoRealizado(rep.trabajo_realizado || descFallback.trim());
+        setMaterialUtilizado(rep.material_utilizado || matFallback.trim());
+        
+        // Highly strict check to avoid false positives from 'null' strings or placeholders
+        const isSigned = !!rep.firma_url && 
+                         typeof rep.firma_url === 'string' && 
+                         rep.firma_url.startsWith('http') && 
+                         rep.firma_url.length > 50; 
+        setHasSignature(isSigned);
+        
+        // Reset canvas before loading (it will show the image if firma_url exists)
+        const ctx = canvasRef.current?.getContext('2d');
+        ctx?.clearRect(0, 0, canvasRef.current?.width || 0, canvasRef.current?.height || 0);
+        
+        // Use fecha_trabajo if available, fallback to creado_en
+        const reportDate = rep.fecha_trabajo || (rep.creado_en ? new Date(rep.creado_en).toISOString().split('T')[0] : '');
+        setFecha(reportDate);
+        
+        // Load previously saved hours
+        const totalHours = rep.horas_trabajadas || 0;
+        setSelectedHora(Math.floor(totalHours));
+        setSelectedMinuto(Math.round((totalHours % 1) * 60));
+
+        // Restore previously uploaded photos and invoices
+        setFotos(rep.fotos_urls || []);
+        setFotoPreviews(rep.fotos_urls || []);
+        setFacturas(rep.facturas_urls || []);
+        setFacturaPreviews(rep.facturas_urls || []);
+        
+        // Open Modal
+        setShowForm(true);
     };
 
     // --- Photo Upload ---
@@ -236,14 +321,12 @@ const MobileDetalleOrden = () => {
         if (canvasRef.current) {
             const ctx = canvasRef.current.getContext('2d');
             if (ctx) ctx.beginPath(); // Reset path
-            
-            // Check if there is something drawn by seeing if we can get image data
-            setHasSignature(true); 
         }
     };
 
     const draw = (e: any) => {
         if (!isDrawing || !canvasRef.current) return;
+        setHasSignature(true); // Only set to true when actual drawing/movement occurs
         
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
@@ -271,6 +354,8 @@ const MobileDetalleOrden = () => {
     };
 
     const clearSignature = () => {
+        if (!window.confirm('¿Estás seguro de que deseas borrar la firma actual? Deberás firmar de nuevo.')) return;
+        
         if (reporte?.firma_url) {
             setReporte({...reporte, firma_url: null});
         }
@@ -285,37 +370,83 @@ const MobileDetalleOrden = () => {
     const handleComplete = async () => {
         setSubmitting(true);
         
-        let signatureDataUrl = reporte?.firma_url;
-        if (!signatureDataUrl && canvasRef.current && hasSignature) {
-            signatureDataUrl = canvasRef.current.toDataURL('image/png');
+        let signatureUrl = reporte?.firma_url;
+
+        // If the signature pad is empty/cleared, we MUST set signatureUrl to null
+        if (!hasSignature) {
+            signatureUrl = null;
+        } 
+        // If we have a new signature on canvas, upload it to Storage
+        else if (canvasRef.current && (!reporte?.firma_url || canvasRef.current.toDataURL('image/png') !== reporte.firma_url)) {
+            try {
+                const blob = await new Promise<Blob>((resolve) => canvasRef.current!.toBlob((b) => resolve(b!), 'image/png'));
+                const fileName = `firmas/${id}/${Date.now()}-firma.png`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('fotos-reportes')
+                    .upload(fileName, blob, { contentType: 'image/png', upsert: true });
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('fotos-reportes')
+                    .getPublicUrl(uploadData.path);
+                
+                signatureUrl = publicUrl;
+            } catch (err) {
+                console.error('Error uploading signature:', err);
+                alert("Error al subir la firma al servidor.");
+                setSubmitting(false);
+                return;
+            }
         }
-        
+
         const parsedHoras = selectedHora + (selectedMinuto / 60);
 
-        const reportData = {
+        const reportData: any = {
             orden_id: id,
-            tecnico_id: currentUserId,
-            notas: materialUtilizado,
-            firma_url: signatureDataUrl,
+            // Preserve the original technician when editing
+            tecnico_id: reporte?.tecnico_id || currentUserId,
+            notas: `${trabajoRealizado}\n\nMATERIALES:\n${materialUtilizado}`,
+            firma_url: signatureUrl,
             horas_trabajadas: parsedHoras,
-            fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
             fotos_urls: fotos,
+            creado_en: signatureUrl ? new Date().toISOString() : (reporte?.creado_en || new Date().toISOString()),
+            // The following fields require the database migration
+            trabajo_realizado: trabajoRealizado,
+            material_utilizado: materialUtilizado,
             facturas_urls: facturas,
+            fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
+        };
+
+        const saveReport = async (data: any) => {
+            if (reporte?.id) {
+                return await supabase.from('reportes').update(data).eq('id', reporte.id);
+            } else {
+                return await supabase.from('reportes').insert(data);
+            }
         };
 
         let errorReporte = null;
+
+        // Attempt 1: Full save with all columns
+        const { error: errFull } = await saveReport(reportData);
         
-        if (reporte?.id) {
-            const { error: errUpdate } = await supabase
-                .from('reportes')
-                .update(reportData)
-                .eq('id', reporte.id);
-            errorReporte = errUpdate;
+        // Attempt 2: Fallback if columns are missing (error 42703 is Undefined Column in PG)
+        if (errFull && (errFull.code === '42703' || errFull.message?.includes('column'))) {
+            console.warn('Fallback save: Missing specialized columns. Run migration for full support.');
+            const fallbackData = {
+                orden_id: id,
+                tecnico_id: currentUserId,
+                notas: reportData.notas,
+                firma_url: reportData.firma_url,
+                horas_trabajadas: reportData.horas_trabajadas,
+                fotos_urls: reportData.fotos_urls,
+                creado_en: reportData.creado_en
+            };
+            const { error: errFallback } = await saveReport(fallbackData);
+            errorReporte = errFallback;
         } else {
-            const { error: errInsert } = await supabase
-                .from('reportes')
-                .insert(reportData);
-            errorReporte = errInsert;
+            errorReporte = errFull;
         }
 
         if (errorReporte) {
@@ -325,18 +456,23 @@ const MobileDetalleOrden = () => {
             return;
         }
         
-        // Mark order as 'En Curso' when a tech submits a report.
-        // 'Finalizada' only happens when the client signs (managed from admin panel).
+        // AUTOMATION:
+        // 1. If there is a signature, set to 'En revisión'
+        // 2. If no signature but was 'Pendiente', set to 'En Curso'
+        const newEstado = signatureUrl ? 'En revisión' : 'En Curso';
+        
         await supabase
             .from('ordenes')
             .update({ 
-                estado: 'En Curso',
+                estado: newEstado,
             })
-            .eq('id', id)
-            .eq('estado', 'Pendiente'); // Only update if still 'Pendiente'
+            .eq('id', id);
 
         setSubmitting(false);
-        alert("¡Reporte añadido correctamente!");
+        alert("¡Reporte guardado correctamente!");
+        setShowForm(false); // Close Modal on success
+        fetchOrden(); // Refresh list
+        localStorage.setItem('last_active_order', id || '');
         navigate('/m/ordenes');
     };
 
@@ -357,7 +493,7 @@ const MobileDetalleOrden = () => {
                 </button>
             </div>
 
-            {/* INTERVENTION DATA */}
+            {/* DATOS DE LA ORDEN (HEADER) */}
             <div className="bg-white p-5 space-y-4 shadow-sm border-b border-slate-200">
                  <div className="flex justify-between items-start">
                      <div>
@@ -400,30 +536,159 @@ const MobileDetalleOrden = () => {
                          <p className="text-sm font-medium text-slate-700">{orden?.persona_contacto || '-'} {orden?.telefono_contacto && <>— <a href={`tel:${orden.telefono_contacto}`} className="text-blue-600 font-bold">{orden.telefono_contacto}</a></>}</p>
                      </div>
                  )}
-                 
-                 <div className="pt-3 border-t border-slate-100">
-                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight flex justify-between items-center">
-                         Motivo / Notas Adicionales 
-                         <span className="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-bold">Póliza: {orden?.poliza || '-'}</span>
-                     </p>
-                     <p className="text-sm text-slate-700 mt-2 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-inner italic break-words">
-                         {orden?.descripcion || 'Sin descripción detallada de la avería'}
-                     </p>
-                 </div>
+
+                  {/* INTERVENCIONES PREVIAS (HISTORIAL) */}
+                  <div className="pt-5 border-t border-slate-200">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                           <span className="material-symbols-outlined text-[18px]">history</span>
+                           Intervenciones Realizadas ({reportes.length})
+                        </h3>
+                        <button 
+                            onClick={resetForm}
+                            className="bg-primary hover:bg-primary/90 text-white text-[11px] font-black px-4 py-2 rounded-xl flex items-center gap-2 shadow-sm active:scale-95 transition-all"
+                        >
+                            <span className="material-symbols-outlined text-[16px]">add</span>
+                            NUEVA
+                        </button>
+                      </div>
+
+                      {reportes.length === 0 ? (
+                        <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-4 text-center">
+                            <p className="text-xs text-slate-400 font-medium italic">No hay intervenciones registradas aún.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                            {reportes.map((rep, idx) => {
+                                const canEdit = currentUserRole === 'Administrador' || currentUserRole === 'Editor' || rep.tecnico_id === currentUserId;
+                                const canDelete = currentUserRole === 'Administrador';
+                                const tecnicoName = (rep.perfiles as any)?.nombre_completo || 'Técnico';
+
+                                return (
+                                    <div 
+                                        key={rep.id} 
+                                        className={`p-3 rounded-xl border transition-all relative ${reporte?.id === rep.id ? 'bg-primary/5 border-primary shadow-sm ring-1 ring-primary/20' : 'bg-slate-50 border-slate-100'}`}
+                                    >
+                                        <div className="flex justify-between items-start mb-1">
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase">PARTE #{reportes.length - idx}</span>
+                                                <span className="text-[10px] font-bold text-primary flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[12px]">person</span>
+                                                    {tecnicoName}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-[10px] font-bold text-slate-500 bg-slate-200/50 px-1.5 py-0.5 rounded uppercase">
+                                                    {new Date(rep.fecha_trabajo || rep.creado_en).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                                                </span>
+                                                {canDelete && (
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); handleDeleteReport(rep.id); }}
+                                                        className="w-7 h-7 flex items-center justify-center text-red-400 hover:text-red-600 active:scale-90 transition-all"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div onClick={() => canEdit && loadReportData(rep)} className="cursor-pointer">
+                                            <p className="text-xs font-bold text-slate-800 line-clamp-2 mt-1">
+                                                {(rep.notas || '').split(/[ \t\n]*(?:MATERIALES:?)[ \t\n]*/i)[0] || <span className="italic text-slate-400 font-normal">(Sin descripción)</span>}
+                                            </p>
+                                            <div className="mt-2 flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    {rep.horas_trabajadas > 0 && (
+                                                        <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                            <span className="material-symbols-outlined text-[12px]">schedule</span> {rep.horas_trabajadas}h
+                                                        </span>
+                                                    )}
+                                                    {(rep.firma_url && typeof rep.firma_url === 'string' && rep.firma_url.startsWith('http') && rep.firma_url.length > 50) && (
+                                                        <span className="text-[9px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                            <span className="material-symbols-outlined text-[14px]">verified</span> FIRMADO
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {canEdit && <span className="text-primary text-[10px] font-black underline underline-offset-2 uppercase">Ver/Editar</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                      )}
+                  </div>
             </div>
 
-            <div className="p-5 space-y-6">
-                {/* GENERAL INFORMATION */}
-                <div className="space-y-4">
-                    <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Información General</h2>
+            {/* MODAL / BOTTOM SHEET PARA EL FORMULARIO */}
+            {showForm && (
+                <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+                    {/* Backdrop */}
+                    <div 
+                        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                        onClick={() => !submitting && setShowForm(false)}
+                    />
+
+                    {/* Modal Content (Bottom Sheet on mobile) */}
+                    <div className="relative w-full max-w-2xl bg-[#f0f2f5] rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full duration-300 max-h-[95vh] flex flex-col">
+                        
+                        {/* Modal Header */}
+                        <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${reporte?.id ? 'bg-primary text-white shadow-md' : 'bg-primary/10 text-primary'}`}>
+                                    <span className="material-symbols-outlined text-[20px]">{reporte?.id ? 'edit_note' : 'add_notes'}</span>
+                                </div>
+                                <h2 className="text-lg font-black text-slate-800 tracking-tight">
+                                    {reporte?.id ? 'Editar Reporte' : 'Nueva Intervención'}
+                                </h2>
+                            </div>
+                            <button 
+                                onClick={() => !submitting && setShowForm(false)}
+                                className="text-slate-400 hover:text-slate-600 active:scale-95 transition-all p-1"
+                            >
+                                <span className="material-symbols-outlined text-[28px]">close</span>
+                            </button>
+                        </div>
+
+                        {/* Modal Body (Scrollable) */}
+                        <div className="overflow-y-auto p-6 pb-24 space-y-6">
+                            {reporte && (
+                                <div className="bg-blue-600 text-white p-3 rounded-2xl shadow-sm flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <span className="material-symbols-outlined text-[20px]">edit_square</span>
+                                        <div className="flex flex-col">
+                                            <span className="text-xs font-black uppercase leading-none">MODO EDICIÓN</span>
+                                            <span className="text-[10px] opacity-90">Parte de {new Date(reporte.creado_en).toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={resetForm}
+                                        className="bg-white/20 text-white text-[10px] font-bold px-2 py-1 rounded-lg border border-white/20 hover:bg-white/30"
+                                    >
+                                        CAMBIAR A NUEVA
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Motivo de la orden (para referencia) */}
+                            <div className="pt-2">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight flex justify-between items-center mb-2">
+                                    Motivo de la Orden 
+                                    <span className="text-[9px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded font-black">POL: {orden?.poliza || '-'}</span>
+                                </p>
+                                <p className="text-xs text-slate-600 leading-relaxed bg-white/50 p-4 rounded-2xl border border-white shadow-inner italic">
+                                    {orden?.descripcion || 'Sin descripción detallada'}
+                                </p>
+                            </div>
+                <div className="space-y-4 pt-4">
+                    <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Información de esta Intervención</h2>
                     
                     {/* Fecha */}
                     <div>
-                        <label className="block text-xs font-bold text-slate-800 mb-2 pl-1">Fecha</label>
+                        <label className="block text-xs font-bold text-slate-800 mb-2 pl-1">Fecha de trabajo</label>
                         <div className="relative">
                             <input 
                                 type="date"
-                                className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-4 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm appearance-none"
+                                className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-4 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary shadow-sm appearance-none"
                                 value={fecha}
                                 onChange={e => setFecha(e.target.value)}
                             />
@@ -431,10 +696,10 @@ const MobileDetalleOrden = () => {
                         </div>
                     </div>
 
-                    {/* Horas y Minutos with simple +/- buttons */}
+                    {/* Horas y Minutos */}
                     <div className="grid grid-cols-2 gap-4">
                          <div>
-                             <label className="block text-xs font-bold text-slate-800 mb-2 pl-1">Horas trabajadas</label>
+                             <label className="block text-xs font-bold text-slate-800 mb-2 pl-1">Horas dedicadas</label>
                              <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex items-center justify-between px-4 py-3">
                                 <button 
                                     type="button"
@@ -443,7 +708,7 @@ const MobileDetalleOrden = () => {
                                 >
                                     −
                                 </button>
-                                <span className="text-2xl font-black text-blue-500">{selectedHora.toString().padStart(2, '0')}</span>
+                                <span className="text-2xl font-black text-primary">{selectedHora.toString().padStart(2, '0')}</span>
                                 <button 
                                     type="button"
                                     onClick={() => setSelectedHora(selectedHora + 1)}
@@ -463,7 +728,7 @@ const MobileDetalleOrden = () => {
                                 >
                                     −
                                 </button>
-                                <span className="text-2xl font-black text-blue-500">{selectedMinuto.toString().padStart(2, '0')}</span>
+                                <span className="text-2xl font-black text-primary">{selectedMinuto.toString().padStart(2, '0')}</span>
                                 <button 
                                     type="button"
                                     onClick={() => setSelectedMinuto(Math.min(45, selectedMinuto + 15))}
@@ -475,27 +740,27 @@ const MobileDetalleOrden = () => {
                          </div>
                     </div>
 
-                    {/* Trabajador (read-only, shows logged-in user) */}
+                    {/* Técnico (read-only) */}
                     <div>
-                        <label className="block text-xs font-bold text-slate-800 mb-2 pl-1">Técnico</label>
+                        <label className="block text-xs font-bold text-slate-800 mb-2 pl-1">Técnico asignado</label>
                         <div className="bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 flex items-center gap-3">
                             <span className="material-symbols-outlined text-primary text-[20px]">engineering</span>
-                            <span className="text-sm font-bold text-slate-800">{currentUserName || 'Cargando...'}</span>
+                            <span className="text-sm font-bold text-slate-800">{currentUserName}</span>
                         </div>
                     </div>
                 </div>
 
-                {/* REPORT DETAILS */}
+                {/* DETALLES DEL REPORTE */}
                 <div className="space-y-4 pt-2">
                     <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Detalles del Reporte</h2>
                     
                     {/* Trabajo Realizado */}
                     <div>
-                        <label className="block text-xs font-bold text-slate-800 mb-2 pl-1">Trabajo Realizado</label>
+                        <label className="block text-xs font-bold text-slate-800 mb-2 pl-1">Descripción del Trabajo</label>
                         <textarea 
                             rows={3}
-                            placeholder="Describa el trabajo realizado..."
-                            className="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm resize-none"
+                            placeholder="Describa qué se ha hecho en esta visita..."
+                            className="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary shadow-sm resize-none"
                             value={trabajoRealizado}
                             onChange={(e) => setTrabajoRealizado(e.target.value)}
                         />
@@ -504,7 +769,7 @@ const MobileDetalleOrden = () => {
                     {/* Material Utilizado */}
                     <div>
                         <div className="flex items-center justify-between mb-2">
-                            <label className="text-xs font-bold text-slate-800 pl-1">Material Utilizado</label>
+                            <label className="text-xs font-bold text-slate-800 pl-1">Material y Gastos</label>
                             <button
                                 type="button"
                                 onClick={() => facturaInputRef.current?.click()}
@@ -513,10 +778,9 @@ const MobileDetalleOrden = () => {
                             >
                                 {uploadingFactura
                                     ? <><span className="material-symbols-outlined text-[14px] animate-spin">refresh</span> Subiendo...</>
-                                    : <><span className="material-symbols-outlined text-[14px]">receipt_long</span> Foto factura</>}
+                                    : <><span className="material-symbols-outlined text-[14px]">receipt_long</span> Foto Factura/Gasto</>}
                             </button>
                         </div>
-                        {/* Hidden invoice file input */}
                         <input
                             ref={facturaInputRef}
                             type="file"
@@ -527,41 +791,22 @@ const MobileDetalleOrden = () => {
                         />
                         <textarea 
                             rows={3}
-                            placeholder="Lista de materiales utilizados..."
-                            className="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm resize-none"
+                            placeholder="Materiales usados, repuestos, peajes, etc..."
+                            className="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary shadow-sm resize-none"
                             value={materialUtilizado}
                             onChange={(e) => setMaterialUtilizado(e.target.value)}
                         />
-                        {/* Invoice photo previews */}
+                        {/* Shorthand for previews */}
                         {facturaPreviews.length > 0 && (
-                            <div className="mt-2 space-y-1.5">
-                                <p className="text-[10px] font-bold text-amber-700 pl-1 flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-[12px]">receipt_long</span>
-                                    {facturaPreviews.length} factura{facturaPreviews.length !== 1 ? 's' : ''} adjunta{facturaPreviews.length !== 1 ? 's' : ''}
-                                </p>
-                                <div className="flex gap-2 overflow-x-auto pb-1">
-                                    {facturaPreviews.map((src, i) => (
-                                        <div key={i} className="relative shrink-0">
-                                            <img
-                                                src={src}
-                                                alt={`Factura ${i + 1}`}
-                                                className={`w-20 h-20 object-cover rounded-xl border-2 ${i < facturas.length ? 'border-amber-400' : 'border-blue-300 opacity-60'}`}
-                                            />
-                                            {i < facturas.length && (
-                                                <span className="absolute top-1 right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center">
-                                                    <span className="material-symbols-outlined text-white text-[10px]">receipt_long</span>
-                                                </span>
-                                            )}
-                                            <button
-                                                type="button"
-                                                onClick={() => handleDeleteFactura(i)}
-                                                className="absolute top-0.5 left-0.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow-md active:scale-90 transition-all"
-                                            >
-                                                <span className="material-symbols-outlined text-white text-[12px]">close</span>
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
+                            <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
+                                {facturaPreviews.map((src, i) => (
+                                    <div key={i} className="relative shrink-0">
+                                        <img src={src} alt="Factura" className="w-16 h-16 object-cover rounded-lg border border-amber-200" />
+                                        <button onClick={() => handleDeleteFactura(i)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                                            <span className="material-symbols-outlined text-[10px]">close</span>
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
@@ -569,25 +814,17 @@ const MobileDetalleOrden = () => {
 
                 {/* FIRMA DEL CLIENTE */}
                 <div className="space-y-4 pt-2">
-                    <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Firma Del Cliente</h2>
-                    
-                    {/* Warning Box (Only show if no signature yet) */}
-                    {!hasSignature && (
-                        <div className="bg-[#fff9e6] border border-[#ffe082] rounded-xl p-3 flex items-center gap-3">
-                            <span className="material-symbols-outlined text-orange-500 select-none">warning</span>
-                            <span className="text-xs font-bold text-orange-800 tracking-wide">PENDIENTE DE FIRMA</span>
-                        </div>
-                    )}
-
-                    {/* Canvas Area */}
-                    <div className="bg-white border-2 border-dashed border-[#d1d5db] rounded-xl overflow-hidden touch-none relative h-[200px]">
+                    <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Conformidad (Firma)</h2>
+                    <div className="bg-white border-2 border-dashed border-slate-300 rounded-xl overflow-hidden touch-none relative h-[180px]">
                         {reporte?.firma_url ? (
-                            <img src={reporte.firma_url} alt="Firma Guardada" className="w-full h-full object-contain" />
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50">
+                                <img src={reporte.firma_url} alt="Firma Guardada" className="h-full object-contain" />
+                            </div>
                         ) : (
                             <>
                                 {!hasSignature && (
                                     <span className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-300 font-sans text-sm select-none">
-                                        Espacio para firma
+                                        Firmar aquí
                                     </span>
                                 )}
                                 <canvas 
@@ -608,73 +845,29 @@ const MobileDetalleOrden = () => {
                             </>
                         )}
                     </div>
-
-                    {/* Clear Button */}
-                    <div className="flex justify-end">
-                        <button onClick={clearSignature} className="flex items-center gap-1 text-[#2196f3] hover:text-[#1976d2] font-bold text-xs py-1 px-2 transition-colors">
-                            <span className="material-symbols-outlined text-[16px]">ink_eraser</span>
-                            Limpiar Firma
+                    <div className="flex justify-between items-center px-1">
+                        <p className="text-[10px] text-slate-400 italic">Obligatorio para cerrar el parte</p>
+                        <button onClick={clearSignature} className="flex items-center gap-1 text-primary font-bold text-xs">
+                            <span className="material-symbols-outlined text-[14px]">ink_eraser</span>
+                            Limpiar
                         </button>
                     </div>
-
-                    <p className="text-[10px] text-slate-400 italic leading-snug px-1">
-                        Al firmar, el cliente declara su conformidad con el trabajo realizado y los materiales descritos en este reporte técnico.
-                    </p>
                 </div>
 
-                {/* Main Action Buttons */}
-                <div className="space-y-3 pt-4">
-
-                    {/* Hidden file input — opened programmatically */}
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={handleFotoUpload}
-                    />
-
-                    {/* Photo preview strip */}
+                {/* MAIN ACTIONS */}
+                <div className="space-y-4 pt-6">
+                    <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFotoUpload} />
+                    
                     {fotoPreviews.length > 0 && (
-                        <div className="space-y-2">
-                            <p className="text-xs font-bold text-slate-700 pl-1 flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[14px] text-orange-500">photo_library</span>
-                                {fotoPreviews.length} foto{fotoPreviews.length !== 1 ? 's' : ''} adjunta{fotoPreviews.length !== 1 ? 's' : ''}
-                                {fotos.length < fotoPreviews.length && (
-                                    <span className="ml-1 text-[10px] text-blue-500 font-medium animate-pulse">(subiendo...)</span>
-                                )}
-                            </p>
-                            <div className="flex gap-2 overflow-x-auto pb-1">
-                                {fotoPreviews.map((src, i) => (
-                                    <div key={i} className="relative shrink-0">
-                                        <img
-                                            src={src}
-                                            alt={`Foto ${i + 1}`}
-                                            className={`w-20 h-20 object-cover rounded-xl border-2 ${i < fotos.length ? 'border-green-400' : 'border-blue-300 opacity-60'}`}
-                                        />
-                                        {i >= fotos.length && (
-                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                <span className="material-symbols-outlined text-blue-500 animate-spin text-[20px]">refresh</span>
-                                            </div>
-                                        )}
-                                        {i < fotos.length && (
-                                            <span className="absolute top-1 right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                                                <span className="material-symbols-outlined text-white text-[10px]">check</span>
-                                            </span>
-                                        )}
-                                        {/* Delete button */}
-                                        <button
-                                            type="button"
-                                            onClick={() => handleDeleteFoto(i)}
-                                            className="absolute top-0.5 left-0.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow-md active:scale-90 transition-all"
-                                            title="Borrar foto"
-                                        >
-                                            <span className="material-symbols-outlined text-white text-[12px]">close</span>
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
+                        <div className="flex gap-2 overflow-x-auto pb-2">
+                            {fotoPreviews.map((src, i) => (
+                                <div key={i} className="relative shrink-0">
+                                    <img src={src} className="w-20 h-20 object-cover rounded-xl border-2 border-white shadow-sm" alt="Trabajo" />
+                                    <button onClick={() => handleDeleteFoto(i)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center border-2 border-white shadow-sm">
+                                        <span className="material-symbols-outlined text-[12px]">close</span>
+                                    </button>
+                                </div>
+                            ))}
                         </div>
                     )}
 
@@ -682,32 +875,29 @@ const MobileDetalleOrden = () => {
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploadingFoto}
-                        className="w-full bg-[#ff7b1c] text-white font-bold text-sm py-4 rounded-xl shadow-md shadow-orange-500/20 flex justify-center items-center gap-2 active:scale-95 transition-all disabled:opacity-60"
+                        className="w-full bg-[#ff7b1c] text-white font-bold py-4 rounded-2xl shadow-lg shadow-orange-500/20 active:scale-95 transition-all flex justify-center items-center gap-2"
                     >
-                        {uploadingFoto ? (
-                            <><span className="material-symbols-outlined text-[20px] animate-spin">refresh</span> Comprimiendo y subiendo...</>
-                        ) : (
-                            <><span className="material-symbols-outlined text-[20px]">photo_camera</span>
-                            {fotoPreviews.length > 0 ? 'AÑADIR MÁS FOTOS' : 'AGREGAR FOTOS'}</>
-                        )}
+                        <span className="material-symbols-outlined">photo_camera</span>
+                        {uploadingFoto ? 'SUBIENDO...' : 'AÑADIR FOTOS DE LA VISITA'}
                     </button>
-                    
+
                     <button 
                         onClick={handleComplete}
                         disabled={submitting || uploadingFoto}
-                        className="w-full bg-[#1b84ff] text-white font-bold text-sm py-4 rounded-xl shadow-md shadow-blue-500/30 flex justify-center items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+                        className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl active:scale-95 transition-all flex justify-center items-center gap-3 text-lg"
                     >
-                        {submitting ? (
-                            <span className="material-symbols-outlined animate-spin text-[20px]">refresh</span>
-                        ) : (
-                            <span className="material-symbols-outlined text-[20px]">inventory</span>
-                        )}
-                        AGREGAR REPORTE
+                        <span className="material-symbols-outlined">
+                            {submitting ? 'sync' : (reporte?.id ? 'save' : 'done_all')}
+                        </span>
+                        {submitting ? 'GUARDANDO...' : (reporte?.id ? 'GUARDAR CAMBIOS' : 'AÑADIR INTERVENCIÓN')}
                     </button>
+                    </div>
                 </div>
             </div>
         </div>
-    );
+        )}
+    </div>
+);
 };
 
 export default MobileDetalleOrden;
