@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 antialiased">
+<div class="flex h-screen overflow-hidden">
+<!-- Sidebar -->
+<aside class="w-64 flex-shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col">
+<div class="p-6 flex items-center gap-3 border-b border-slate-200 dark:border-slate-800">
+<div class="bg-primary rounded-lg p-2 text-white">
+<span class="material-symbols-outlined block">engineering</span>
+</div>
+<div>
+<h1 class="text-sm font-bold tracking-tight">Gestión OT</h1>
+<p class="text-[10px] text-slate-500 uppercase tracking-widest">Administración</p>
+</div>
+</div>
+<nav class="flex-1 overflow-y-auto p-4 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-primary/10 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+<span class="text-sm font-medium">Tablero</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-primary/10 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">assessment</span>
+<span class="text-sm font-medium">Reportes</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1">receipt_long</span>
+<span class="text-sm font-medium">Liquidaciones</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-primary/10 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">shield</span>
+<span class="text-sm font-medium">Aseguradoras</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-primary/10 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">group</span>
+<span class="text-sm font-medium">Trabajadores</span>
+</a>
+<div class="pt-4 pb-2">
+<p class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Configuración</p>
+</div>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-primary/10 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">manage_accounts</span>
+<span class="text-sm font-medium">Usuarios</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-primary/10 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">database</span>
+<span class="text-sm font-medium">Compactar BD</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-primary/10 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">admin_panel_settings</span>
+<span class="text-sm font-medium">Roles Management</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-primary/10 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">key</span>
+<span class="text-sm font-medium">Permissions</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-primary/10 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">security</span>
+<span class="text-sm font-medium">RBAC Dashboard</span>
+</a>
+</nav>
+<div class="p-4 border-t border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-3 p-2 bg-slate-100 dark:bg-slate-800 rounded-xl">
+<div class="size-8 rounded-full bg-slate-300 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Avatar de usuario administrador" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB1jm-6h2vEMqGOsIHLrCVl0Br6NwHsMCZTzO3Ej04KqEpXgLzh1svULAqiimKB11xlXwyJhKqfPI70v3ulYIJVb5A_DadJdLeoE7AI_eZoLaJ-uBdwNJfsnwVxiyXdASM-3g9dgnP8UnUZJsbzGNHs98NzJe8yGDXGYMi0GeE79y4brYqeUw_B_NnX-HwlnC5XhI3QcR5L1RMFDiLEqWMHLr8M06_K2XAe-gC4K-IpSXWcU0NBE84IWCn-O6RUk_6T9asDAO2GHoc"/>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-xs font-semibold truncate">Juan Pérez</p>
+<p class="text-[10px] text-slate-500 truncate">Administrador</p>
+</div>
+<span class="material-symbols-outlined text-slate-400 cursor-pointer text-lg">logout</span>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col overflow-hidden">
+<!-- Header -->
+<header class="h-16 flex-shrink-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8">
+<h2 class="text-lg font-bold">Liquidaciones</h2>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</header>
+<!-- Scrollable Area -->
+<div class="flex-1 overflow-y-auto p-8 space-y-6">
+<!-- Filters Section -->
+<section class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+<div class="space-y-2">
+<label class="text-xs font-semibold text-slate-500 uppercase">Desde</label>
+<input class="w-full rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-primary" type="date"/>
+</div>
+<div class="space-y-2">
+<label class="text-xs font-semibold text-slate-500 uppercase">Hasta</label>
+<input class="w-full rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-primary" type="date"/>
+</div>
+<div class="space-y-2">
+<label class="text-xs font-semibold text-slate-500 uppercase">Trabajador</label>
+<select class="w-full rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-primary">
+<option>Todos los trabajadores</option>
+<option>Carlos Martínez</option>
+<option>Elena Rodríguez</option>
+<option>Marcos Soler</option>
+</select>
+</div>
+<div class="flex gap-2">
+<button class="flex-1 bg-primary text-white text-sm font-bold py-2.5 px-4 rounded-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-lg">search</span>
+                            Filtrar
+                        </button>
+</div>
+</div>
+</section>
+<!-- Action Bar -->
+<div class="flex flex-wrap items-center justify-between gap-4">
+<div class="flex items-center gap-2">
+<button class="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-green-600">table_view</span>
+                        Exportar a Excel
+                    </button>
+<button class="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-red-600">picture_as_pdf</span>
+                        Exportar a PDF
+                    </button>
+<button class="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-600">print</span>
+                        Imprimir
+                    </button>
+</div>
+</div>
+<!-- Main Table -->
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre del Trabajador</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Ref. Trabajo</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha Intervención</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Horas</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Tarifa</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Total a Liquidar</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Estado</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">CM</div>
+<span class="text-sm font-medium">Carlos Martínez</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500">OT-2023-0041</td>
+<td class="px-6 py-4 text-sm">12 Oct 2023</td>
+<td class="px-6 py-4 text-sm text-center font-semibold">8.5</td>
+<td class="px-6 py-4 text-sm text-right">$25.00</td>
+<td class="px-6 py-4 text-sm text-right font-bold">$212.50</td>
+<td class="px-6 py-4 text-center">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                    Procesada
+                                </span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">ER</div>
+<span class="text-sm font-medium">Elena Rodríguez</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500">OT-2023-0045</td>
+<td class="px-6 py-4 text-sm">13 Oct 2023</td>
+<td class="px-6 py-4 text-sm text-center font-semibold">4.0</td>
+<td class="px-6 py-4 text-sm text-right">$30.00</td>
+<td class="px-6 py-4 text-sm text-right font-bold">$120.00</td>
+<td class="px-6 py-4 text-center">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                                    Pendiente
+                                </span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">MS</div>
+<span class="text-sm font-medium">Marcos Soler</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500">OT-2023-0048</td>
+<td class="px-6 py-4 text-sm">14 Oct 2023</td>
+<td class="px-6 py-4 text-sm text-center font-semibold">6.0</td>
+<td class="px-6 py-4 text-sm text-right">$25.00</td>
+<td class="px-6 py-4 text-sm text-right font-bold">$150.00</td>
+<td class="px-6 py-4 text-center">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                    Procesada
+                                </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Footer Summary -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Total Horas Trabajador</p>
+<div class="flex items-baseline gap-2">
+<span class="text-2xl font-bold">18.5</span>
+<span class="text-sm text-slate-400">horas</span>
+</div>
+<p class="text-[10px] text-slate-400 mt-2 italic">Basado en el filtro actual</p>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Total General Periodo</p>
+<div class="flex items-baseline gap-2 text-primary">
+<span class="text-2xl font-bold">142.0</span>
+<span class="text-sm font-semibold uppercase">horas</span>
+</div>
+<p class="text-[10px] text-slate-400 mt-2">Suma total de todos los trabajadores</p>
+</div>
+<div class="bg-primary p-6 rounded-xl shadow-lg text-white">
+<p class="text-xs font-bold text-white/70 uppercase tracking-widest mb-1">Monto Total a Liquidar</p>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-black">$3,550.00</span>
+</div>
+<div class="mt-4 flex items-center gap-2 text-xs font-medium bg-white/20 w-fit px-2 py-1 rounded">
+<span class="material-symbols-outlined text-sm">payments</span>
+                        Pago listo para aprobación
+                    </div>
+</div>
+</section>
+</div>
+</main>
+</div>
+</body></html>

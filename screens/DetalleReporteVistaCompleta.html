@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            border-top: 1px solid #e2e8f0;
+            border-left: 1px solid #e2e8f0;
+        }
+        .calendar-day {
+            min-height: 140px;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 8px;
+        }
+        .task-bar {
+            height: 24px;
+            font-size: 11px;
+            margin-bottom: 2px;
+            padding: 0 6px;
+            display: flex;
+            align-items: center;
+            border-radius: 4px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
+<div class="flex min-h-screen overflow-hidden">
+<aside class="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0">
+<div class="p-6">
+<h1 class="text-primary text-xl font-bold flex items-center gap-2">
+<span class="material-symbols-outlined">analytics</span>
+                    Gestión
+                </h1>
+<p class="text-slate-500 text-xs mt-1 uppercase tracking-widest font-semibold">Admin Panel</p>
+</div>
+<nav class="flex-1 px-4 space-y-1 overflow-y-auto">
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-sm font-medium">Tablero</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 bg-primary/10 text-primary rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1">bar_chart_4_bars</span>
+<span class="text-sm font-medium">Reportes</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="text-sm font-medium">Liquidaciones</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">verified_user</span>
+<span class="text-sm font-medium">Aseguradoras</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">engineering</span>
+<span class="text-sm font-medium">Trabajadores</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">manage_accounts</span>
+<span class="text-sm font-medium">Usuarios</span>
+</a>
+<div class="pt-4 pb-2">
+<p class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sistema</p>
+</div>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">database</span>
+<span class="text-sm font-medium">Compactar BD</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">person_add</span>
+<span class="text-sm font-medium">Roles Management</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">key</span>
+<span class="text-sm font-medium">Permissions</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">shield</span>
+<span class="text-sm font-medium">RBAC Dashboard</span>
+</a>
+</nav>
+<div class="p-4 border-t border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">JD</div>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-semibold truncate">Juan Delgado</p>
+<p class="text-xs text-slate-500 truncate">Administrador</p>
+</div>
+</div>
+</div>
+</aside>
+<main class="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark">
+<header class="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-6 shrink-0">
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm font-medium">
+                        Técnico <span class="material-symbols-outlined text-sm">expand_more</span>
+</button>
+<button class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm font-medium">
+                        Cliente <span class="material-symbols-outlined text-sm">expand_more</span>
+</button>
+<button class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm font-medium">
+                        Estado <span class="material-symbols-outlined text-sm">expand_more</span>
+</button>
+<button class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm font-medium">
+                        Aseguradora <span class="material-symbols-outlined text-sm">expand_more</span>
+</button>
+</div>
+<div class="flex items-center gap-2">
+<button class="flex items-center gap-2 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+<span class="material-symbols-outlined text-lg">picture_as_pdf</span>
+                        PDF
+                    </button>
+<button class="flex items-center gap-2 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+<span class="material-symbols-outlined text-lg">description</span>
+                        Excel
+                    </button>
+</div>
+</header>
+<div class="flex-1 flex overflow-hidden">
+<div class="flex-1 overflow-y-auto p-6 scrollbar-hide">
+<div class="flex items-center justify-between mb-6">
+<h2 class="text-2xl font-bold flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">calendar_month</span>
+                            Octubre 2023
+                        </h2>
+<div class="flex bg-white dark:bg-slate-800 p-1 rounded-xl shadow-sm">
+<button class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="px-4 text-sm font-bold border-x border-slate-100 dark:border-slate-700">Hoy</button>
+<button class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+<div class="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800">
+<div class="py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">Dom</div>
+<div class="py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">Lun</div>
+<div class="py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">Mar</div>
+<div class="py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">Mie</div>
+<div class="py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">Jue</div>
+<div class="py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">Vie</div>
+<div class="py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">Sab</div>
+</div>
+<div class="calendar-grid">
+<!-- Empty cells -->
+<div class="calendar-day bg-slate-50/50 dark:bg-slate-950/20"></div>
+<div class="calendar-day bg-slate-50/50 dark:bg-slate-950/20"></div>
+<!-- Day 1 -->
+<div class="calendar-day group">
+<span class="text-sm font-bold text-slate-400">1</span>
+<div class="mt-2 space-y-1">
+<div class="task-bar bg-blue-500 text-white">#9928 - Fugas Agua</div>
+<div class="task-bar bg-emerald-500 text-white">#8821 - Instalación</div>
+<div class="task-bar bg-amber-500 text-white">#7712 - Revisión</div>
+</div>
+</div>
+<div class="calendar-day group">
+<span class="text-sm font-bold text-slate-400">2</span>
+<div class="mt-2 space-y-1">
+<div class="task-bar bg-rose-500 text-white font-bold border-l-4 border-rose-800">#1022 - EMERGENCIA</div>
+<div class="task-bar bg-blue-500 text-white">#9930 - Mantenimiento</div>
+</div>
+</div>
+<div class="calendar-day group">
+<span class="text-sm font-bold text-slate-400">3</span>
+<div class="mt-2 space-y-1">
+<div class="task-bar bg-purple-500 text-white">#9122 - Pintura</div>
+<div class="task-bar bg-emerald-500 text-white">#8825 - Electricidad</div>
+<div class="task-bar bg-slate-500 text-white">#6621 - Cerrado</div>
+<div class="task-bar bg-slate-500 text-white">#6622 - Cerrado</div>
+</div>
+</div>
+<div class="calendar-day group">
+<span class="text-sm font-bold text-slate-400">4</span>
+<div class="mt-2 space-y-1">
+<div class="task-bar bg-primary text-white border-2 border-primary/50 shadow-md">#4412 - Activo</div>
+</div>
+</div>
+<div class="calendar-day group">
+<span class="text-sm font-bold text-slate-400">5</span>
+<div class="mt-2 space-y-1">
+<div class="task-bar bg-amber-500 text-white">#7715 - Gas</div>
+<div class="task-bar bg-blue-500 text-white">#9935 - Fontanería</div>
+<div class="task-bar bg-blue-500 text-white">#9936 - Fontanería</div>
+</div>
+</div>
+<!-- Next Row -->
+<div class="calendar-day group">
+<span class="text-sm font-bold text-slate-400">6</span>
+<div class="mt-2 space-y-1">
+<div class="task-bar bg-emerald-500 text-white">#8830 - Solar</div>
+</div>
+</div>
+<div class="calendar-day group ring-2 ring-primary ring-inset bg-primary/5">
+<span class="text-sm font-bold text-primary">7</span>
+<div class="mt-2 space-y-1">
+<div class="task-bar bg-rose-500 text-white">#1035 - Gasolinería</div>
+<div class="task-bar bg-primary text-white font-bold shadow-lg">#2210 - Reporte Actual</div>
+<div class="task-bar bg-emerald-500 text-white">#8835 - AC</div>
+<div class="task-bar bg-amber-500 text-white">#7720 - Techos</div>
+<div class="task-bar bg-blue-500 text-white">#9940 - Purgado</div>
+</div>
+</div>
+<div class="calendar-day group"><span class="text-sm font-bold text-slate-400">8</span></div>
+<div class="calendar-day group"><span class="text-sm font-bold text-slate-400">9</span></div>
+<div class="calendar-day group"><span class="text-sm font-bold text-slate-400">10</span></div>
+<div class="calendar-day group"><span class="text-sm font-bold text-slate-400">11</span></div>
+<div class="calendar-day group"><span class="text-sm font-bold text-slate-400">12</span></div>
+<!-- Rows continues... -->
+</div>
+</div>
+</div>
+<!-- Right Details Panel -->
+<div class="w-[480px] border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0">
+<div class="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+<div>
+<p class="text-xs font-bold text-primary uppercase tracking-widest">Detalle del Reporte</p>
+<h3 class="text-xl font-bold">#2210-2023-OCT</h3>
+</div>
+<button class="size-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-hide">
+<!-- Client Info -->
+<section>
+<h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Información del Cliente</h4>
+<div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl space-y-3">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-slate-400">person</span>
+<div>
+<p class="text-sm font-bold">Constructora Alianza S.A.</p>
+<p class="text-xs text-slate-500">Roberto Carlos Méndez</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400">call</span>
+<p class="text-sm">+34 612 345 678</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400">mail</span>
+<p class="text-sm">contacto@alianza.com</p>
+</div>
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-slate-400">location_on</span>
+<p class="text-sm">Av. Diagonal 452, Planta 4, Barcelona</p>
+</div>
+</div>
+</section>
+<!-- Intervention History -->
+<section>
+<div class="flex items-center justify-between mb-4">
+<h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Historial de Intervención</h4>
+<span class="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded">EN PROCESO</span>
+</div>
+<div class="space-y-4">
+<p class="text-sm font-medium text-slate-600 dark:text-slate-300">Evidencia Fotográfica</p>
+<div class="grid grid-cols-2 gap-3">
+<div class="relative group">
+<img class="w-full h-32 object-cover rounded-lg" data-alt="Tubería dañada antes de reparación" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1iW8HODIiXVhgvNZ1Hs_VVAGc_449DLkCDSHs8JmHmAhwGVdSfXVYR5yZEFx81ZDG1YU64NlR8xXTRJzrDjV81GfySgFypfqJpmfPC0VPZjCwk80CcAQ7E8Ab7TEqdqDmWAunv8IamP5PAg8CwewpUEKcJGOJNweH1Ht-DQnYjIzIcurm8jDnsjwRCpSM-EOuH13WFZOyt3PphD3jCkozCeQjRzlowNBzi38SubP7khOgFlyKCrUn6JRCEqWcZqpevdWnfJLNMNE"/>
+<div class="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-[10px] rounded">Antes</div>
+</div>
+<div class="relative group">
+<img class="w-full h-32 object-cover rounded-lg" data-alt="Tubería reparada nueva" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCR1VORcS309lDIOq8ou8LKKr5yjgZ4TSUrEOdBJ44y3A1UlYfq083IqS0vs4lPRugC1wElUIFgLFJhK1DahKpdt5dRKXHqLv6YI9MgHlB-6U1MA3erw03SqI0qNR7owaBPTiagftKAAwPUvLpf9VtwRqRgfS--jHFNoeDj8ly1ZTnMmSLGRLyOzcMMiMNsh3eiugqjBqvgkkHsrvcFCSkyNZ6PQitYUXInzamGtHKfCkOKPX3hnanWg9dcFb9W51IBCYkg8vJwZPw"/>
+<div class="absolute bottom-2 left-2 px-2 py-1 bg-primary text-white text-[10px] rounded">Después</div>
+</div>
+</div>
+<div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border-l-4 border-primary">
+<p class="text-xs font-bold text-slate-400 mb-2">Materiales Utilizados</p>
+<ul class="text-xs space-y-1 text-slate-600 dark:text-slate-300">
+<li class="flex justify-between"><span>Válvula de presión 3/4"</span> <span class="font-bold">2 unid.</span></li>
+<li class="flex justify-between"><span>Codo cobre 90°</span> <span class="font-bold">4 unid.</span></li>
+<li class="flex justify-between"><span>Sellador industrial</span> <span class="font-bold">1 bote</span></li>
+</ul>
+</div>
+</div>
+</section>
+<!-- Mano de Obra Summary Table -->
+<section>
+<h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Resumen Mano de Obra</h4>
+<div class="overflow-hidden border border-slate-200 dark:border-slate-800 rounded-xl">
+<table class="w-full text-left text-xs">
+<thead class="bg-slate-50 dark:bg-slate-800 text-slate-400">
+<tr>
+<th class="p-3 font-bold uppercase">Técnico</th>
+<th class="p-3 font-bold uppercase text-center">Horas</th>
+<th class="p-3 font-bold uppercase text-right">Acumulado</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+<tr>
+<td class="p-3">
+<div class="flex items-center gap-2">
+<img class="size-6 rounded-full object-cover" data-alt="Retrato de técnico especialista" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDselI9P6B5YYEbn7aotKfvSyl1-O4mzb0IFM-4TX2o9ymcGjIrb0crKFGV7-cV67R1YHJovuObumNz29uWB-XnZCYHjGtYq7KszlwZ95_7o0ZMwAb8eXwlleIZ922QWJEVccToNLavtx_vEc-aSezRV-9OnlN395aunv1UEpEyNwXktyDTRuWTTyONgA6xtUoGIB8Ho5VULoI_FqI6rKBzxwrLLHZ3NrJVveydsnpIh31DdJyHLhuYTT9CoNbdTZEGuqZwc1QM7wk"/>
+<span class="font-medium">Carlos R.</span>
+</div>
+</td>
+<td class="p-3 text-center">4.5h</td>
+<td class="p-3 text-right font-bold">12.0h</td>
+</tr>
+<tr>
+<td class="p-3">
+<div class="flex items-center gap-2">
+<img class="size-6 rounded-full object-cover" data-alt="Retrato de técnico asistente" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC4fxWll4JTuzgCMtTSZrCiZNlsSHCPT7HpadeQFrrg3_hbtvv98oXIoLIFHkDsl5RYexJ5xtXKeVD0QGJlhVXMT0QnHaguIiSgQBTciEcqo2QyymMOhjX6iMAparvCCE_ZSSw8_UTymT-pS5-2dchEzim3O-mCbJIQhJepIR0FYsqtMsoQ_NmEmoKdPnruMttsyd2bRTDP7mhhs98osPFk7qbGW8W3dLqSExd_EENrTGAmd6CGcwjup4KfeHayqUK7WJerlDEJj5Q"/>
+<span class="font-medium">Miguel S.</span>
+</div>
+</td>
+<td class="p-3 text-center">3.0h</td>
+<td class="p-3 text-right font-bold">8.5h</td>
+</tr>
+</tbody>
+<tfoot class="bg-primary/5">
+<tr>
+<td class="p-3 font-bold text-right text-primary" colspan="2">Total Horas:</td>
+<td class="p-3 text-right font-bold text-primary">20.5h</td>
+</tr>
+</tfoot>
+</table>
+</div>
+</section>
+<div class="grid grid-cols-2 gap-4">
+<button class="w-full py-3 bg-primary text-white rounded-xl font-bold text-sm shadow-lg shadow-primary/20 hover:opacity-90 transition-opacity">
+                                Aprobar Reporte
+                            </button>
+<button class="w-full py-3 border-2 border-slate-200 dark:border-slate-800 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                Solicitar Revisión
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

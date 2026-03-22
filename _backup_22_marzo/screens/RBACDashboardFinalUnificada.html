@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Panel de Control RBAC</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
+<div class="flex h-screen overflow-hidden">
+<!-- Sidebar -->
+<aside class="w-72 bg-white dark:bg-slate-900 border-r border-primary/10 flex flex-col h-full">
+<div class="p-6 flex flex-col gap-1 border-b border-primary/5">
+<h1 class="text-primary text-xl font-bold leading-normal flex items-center gap-2">
+<span class="material-symbols-outlined">admin_panel_settings</span>
+                    Gestión RBAC
+                </h1>
+<p class="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">Administración de Accesos</p>
+</div>
+<nav class="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1">
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-sm font-medium">Tablero</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">description</span>
+<span class="text-sm font-medium">Reportes</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="text-sm font-medium">Liquidaciones</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">verified_user</span>
+<span class="text-sm font-medium">Aseguradoras</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="text-sm font-medium">Trabajadores</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">account_circle</span>
+<span class="text-sm font-medium">Usuarios</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">database</span>
+<span class="text-sm font-medium">Compactar BD</span>
+</a>
+</div>
+<div class="mt-8">
+<p class="px-4 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Configuración</p>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">shield_person</span>
+<span class="text-sm font-medium">Roles Management</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">vpn_key</span>
+<span class="text-sm font-medium">Permissions</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-primary text-white shadow-md shadow-primary/20" href="#">
+<span class="material-symbols-outlined">lock_open</span>
+<span class="text-sm font-medium">RBAC Dashboard</span>
+</a>
+</div>
+</div>
+</nav>
+<div class="p-4 border-t border-primary/10 flex flex-col gap-3">
+<button class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary transition-colors w-full">
+<span class="material-symbols-outlined text-xl">settings</span>
+<span class="text-sm font-medium">Configuración</span>
+</button>
+<button class="bg-primary text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 transition-all">
+<span class="material-symbols-outlined text-lg">logout</span>
+                    Cerrar Sesión
+                </button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 overflow-y-auto p-8 lg:p-12">
+<div class="max-w-6xl mx-auto space-y-8">
+<!-- Header -->
+<div class="flex flex-col gap-2">
+<h2 class="text-slate-900 dark:text-white text-4xl font-black leading-tight tracking-tight">Panel de Control RBAC</h2>
+<p class="text-slate-500 dark:text-slate-400 text-lg font-normal">Asignación centralizada de roles y permisos específicos a usuarios</p>
+</div>
+<!-- Table Section -->
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-primary/10 shadow-sm overflow-hidden">
+<div class="p-6 border-b border-primary/10">
+<h3 class="text-slate-900 dark:text-white text-xl font-bold">Usuarios y sus Accesos</h3>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50 dark:bg-slate-800/50">
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Nombre</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Rol Actual</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Permisos Directos</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-primary/5">
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white">Juan Pérez</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">juan@empresa.com</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 text-xs font-bold bg-primary/10 text-primary rounded-full">Administrador</span>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex justify-end gap-1.5 flex-wrap">
+<span class="px-2 py-0.5 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded">Escritura</span>
+<span class="px-2 py-0.5 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded">Eliminar</span>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white">María García</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">maria@empresa.com</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 text-xs font-bold bg-green-500/10 text-green-600 rounded-full">Editor</span>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex justify-end gap-1.5 flex-wrap">
+<span class="px-2 py-0.5 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded">Publicar</span>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white">Carlos López</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">carlos@empresa.com</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 text-xs font-bold bg-amber-500/10 text-amber-600 rounded-full">Visualizador</span>
+</td>
+<td class="px-6 py-4 text-right">
+<span class="text-xs text-slate-400 italic">Ninguno</span>
+</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white">Ana Martínez</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">ana.m@empresa.com</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 text-xs font-bold bg-purple-500/10 text-purple-600 rounded-full">Gestor RH</span>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex justify-end gap-1.5 flex-wrap">
+<span class="px-2 py-0.5 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded">Audit</span>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Quick Actions Panel -->
+<div class="space-y-4">
+<h3 class="text-[#0d141b] dark:text-white text-xl font-bold">Acciones Rápidas</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Action Card 1: Assign Role -->
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-primary/10 shadow-sm flex flex-col gap-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+<span class="material-symbols-outlined">person_add</span>
+</div>
+<h4 class="font-bold text-slate-900 dark:text-white">Asignar Rol a Usuario</h4>
+</div>
+<div class="space-y-3">
+<div class="flex flex-col gap-1.5">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-tight">Usuario</label>
+<select class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all">
+<option>Seleccione un usuario...</option>
+<option>Juan Pérez</option>
+<option>María García</option>
+<option>Carlos López</option>
+</select>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-tight">Nuevo Rol</label>
+<select class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all">
+<option>Seleccione el rol...</option>
+<option>Administrador</option>
+<option>Editor</option>
+<option>Visualizador</option>
+<option>Soporte Técnico</option>
+</select>
+</div>
+<button class="w-full bg-primary text-white py-2.5 rounded-lg font-bold text-sm hover:shadow-lg hover:shadow-primary/20 transition-all mt-2">
+                                    Actualizar Rol
+                                </button>
+</div>
+</div>
+<!-- Action Card 2: Assign Specific Permission -->
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-primary/10 shadow-sm flex flex-col gap-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
+<span class="material-symbols-outlined">key_visualizer</span>
+</div>
+<h4 class="font-bold text-slate-900 dark:text-white">Asignar Permiso Específico</h4>
+</div>
+<div class="space-y-3">
+<div class="flex flex-col gap-1.5">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-tight">Usuario</label>
+<select class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all">
+<option>Seleccione un usuario...</option>
+<option>Juan Pérez</option>
+<option>María García</option>
+<option>Carlos López</option>
+</select>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-tight">Permiso (Excepción)</label>
+<select class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all">
+<option>Seleccione un permiso...</option>
+<option>Eliminar Registros</option>
+<option>Exportar Base de Datos</option>
+<option>Acceso a Logs Críticos</option>
+<option>Gestión de API</option>
+</select>
+</div>
+<button class="w-full bg-primary text-white py-2.5 rounded-lg font-bold text-sm hover:shadow-lg hover:shadow-primary/20 transition-all mt-2">
+                                    Otorgar Excepción
+                                </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

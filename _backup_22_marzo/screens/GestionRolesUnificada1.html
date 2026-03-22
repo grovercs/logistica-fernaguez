@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<title>Gestión de Roles - Sistema de Accesos</title>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
+<div class="flex min-h-screen">
+<!-- Side Navigation -->
+<aside class="w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col fixed h-full">
+<div class="p-6 flex items-center gap-3">
+<div class="bg-primary/10 p-2 rounded-lg">
+<span class="material-symbols-outlined text-primary text-2xl">shield_person</span>
+</div>
+<div>
+<h1 class="text-slate-900 dark:text-white font-bold text-lg leading-tight">Gestión Accesos</h1>
+<p class="text-slate-500 dark:text-slate-400 text-xs">Administrador del Sistema</p>
+</div>
+</div>
+<nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">dashboard</span>
+<span class="text-sm font-medium">Tablero</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">description</span>
+<span class="text-sm font-medium">Reportes</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">account_balance_wallet</span>
+<span class="text-sm font-medium">Liquidaciones</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">verified_user</span>
+<span class="text-sm font-medium">Aseguradoras</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">groups</span>
+<span class="text-sm font-medium">Trabajadores</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">person_search</span>
+<span class="text-sm font-medium">Usuarios</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">database</span>
+<span class="text-sm font-medium">Compactar BD</span>
+</a>
+<div class="pt-4 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3">Configuración de Seguridad</div>
+<a class="flex items-center gap-3 px-3 py-2 bg-primary text-white rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">security</span>
+<span class="text-sm font-medium">Roles Management</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">key</span>
+<span class="text-sm font-medium">Permissions</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">admin_panel_settings</span>
+<span class="text-sm font-medium">RBAC Dashboard</span>
+</a>
+</nav>
+<div class="p-4 border-t border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+<div class="size-10 rounded-full bg-slate-300 overflow-hidden">
+<img alt="User" data-alt="Avatar de perfil de un administrador sonriente" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAeid4AB1nXOtHpK_ca9kxladIhUYBODcBqmpVuCnGqoxqtO8ZnAcuIG4drjVPSpRafmPR0A568qQ6QnbFzPeZxI0SKmtZ_bmye9qlEsHhl11NEVxFSb1LDWoSzkmdqex_T7u-6j6K-ZZWpqDtz3G2qy5m_X7ZM8ljEEmsWjtZd-cnY34wtIBQbzCADtaFku41OoxHCDjg_RvwLlXxZh63F9KAGmiwtSDgPwnwG6FznUyQ-5_N0TUnBJqN_kBYdJ-x7hG_zkfF2CvI"/>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-bold truncate">Juan Pérez</p>
+<p class="text-[10px] text-slate-500 truncate">Soporte Técnico</p>
+</div>
+<span class="material-symbols-outlined text-slate-400 text-sm">logout</span>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 ml-72">
+<!-- Header -->
+<header class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800 px-8 py-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<h2 class="text-xl font-bold">Gestión de Roles</h2>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden md:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+<input class="bg-slate-100 dark:bg-slate-800 border-none rounded-lg pl-10 pr-4 py-2 text-sm w-64 focus:ring-2 focus:ring-primary transition-all" placeholder="Buscar permisos o roles..." type="text"/>
+</div>
+<button class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 relative transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 size-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>
+</button>
+</div>
+</div>
+</header>
+<div class="p-8">
+<!-- Hero Section -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+<div>
+<h3 class="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">Configuración de Niveles de Acceso</h3>
+<p class="text-slate-500 dark:text-slate-400 mt-2 max-w-2xl text-lg leading-relaxed">
+                            Define y administra los roles de seguridad de la plataforma. Configura permisos específicos para asegurar que cada usuario tenga acceso únicamente a lo que necesita.
+                        </p>
+</div>
+<button class="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-primary/25 transition-all active:scale-95 whitespace-nowrap">
+<span class="material-symbols-outlined">add</span>
+<span>Añadir Nuevo Rol</span>
+</button>
+</div>
+<!-- Roles Table Card -->
+<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Rol</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Descripción</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Permisos Clave</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Usuarios</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+<!-- Administrador -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-lg bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 flex items-center justify-center">
+<span class="material-symbols-outlined text-xl">workspace_premium</span>
+</div>
+<span class="font-bold text-slate-900 dark:text-white">Administrador</span>
+</div>
+</td>
+<td class="px-6 py-5 text-sm text-slate-600 dark:text-slate-400">Control total sobre todos los módulos, ajustes y bases de datos.</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+                                            Acceso Maestro
+                                        </span>
+</td>
+<td class="px-6 py-5 text-sm font-medium">5 usuarios</td>
+<td class="px-6 py-5 text-right">
+<div class="flex justify-end gap-2">
+<button class="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Editar">
+<span class="material-symbols-outlined text-sm">edit</span>
+</button>
+<button class="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Configurar">
+<span class="material-symbols-outlined text-sm">settings</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Editor -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+<span class="material-symbols-outlined text-xl">edit_note</span>
+</div>
+<span class="font-bold text-slate-900 dark:text-white">Editor</span>
+</div>
+</td>
+<td class="px-6 py-5 text-sm text-slate-600 dark:text-slate-400">Puede crear, modificar y eliminar registros en liquidaciones y reportes.</td>
+<td class="px-6 py-5 flex flex-wrap gap-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">LECTURA</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">ESCRITURA</span>
+</td>
+<td class="px-6 py-5 text-sm font-medium">12 usuarios</td>
+<td class="px-6 py-5 text-right">
+<div class="flex justify-end gap-2">
+<button class="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Editar">
+<span class="material-symbols-outlined text-sm">edit</span>
+</button>
+<button class="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Configurar">
+<span class="material-symbols-outlined text-sm">settings</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Visualizador -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+<span class="material-symbols-outlined text-xl">visibility</span>
+</div>
+<span class="font-bold text-slate-900 dark:text-white">Visualizador</span>
+</div>
+</td>
+<td class="px-6 py-5 text-sm text-slate-600 dark:text-slate-400">Acceso restringido únicamente para consulta de reportes y tableros.</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">SOLO LECTURA</span>
+</td>
+<td class="px-6 py-5 text-sm font-medium">8 usuarios</td>
+<td class="px-6 py-5 text-right">
+<div class="flex justify-end gap-2">
+<button class="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Editar">
+<span class="material-symbols-outlined text-sm">edit</span>
+</button>
+<button class="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Configurar">
+<span class="material-symbols-outlined text-sm">settings</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Trabajador -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors border-none">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+<span class="material-symbols-outlined text-xl">engineering</span>
+</div>
+<span class="font-bold text-slate-900 dark:text-white">Trabajador</span>
+</div>
+</td>
+<td class="px-6 py-5 text-sm text-slate-600 dark:text-slate-400">Acceso a perfil propio, marcaciones y gestión de tareas personales.</td>
+<td class="px-6 py-5 flex flex-wrap gap-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">TAREAS</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">MI PERFIL</span>
+</td>
+<td class="px-6 py-5 text-sm font-medium">45 usuarios</td>
+<td class="px-6 py-5 text-right">
+<div class="flex justify-end gap-2">
+<button class="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Editar">
+<span class="material-symbols-outlined text-sm">edit</span>
+</button>
+<button class="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Configurar">
+<span class="material-symbols-outlined text-sm">settings</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Stats/Capabilities Summary -->
+<div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-primary/5 dark:bg-primary/10 border border-primary/20 p-6 rounded-2xl">
+<div class="flex items-center gap-3 text-primary mb-3">
+<span class="material-symbols-outlined">rule</span>
+<h4 class="font-bold">Jerarquía de Roles</h4>
+</div>
+<p class="text-sm text-slate-600 dark:text-slate-400">El sistema utiliza una estructura de herencia. Los roles superiores incluyen automáticamente los permisos de los inferiores.</p>
+</div>
+<div class="bg-slate-900 dark:bg-slate-800 text-white p-6 rounded-2xl">
+<div class="flex items-center gap-3 mb-3 text-primary">
+<span class="material-symbols-outlined">security_update_good</span>
+<h4 class="font-bold">Seguridad RBAC</h4>
+</div>
+<p class="text-sm text-slate-300">Control de Acceso Basado en Roles (RBAC) activo. Actualmente auditando 124 acciones diferentes en el sistema.</p>
+</div>
+<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl">
+<div class="flex items-center gap-3 text-emerald-500 mb-3">
+<span class="material-symbols-outlined">analytics</span>
+<h4 class="font-bold">Métricas de Uso</h4>
+</div>
+<p class="text-sm text-slate-600 dark:text-slate-400">70 usuarios activos hoy distribuidos en los 4 roles principales sin incidencias reportadas.</p>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

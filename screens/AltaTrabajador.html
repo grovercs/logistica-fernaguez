@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<title>Gestión de Trabajadores - ERP</title>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased">
+<div class="flex min-h-screen overflow-hidden">
+<!-- SideNavBar -->
+<aside class="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark overflow-y-auto">
+<div class="p-6">
+<h1 class="text-primary text-xl font-bold tracking-tight">Gestión ERP</h1>
+<p class="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider mt-1">Administrador</p>
+</div>
+<nav class="flex flex-col gap-1 px-3">
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-sm font-medium">Tablero</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="text-sm font-medium">Reportes</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="text-sm font-medium">Liquidaciones</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">security</span>
+<span class="text-sm font-medium">Aseguradoras</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 bg-primary/10 text-primary rounded-lg" href="#">
+<span class="material-symbols-outlined">engineering</span>
+<span class="text-sm font-bold">Trabajadores</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="text-sm font-medium">Usuarios</span>
+</a>
+<div class="h-px bg-slate-200 dark:bg-slate-800 my-2 mx-3"></div>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">database</span>
+<span class="text-sm font-medium">Compactar BD</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">tune</span>
+<span class="text-sm font-medium">Roles Management</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">key</span>
+<span class="text-sm font-medium">Permissions</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">admin_panel_settings</span>
+<span class="text-sm font-medium">RBAC Dashboard</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto relative">
+<header class="p-8 flex justify-between items-center bg-white dark:bg-background-dark border-b border-slate-200 dark:border-slate-800">
+<div>
+<h2 class="text-2xl font-bold">Listado de Trabajadores</h2>
+<p class="text-slate-500 text-sm">Gestiona la plantilla de operarios y sus especialidades</p>
+</div>
+<button class="bg-primary text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined">add</span>
+                Nuevo Trabajador
+            </button>
+</header>
+<!-- Mock Background Table Content -->
+<div class="p-8">
+<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+<table class="w-full text-left">
+<thead class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+<tr>
+<th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Nombre</th>
+<th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">DNI</th>
+<th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Especialidad</th>
+<th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Estado</th>
+<th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+<td class="px-6 py-4 whitespace-nowrap">Carlos Ruiz Ortiz</td>
+<td class="px-6 py-4 whitespace-nowrap">45678912K</td>
+<td class="px-6 py-4 whitespace-nowrap">Fontanería</td>
+<td class="px-6 py-4 whitespace-nowrap"><span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-medium uppercase">Activo</span></td>
+<td class="px-6 py-4 whitespace-nowrap text-primary"><span class="material-symbols-outlined cursor-pointer">edit</span></td>
+</tr>
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+<td class="px-6 py-4 whitespace-nowrap">Marta García López</td>
+<td class="px-6 py-4 whitespace-nowrap">78901234S</td>
+<td class="px-6 py-4 whitespace-nowrap">Electricidad</td>
+<td class="px-6 py-4 whitespace-nowrap"><span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-medium uppercase">Activo</span></td>
+<td class="px-6 py-4 whitespace-nowrap text-primary"><span class="material-symbols-outlined cursor-pointer">edit</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- MODAL OVERLAY -->
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+<!-- Modal Container -->
+<div class="bg-white dark:bg-background-dark w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden animate-fade-in-up">
+<!-- Modal Header -->
+<div class="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+<div>
+<h3 class="text-xl font-bold text-slate-900 dark:text-slate-100">Alta de Nuevo Trabajador</h3>
+<p class="text-slate-500 dark:text-slate-400 text-sm">Introduzca los datos para el registro en el sistema</p>
+</div>
+<button class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Modal Body (Form) -->
+<form class="p-6">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Profile Photo Section -->
+<div class="col-span-full flex items-center gap-6 pb-2">
+<div class="relative group">
+<div class="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden border-2 border-dashed border-slate-300 dark:border-slate-700">
+<span class="material-symbols-outlined text-3xl text-slate-400">person_add</span>
+</div>
+<button class="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full shadow-lg hover:scale-110 transition-transform" type="button">
+<span class="material-symbols-outlined text-xs">photo_camera</span>
+</button>
+</div>
+<div>
+<p class="text-sm font-semibold text-slate-900 dark:text-slate-100">Foto de Perfil</p>
+<p class="text-xs text-slate-500">JPG, PNG o GIF. Máx 5MB</p>
+</div>
+</div>
+<!-- Full Name -->
+<div class="flex flex-col gap-1.5">
+<label class="text-sm font-medium text-slate-700 dark:text-slate-300">Nombre completo</label>
+<input class="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-400" placeholder="Ej. Juan Pérez" type="text"/>
+</div>
+<!-- ID / DNI -->
+<div class="flex flex-col gap-1.5">
+<label class="text-sm font-medium text-slate-700 dark:text-slate-300">DNI/NIE</label>
+<input class="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-400" placeholder="12345678X" type="text"/>
+</div>
+<!-- Speciality -->
+<div class="flex flex-col gap-1.5">
+<label class="text-sm font-medium text-slate-700 dark:text-slate-300">Especialidad</label>
+<select class="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300">
+<option value="">Seleccione especialidad</option>
+<option value="fontaneria">Fontanería</option>
+<option value="electricidad">Electricidad</option>
+<option value="albanileria">Albañilería</option>
+<option value="pintura">Pintura</option>
+<option value="carpinteria">Carpintería</option>
+<option value="climatizacion">Climatización</option>
+</select>
+</div>
+<!-- Phone -->
+<div class="flex flex-col gap-1.5">
+<label class="text-sm font-medium text-slate-700 dark:text-slate-300">Teléfono de contacto</label>
+<input class="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-400" placeholder="+34 600 000 000" type="tel"/>
+</div>
+<!-- Email -->
+<div class="flex flex-col gap-1.5">
+<label class="text-sm font-medium text-slate-700 dark:text-slate-300">Correo Electrónico</label>
+<input class="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-400" placeholder="ejemplo@empresa.com" type="email"/>
+</div>
+<!-- Join Date -->
+<div class="flex flex-col gap-1.5">
+<label class="text-sm font-medium text-slate-700 dark:text-slate-300">Fecha de incorporación</label>
+<div class="relative">
+<input class="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300" type="date"/>
+</div>
+</div>
+</div>
+<!-- Modal Footer -->
+<div class="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3">
+<button class="px-6 py-2.5 rounded-lg font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" type="button">
+                            Cancelar
+                        </button>
+<button class="px-6 py-2.5 rounded-lg font-bold bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all" type="submit">
+                            Guardar Trabajador
+                        </button>
+</div>
+</form>
+</div>
+</div>
+</main>
+</div>
+</body></html>
