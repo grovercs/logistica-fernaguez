@@ -19,7 +19,8 @@ export default function EditarTrabajadorModal({ isOpen, onClose, onUpdated, trab
       telefono: '',
       email: '',
       fecha_incorporacion: '',
-      estado: ''
+      estado: '',
+      tarifa_hora: ''
   });
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +34,8 @@ export default function EditarTrabajadorModal({ isOpen, onClose, onUpdated, trab
              telefono: trabajadorData.telefono || '',
              email: trabajadorData.email || '',
              fecha_incorporacion: trabajadorData.fecha_incorporacion || '',
-             estado: trabajadorData.estado || 'Disponible'
+             estado: trabajadorData.estado || 'Disponible',
+             tarifa_hora: trabajadorData.tarifa_hora?.toString() || ''
          });
          setShowNewSpecInput(false);
      }
@@ -64,6 +66,14 @@ export default function EditarTrabajadorModal({ isOpen, onClose, onUpdated, trab
               estado: formData.estado
           })
           .eq('id', trabajadorData.id);
+
+      // Also update tarifa_hora on perfiles if there's a linked user
+      if (!error && trabajadorData.auth_user_id) {
+          await supabase
+              .from('perfiles')
+              .update({ tarifa_hora: parseFloat(formData.tarifa_hora) || 0 })
+              .eq('id', trabajadorData.auth_user_id);
+      }
 
       setLoading(false);
       if (!error) {
@@ -232,6 +242,23 @@ export default function EditarTrabajadorModal({ isOpen, onClose, onUpdated, trab
                    onChange={(e) => setFormData({...formData, fecha_incorporacion: e.target.value})}
                 />
               </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5 col-span-full">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tarifa €/hora (Liquidaciones)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span>
+                <input
+                   className="w-full pl-8 pr-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-slate-700 dark:text-slate-300 font-medium"
+                   type="number"
+                   min="0"
+                   step="0.5"
+                   placeholder="0.00"
+                   value={formData.tarifa_hora}
+                   onChange={(e) => setFormData({...formData, tarifa_hora: e.target.value})}
+                />
+              </div>
+              <p className="text-[11px] text-slate-400">Se usa en Liquidaciones para calcular el coste de mano de obra. Si el trabajador no tiene usuario vinculado en el sistema, este valor no se aplicará automáticamente.</p>
             </div>
             
           </div>
