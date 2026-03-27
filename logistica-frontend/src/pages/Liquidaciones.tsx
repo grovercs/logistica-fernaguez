@@ -51,26 +51,43 @@ export default function Liquidaciones() {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+
+    // Fetch reportes with ordenes join (this works fine)
+    const { data: reportesData, error: repErr } = await supabase
       .from('reportes')
-      .select(`
-        id, orden_id, tecnico_id, horas_trabajadas, creado_en, estado_liquidacion,
-        ordenes(id_legible, cliente, estado),
-        perfiles(nombre_completo, tarifa_hora)
-      `)
+      .select('id, orden_id, tecnico_id, horas_trabajadas, creado_en, estado_liquidacion, ordenes(id_legible, cliente, estado)')
       .order('creado_en', { ascending: false });
 
-    if (!error && data) {
-      setReportes(data as any);
-      // Build perfiles map for worker filter dropdown
+    // Fetch all perfiles separately (Supabase doesn't recognize tecnico_id FK to perfiles)
+    const { data: perfilesData } = await supabase
+      .from('perfiles')
+      .select('id, nombre_completo, tarifa_hora');
+
+    if (!repErr && reportesData && perfilesData) {
+      // Build perfiles lookup map by id
+      const perfilesLookup: Record<string, { nombre_completo: string; tarifa_hora: number }> = {};
+      perfilesData.forEach((p: any) => {
+        perfilesLookup[p.id] = { nombre_completo: p.nombre_completo, tarifa_hora: p.tarifa_hora || 0 };
+      });
+
+      // Merge perfiles into reportes
+      const merged = (reportesData as any[]).map((r: any) => ({
+        ...r,
+        perfiles: perfilesLookup[r.tecnico_id] || null,
+      }));
+
+      setReportes(merged as Reporte[]);
+
+      // Build worker filter dropdown map
       const map: Record<string, { nombre: string; tarifa: number }> = {};
-      (data as any[]).forEach((r: any) => {
+      merged.forEach(r => {
         if (r.tecnico_id && r.perfiles?.nombre_completo) {
           map[r.tecnico_id] = { nombre: r.perfiles.nombre_completo, tarifa: r.perfiles.tarifa_hora || 0 };
         }
       });
       setPerfilesMap(map);
     }
+
     setLoading(false);
   };
 
@@ -230,7 +247,7 @@ export default function Liquidaciones() {
               <input value={obraFilter} onChange={e => setObraFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none" placeholder="Ej: OT-2023-0041" type="text" />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estado</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estado Pago</label>
               <select value={estadoFilter} onChange={e => setEstadoFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none">
                 <option value="">Todos</option>
                 <option value="Pendiente">Pendiente</option>
