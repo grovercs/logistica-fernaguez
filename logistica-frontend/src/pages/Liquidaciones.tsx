@@ -52,10 +52,9 @@ export default function Liquidaciones() {
   const fetchData = async () => {
     setLoading(true);
 
-    // Fetch reportes with ordenes join (this works fine)
     const { data: reportesData, error: repErr } = await supabase
       .from('reportes')
-      .select('id, orden_id, tecnico_id, horas_trabajadas, creado_en, estado_liquidacion, ordenes(id_legible, cliente, estado)')
+      .select('id, orden_id, tecnico_id, horas_trabajadas, creado_en, estado_liquidacion, ordenes!inner(id_legible, cliente, estado)')
       .order('creado_en', { ascending: false });
 
     // Fetch all perfiles separately (Supabase doesn't recognize tecnico_id FK to perfiles)

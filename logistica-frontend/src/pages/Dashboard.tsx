@@ -1,30 +1,91 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import NuevoReporteModal from '../components/modals/NuevoReporteModal';
 
 export default function Dashboard() {
   const [ordenes, setOrdenes] = useState<any[]>([]);
+  const [counts, setCounts] = useState({ pendientes: 0, enCurso: 0, finalizadas: 0 });
+  const [weeklyActivity, setWeeklyActivity] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
+  const [dailyAgenda, setDailyAgenda] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchOrdenes();
+    fetchAll();
   }, []);
 
+  const fetchAll = async () => {
+    setLoading(true);
+    await Promise.all([
+      fetchOrdenes(),
+      fetchStats(),
+      fetchWeeklyActivity(),
+      fetchDailyAgenda()
+    ]);
+    setLoading(false);
+  };
+
   const fetchOrdenes = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('ordenes')
       .select('*')
+      .neq('estado', 'Archivado')
       .order('creado_en', { ascending: false })
       .limit(5);
 
-    if (error) {
-      console.error('Error fetching orders:', error);
-    } else {
-      setOrdenes(data || []);
+    setOrdenes(data || []);
+  };
+
+  const fetchStats = async () => {
+    const { data } = await supabase
+      .from('ordenes')
+      .select('estado')
+      .neq('estado', 'Archivado');
+
+    if (data) {
+      const stats = {
+        pendientes: data.filter(o => o.estado === 'Pendiente' || o.estado === 'Urgente').length,
+        enCurso: data.filter(o => o.estado === 'En Curso' || o.estado === 'En revisión' || o.estado === 'Pendiente de firma').length,
+        finalizadas: data.filter(o => o.estado === 'Finalizada').length
+      };
+      setCounts(stats);
     }
-    setLoading(false);
+  };
+
+  const fetchWeeklyActivity = async () => {
+    // Get last 7 days of completed orders
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+
+    const { data } = await supabase
+      .from('ordenes')
+      .select('creado_en')
+      .gte('creado_en', sevenDaysAgo.toISOString());
+
+    if (data) {
+      const countsPerDay = [0, 0, 0, 0, 0, 0, 0];
+      data.forEach(o => {
+        const d = new Date(o.creado_en).getDay(); 
+        // Sunday is 0, Mon is 1... Adjust to Mon-Sun (0-6)
+        const dayIdx = d === 0 ? 6 : d - 1;
+        countsPerDay[dayIdx]++;
+      });
+      setWeeklyActivity(countsPerDay);
+    }
+  };
+
+  const fetchDailyAgenda = async () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const { data } = await supabase
+      .from('reportes')
+      .select('*, perfiles(nombre_completo), ordenes(id_legible, cliente, estado)')
+      .eq('fecha_trabajo', todayStr)
+      .limit(5);
+    
+    setDailyAgenda(data || []);
   };
 
   return (
@@ -55,10 +116,8 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Pendientes</p>
-              <p className="text-2xl font-bold">12</p>
-              <p className="text-xs text-green-600 font-medium flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs">trending_up</span> +5% hoy
-              </p>
+              <p className="text-2xl font-bold">{loading ? '...' : counts.pendientes}</p>
+              <p className="text-xs text-slate-400 font-medium">Requieren atención</p>
             </div>
           </div>
           <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
@@ -67,8 +126,8 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">En Proceso</p>
-              <p className="text-2xl font-bold">8</p>
-              <p className="text-xs text-slate-500 font-medium">Sin cambios hoy</p>
+              <p className="text-2xl font-bold">{loading ? '...' : counts.enCurso}</p>
+              <p className="text-xs text-slate-400 font-medium">Intervenciones activas</p>
             </div>
           </div>
           <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
@@ -77,9 +136,9 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Finalizadas</p>
-              <p className="text-2xl font-bold">25</p>
+              <p className="text-2xl font-bold">{loading ? '...' : counts.finalizadas}</p>
               <p className="text-xs text-green-600 font-medium flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs">trending_up</span> +10% hoy
+                <span className="material-symbols-outlined text-xs">done_all</span> Listas para cierre
               </p>
             </div>
           </div>
@@ -93,53 +152,28 @@ export default function Dashboard() {
               <div className="flex items-center justify-between mb-8">
                 <div>
                   <h3 className="text-base font-bold">Actividad Semanal</h3>
-                  <p className="text-xs text-slate-500">Órdenes completadas los últimos 7 días</p>
+                  <p className="text-xs text-slate-500">Órdenes creadas en los últimos 7 días</p>
                 </div>
-                <span className="text-sm font-bold text-primary">145 Órdenes</span>
+                <span className="text-sm font-bold text-primary">{weeklyActivity.reduce((a: number, b: number) => a + b, 0)} Registros</span>
               </div>
               <div className="flex items-end justify-between h-40 gap-2 px-2">
-                <div className="flex-1 flex flex-col items-center gap-2 group">
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
-                    <div className="w-full bg-primary/40 group-hover:bg-primary transition-all" style={{ height: '40%' }}></div>
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-500">Lun</span>
-                </div>
-                <div className="flex-1 flex flex-col items-center gap-2 group">
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
-                    <div className="w-full bg-primary/40 group-hover:bg-primary transition-all" style={{ height: '90%' }}></div>
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-500">Mar</span>
-                </div>
-                <div className="flex-1 flex flex-col items-center gap-2 group">
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
-                    <div className="w-full bg-primary/40 group-hover:bg-primary transition-all" style={{ height: '25%' }}></div>
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-500">Mié</span>
-                </div>
-                <div className="flex-1 flex flex-col items-center gap-2 group">
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
-                    <div className="w-full bg-primary/40 group-hover:bg-primary transition-all" style={{ height: '80%' }}></div>
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-500">Jue</span>
-                </div>
-                <div className="flex-1 flex flex-col items-center gap-2 group">
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
-                    <div className="w-full bg-primary/40 group-hover:bg-primary transition-all" style={{ height: '70%' }}></div>
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-500">Vie</span>
-                </div>
-                <div className="flex-1 flex flex-col items-center gap-2 group">
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
-                    <div className="w-full bg-primary/40 group-hover:bg-primary transition-all" style={{ height: '95%' }}></div>
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-500">Sáb</span>
-                </div>
-                <div className="flex-1 flex flex-col items-center gap-2 group">
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
-                    <div className="w-full bg-primary/40 group-hover:bg-primary transition-all" style={{ height: '60%' }}></div>
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-500">Dom</span>
-                </div>
+                {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day, i) => {
+                  const val = weeklyActivity[i];
+                  const max = Math.max(...weeklyActivity, 1);
+                  const height = (val / max) * 100;
+                  return (
+                    <div key={day} className="flex-1 flex flex-col items-center gap-2 group">
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
+                        <div 
+                           className="w-full bg-primary/40 group-hover:bg-primary transition-all duration-500" 
+                           style={{ height: `${height}%` }}
+                           title={`${val} órdenes`}
+                        ></div>
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-500">{day}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -166,7 +200,7 @@ export default function Dashboard() {
                     ) : ordenes.length === 0 ? (
                       <tr><td colSpan={5} className="px-6 py-4 text-center text-slate-500">No hay órdenes recientes registradas.</td></tr>
                     ) : (
-                      ordenes.map((orden) => (
+                      ordenes.map((orden: any) => (
                         <tr key={orden.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                           <td className="px-6 py-4 font-bold">{orden.id_legible}</td>
                           <td className="px-6 py-4">{orden.cliente}</td>
@@ -201,45 +235,32 @@ export default function Dashboard() {
           {/* Right Column: Quick Access Calendar / Tasks */}
           <div className="space-y-8">
             <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-              <h3 className="text-base font-bold mb-6">Calendario de Hoy</h3>
+              <h3 className="text-base font-bold mb-6">Intervenciones de Hoy</h3>
               <div className="space-y-4">
-                {/* Calendar Item */}
-                <div className="flex gap-4 group">
-                  <div className="flex flex-col items-center">
-                    <span className="text-xs font-bold text-primary">09:00</span>
-                    <div className="w-px h-full bg-slate-100 dark:bg-slate-800 my-2"></div>
-                  </div>
-                  <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border-l-4 border-primary">
-                    <p className="text-sm font-bold truncate">Revisión Preventiva</p>
-                    <p className="text-xs text-slate-500">Técnico: Roberto M.</p>
-                  </div>
-                </div>
-                {/* Calendar Item */}
-                <div className="flex gap-4 group">
-                  <div className="flex flex-col items-center">
-                    <span className="text-xs font-bold text-slate-400">11:30</span>
-                    <div className="w-px h-full bg-slate-100 dark:bg-slate-800 my-2"></div>
-                  </div>
-                  <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border-l-4 border-amber-400">
-                    <p className="text-sm font-bold truncate">Reparación Urgente</p>
-                    <p className="text-xs text-slate-500">Técnico: Ana J.</p>
-                  </div>
-                </div>
-                {/* Calendar Item */}
-                <div className="flex gap-4 group">
-                  <div className="flex flex-col items-center">
-                    <span className="text-xs font-bold text-slate-400">14:00</span>
-                    <div className="w-px h-full bg-slate-100 dark:bg-slate-800 my-2"></div>
-                  </div>
-                  <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border-l-4 border-slate-300">
-                    <p className="text-sm font-bold truncate">Entrega de Materiales</p>
-                    <p className="text-xs text-slate-500">Almacén Central</p>
-                  </div>
-                </div>
+                {dailyAgenda.length === 0 ? (
+                  <p className="text-xs text-slate-500 text-center py-4 italic">No hay intervenciones registradas para hoy.</p>
+                ) : (
+                  dailyAgenda.map((item: any) => (
+                    <div key={item.id} className="flex gap-4 group cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 p-1 rounded-lg transition-colors" onClick={() => navigate?.(`/ordenes/${item.orden_id}`)}>
+                      <div className="flex flex-col items-center">
+                        <span className="text-[10px] font-bold text-primary">{new Date(item.creado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <div className="w-px h-full bg-slate-100 dark:bg-slate-800 my-2"></div>
+                      </div>
+                      <div className={`flex-1 p-3 rounded-lg border-l-4 shadow-sm ${
+                        item.ordenes?.estado === 'Urgente' ? 'border-red-500 bg-red-50 dark:bg-red-900/10' :
+                        item.ordenes?.estado === 'Finalizada' ? 'border-green-500 bg-green-50 dark:bg-green-900/10' :
+                        'border-primary bg-slate-50 dark:bg-slate-800/50'
+                      }`}>
+                        <p className="text-xs font-bold truncate">{item.ordenes?.cliente}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{item.perfiles?.nombre_completo || 'Técnico'}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-              <button className="w-full mt-6 py-2 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors">
+              <Link to="/calendario" className="w-full mt-6 py-2 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors flex items-center justify-center">
                 Abrir Calendario Completo
-              </button>
+              </Link>
             </div>
             {/* Quick Actions */}
             <div className="bg-primary p-6 rounded-xl shadow-lg shadow-primary/20 text-white relative overflow-hidden">
@@ -263,7 +284,7 @@ export default function Dashboard() {
       <NuevoReporteModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onCreated={fetchOrdenes}
+        onCreated={fetchAll}
       />
     </div>
   );

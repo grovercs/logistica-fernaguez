@@ -24,6 +24,7 @@ export default function Ordenes() {
     const { data, error } = await supabase
       .from('ordenes')
       .select('*, reportes(tecnico_id)')
+      .neq('estado', 'Archivado')
       .order('creado_en', { ascending: false });
 
     if (!error && data) {

@@ -4,6 +4,13 @@ import { supabaseAdmin } from '../lib/supabase-admin';
 import AltaUsuarioModal from '../components/modals/AltaUsuarioModal';
 import EditarUsuarioModal from '../components/modals/EditarUsuarioModal';
 
+const ROLE_COLORS: Record<string, string> = {
+  'Administrador': 'bg-primary/10 text-primary border-primary/20',
+  'Editor': 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 border-blue-200 dark:border-blue-500/30',
+  'Trabajador': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30',
+  'Visualizador': 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 border-amber-200 dark:border-amber-500/30',
+};
+
 export default function Usuarios() {
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
@@ -152,8 +159,8 @@ export default function Usuarios() {
                             {u.email}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                u.roles?.nombre === 'Administrador' ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-600 dark:bg-slate-800'
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tight border shadow-sm ${
+                                ROLE_COLORS[u.roles?.nombre || ''] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 border-slate-200'
                             }`}>
                                 {u.roles?.nombre || 'Sin rol'}
                             </span>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import AltaAseguradoraModal from '../components/modals/AltaAseguradoraModal';
 import EditarAseguradoraModal from '../components/modals/EditarAseguradoraModal';
 import { supabase } from '../lib/supabase';
@@ -9,9 +9,14 @@ export default function Aseguradoras() {
   const [aseguradoraToEdit, setAseguradoraToEdit] = useState<any>(null);
   const [aseguradoras, setAseguradoras] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState({
+    siniestrosActivos: 0,
+    tasaResolucion: 0
+  });
 
   useEffect(() => {
      fetchAseguradoras();
+     fetchStats();
   }, []);
 
   const fetchAseguradoras = async () => {
@@ -19,6 +24,25 @@ export default function Aseguradoras() {
       const { data, error } = await supabase.from('aseguradoras').select('*').order('creado_en', { ascending: false });
       if (!error && data) setAseguradoras(data);
       setLoading(false);
+  };
+
+  const fetchStats = async () => {
+      // Get all active orders (non-archived)
+      const { data, error } = await supabase
+          .from('ordenes')
+          .select('estado')
+          .not('estado', 'eq', 'Archivado');
+      
+      if (!error && data) {
+          const total = data.length;
+          const finalizadas = data.filter(o => o.estado === 'Finalizada').length;
+          const tasa = total > 0 ? (finalizadas / total) * 100 : 0;
+          
+          setStats({
+              siniestrosActivos: total,
+              tasaResolucion: Math.round(tasa * 10) / 10
+          });
+      }
   };
 
   const handleDelete = async (id: string) => {
@@ -179,21 +203,23 @@ export default function Aseguradoras() {
             </table>
           </div>
           
-          {/* Pagination */}
-          <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-slate-500 font-medium">Mostrando {aseguradoras.length} de {aseguradoras.length} aseguradoras</p>
-            <div className="flex gap-2">
-              <button disabled className="size-8 flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 hover:bg-slate-50 disabled:opacity-50">
-                <span className="material-symbols-outlined text-lg block">chevron_left</span>
-              </button>
-              <button className="size-8 flex items-center justify-center rounded border border-primary bg-primary text-white font-bold text-xs">1</button>
-              <button className="size-8 flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 text-xs font-bold">2</button>
-              <button className="size-8 flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 text-xs font-bold">3</button>
-              <button className="size-8 flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 hover:bg-slate-50 text-slate-600 dark:text-slate-400">
-                <span className="material-symbols-outlined text-lg block">chevron_right</span>
-              </button>
+          {/* Pagination - Only show if more than 10 */}
+          {aseguradoras.length > 10 && (
+            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <p className="text-xs text-slate-500 font-medium">Mostrando {aseguradoras.length} de {aseguradoras.length} aseguradoras</p>
+              <div className="flex gap-2">
+                <button disabled className="size-8 flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 hover:bg-slate-50 disabled:opacity-50">
+                  <span className="material-symbols-outlined text-lg block">chevron_left</span>
+                </button>
+                <button className="size-8 flex items-center justify-center rounded border border-primary bg-primary text-white font-bold text-xs">1</button>
+                <button className="size-8 flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 text-xs font-bold">2</button>
+                <button className="size-8 flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 text-xs font-bold">3</button>
+                <button className="size-8 flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 hover:bg-slate-50 text-slate-600 dark:text-slate-400">
+                  <span className="material-symbols-outlined text-lg block">chevron_right</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Dashboard Stats Summary */}
@@ -214,7 +240,7 @@ export default function Aseguradoras() {
             </div>
             <div>
               <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Siniestros Activos</p>
-              <p className="text-2xl font-black">156</p>
+              <p className="text-2xl font-black">{stats.siniestrosActivos}</p>
             </div>
           </div>
           
@@ -224,7 +250,7 @@ export default function Aseguradoras() {
             </div>
             <div>
               <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Tasa de Resolución</p>
-              <p className="text-2xl font-black">88.4%</p>
+              <p className="text-2xl font-black">{stats.tasaResolucion}%</p>
             </div>
           </div>
         </div>

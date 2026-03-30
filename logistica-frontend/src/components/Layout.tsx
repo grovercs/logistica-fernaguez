@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation, Navigate, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Users, CalendarClock, Briefcase, UserPlus, Shield, Key, Database, ClipboardList, Settings, LogOut } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const Layout = () => {
-  const location = useLocation(); // Add useLocation hook
   const navigate = useNavigate();
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -157,7 +156,7 @@ const Layout = () => {
               }
             >
               <Shield className="w-5 h-5 mr-3" />
-              Roles Management
+              Gestión de Roles
             </NavLink>
 
             <NavLink
@@ -169,7 +168,7 @@ const Layout = () => {
               }
             >
               <Key className="w-5 h-5 mr-3" />
-              Permissions
+              Lista de Permisos
             </NavLink>
 
             <NavLink
@@ -181,7 +180,7 @@ const Layout = () => {
               }
             >
               <Settings className="w-5 h-5 mr-3" />
-              RBAC Dashboard
+              Panel RBAC
             </NavLink>
 
             <NavLink

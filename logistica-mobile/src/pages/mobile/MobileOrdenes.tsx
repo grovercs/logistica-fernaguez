@@ -7,7 +7,6 @@ const MobileOrdenes = () => {
     const [ordenes, setOrdenes] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentUserName, setCurrentUserName] = useState<string>('');
-    const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
     const [currentUserRole, setCurrentUserRole] = useState<string>('');
     const [lastActiveId, setLastActiveId] = useState<string | null>(null);
 
@@ -16,7 +15,6 @@ const MobileOrdenes = () => {
             // Get logged-in user info
             const { data: userData } = await supabase.auth.getUser();
             const userId = userData?.user?.id || null;
-            setCurrentUserEmail(userData?.user?.email || '');
 
             if (!userId) {
                 navigate('/m/login');

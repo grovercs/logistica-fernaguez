@@ -12,7 +12,10 @@
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
     "@supabase/supabase-js": "^2.99.3",
+    "@types/jszip": "^3.4.0",
     "class-variance-authority": "^0.7.1",
+    "html2pdf.js": "^0.14.0",
+    "jszip": "^3.10.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "xlsx": "^0.18.5"

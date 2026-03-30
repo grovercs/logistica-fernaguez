@@ -1,173 +1,186 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { supabaseAdmin } from '../lib/supabase-admin';
 
+interface UserRole {
+  id: string;
+  email: string | null;
+  nombre: string | null;
+  role: string | null;
+  roleId: string | null;
+}
+
+const ROLE_COLORS: Record<string, string> = {
+  'Administrador': 'bg-primary/10 text-primary border-primary/20',
+  'Editor': 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 border-blue-200 dark:border-blue-500/30',
+  'Trabajador': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30',
+  'Visualizador': 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 border-amber-200 dark:border-amber-500/30',
+};
+
+const ROLE_ICONS: Record<string, string> = {
+  'Administrador': 'workspace_premium',
+  'Editor': 'edit_note',
+  'Trabajador': 'engineering',
+  'Visualizador': 'visibility',
+};
 
 export default function RbacDashboard() {
+  const [users, setUsers] = useState<UserRole[]>([]);
+  const [roles, setRoles] = useState<{id: string, nombre: string}[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch profiles and roles
+      const { data: profiles, error: pError } = await supabase
+        .from('perfiles')
+        .select('id, nombre, rol_id, roles(nombre)');
+      if (pError) throw pError;
+
+      const { data: rolesData, error: rError } = await supabase
+        .from('roles')
+        .select('id, nombre');
+      if (rError) throw rError;
+      setRoles(rolesData || []);
+
+      // 2. Fetch emails using Admin API
+      const { data: { users: authUsers }, error: aError } = await supabaseAdmin.auth.admin.listUsers();
+      if (aError) throw aError;
+
+      const emailMap = new Map(authUsers.map(u => [u.id, u.email]));
+
+      // 3. Merge
+      const merged = (profiles || []).map(p => ({
+        id: p.id,
+        nombre: p.nombre,
+        email: emailMap.get(p.id) || 'N/A',
+        roleId: p.rol_id,
+        role: (p.roles as any)?.nombre || 'Sin Rol'
+      }));
+
+      setUsers(merged);
+    } catch (error) {
+      console.error('Error fetching RBAC data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRoleChange = async (userId: string, newRoleId: string) => {
+    setUpdatingId(userId);
+    try {
+      const { error } = await supabase
+        .from('perfiles')
+        .update({ rol_id: newRoleId })
+        .eq('id', userId);
+
+      if (error) throw error;
+      
+      // Update local state
+      const roleName = roles.find(r => r.id === newRoleId)?.nombre || 'Desconocido';
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, roleId: newRoleId, role: roleName } : u));
+    } catch (error) {
+      console.error('Error updating role:', error);
+      alert('Error al actualizar el rol');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100">
-      {/* Header is handled by Layout in standard views, but this screen has a custom internal header */}
-      
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-8 lg:p-12 w-full">
-        <div className="max-w-6xl mx-auto space-y-8">
-            
-            {/* Header / Title */}
-            <div className="flex flex-col gap-2">
-                <h2 className="text-slate-900 dark:text-white text-4xl font-black leading-tight tracking-tight">Panel de Control RBAC</h2>
-                <p className="text-slate-500 dark:text-slate-400 text-lg font-normal">Asignación centralizada de roles y permisos específicos a usuarios</p>
-            </div>
-            
-            {/* Table Section */}
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-primary/10 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-primary/10">
-                    <h3 className="text-slate-900 dark:text-white text-xl font-bold">Usuarios y sus Accesos</h3>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[600px]">
-                        <thead>
-                            <tr className="bg-slate-50 dark:bg-slate-800/50">
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Nombre</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Rol Actual</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Permisos Directos</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-primary/5 dark:divide-slate-800">
-                            
-                            {/* User 1 */}
-                            <tr className="hover:bg-primary/5 dark:hover:bg-slate-800/30 transition-colors">
-                                <td className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white">Juan Pérez</td>
-                                <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">juan@empresa.com</td>
-                                <td className="px-6 py-4">
-                                    <span className="px-3 py-1 text-xs font-bold bg-primary/10 text-primary rounded-full">Administrador</span>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <div className="flex justify-end gap-1.5 flex-wrap">
-                                        <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded">Escritura</span>
-                                        <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded">Eliminar</span>
-                                    </div>
-                                </td>
-                            </tr>
-                            
-                            {/* User 2 */}
-                            <tr className="hover:bg-primary/5 dark:hover:bg-slate-800/30 transition-colors">
-                                <td className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white">María García</td>
-                                <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">maria@empresa.com</td>
-                                <td className="px-6 py-4">
-                                    <span className="px-3 py-1 text-xs font-bold bg-green-500/10 text-green-600 rounded-full">Editor</span>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <div className="flex justify-end gap-1.5 flex-wrap">
-                                        <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded">Publicar</span>
-                                    </div>
-                                </td>
-                            </tr>
-                            
-                            {/* User 3 */}
-                            <tr className="hover:bg-primary/5 dark:hover:bg-slate-800/30 transition-colors">
-                                <td className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white">Carlos López</td>
-                                <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">carlos@empresa.com</td>
-                                <td className="px-6 py-4">
-                                    <span className="px-3 py-1 text-xs font-bold bg-amber-500/10 text-amber-600 rounded-full">Visualizador</span>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <span className="text-xs text-slate-400 italic">Ninguno</span>
-                                </td>
-                            </tr>
-                            
-                            {/* User 4 */}
-                            <tr className="hover:bg-primary/5 dark:hover:bg-slate-800/30 transition-colors">
-                                <td className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white">Ana Martínez</td>
-                                <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">ana.m@empresa.com</td>
-                                <td className="px-6 py-4">
-                                    <span className="px-3 py-1 text-xs font-bold bg-purple-500/10 text-purple-600 rounded-full">Gestor RH</span>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <div className="flex justify-end gap-1.5 flex-wrap">
-                                        <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded">Audit</span>
-                                    </div>
-                                </td>
-                            </tr>
-                            
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            {/* Quick Actions Panel */}
-            <div className="space-y-4">
-                <h3 className="text-[#0d141b] dark:text-white text-xl font-bold">Acciones Rápidas</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    
-                    {/* Action Card 1: Assign Role */}
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-primary/10 shadow-sm flex flex-col gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                                <span className="material-symbols-outlined">person_add</span>
-                            </div>
-                            <h4 className="font-bold text-slate-900 dark:text-white">Asignar Rol a Usuario</h4>
-                        </div>
-                        <div className="space-y-3">
-                            <div className="flex flex-col gap-1.5">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Usuario</label>
-                                <select className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-900 dark:text-white">
-                                    <option>Seleccione un usuario...</option>
-                                    <option>Juan Pérez</option>
-                                    <option>María García</option>
-                                    <option>Carlos López</option>
-                                </select>
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Nuevo Rol</label>
-                                <select className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-900 dark:text-white">
-                                    <option>Seleccione el rol...</option>
-                                    <option>Administrador</option>
-                                    <option>Editor</option>
-                                    <option>Visualizador</option>
-                                    <option>Soporte Técnico</option>
-                                </select>
-                            </div>
-                            <button className="w-full bg-primary text-white py-2.5 rounded-lg font-bold text-sm hover:shadow-lg hover:shadow-primary/20 transition-all mt-2 active:scale-[0.98]">
-                                Actualizar Rol
-                            </button>
-                        </div>
+      {/* Header */}
+      <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8 flex items-center justify-between sticky top-0 z-10 shrink-0">
+        <h2 className="text-xl font-bold">Panel de Seguridad RBAC</h2>
+      </header>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto p-8 space-y-8 max-w-7xl mx-auto w-full">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <h1 className="text-4xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">Mapa de Acceso de Usuarios</h1>
+            <p className="text-slate-500 dark:text-slate-400 mt-2 text-lg">Asigna roles y gestiona permisos del personal desde una vista centralizada.</p>
+          </div>
+          <div className="flex gap-3">
+             <a href="/usuarios" className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
+                Gestionar Usuarios
+             </a>
+             <a href="/trabajadores" className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
+                Gestionar Trabajadores
+             </a>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-slate-500 font-medium">Cargando mapa de usuarios...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {users.map(u => (
+              <div key={u.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm hover:shadow-md transition-all group flex flex-col h-full">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`size-12 rounded-xl flex items-center justify-center text-white text-xl font-black bg-gradient-to-br from-primary to-primary/60 shadow-lg shadow-primary/20`}>
+                      {u.nombre?.[0] || 'U'}
                     </div>
-                    
-                    {/* Action Card 2: Assign Specific Permission */}
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-primary/10 shadow-sm flex flex-col gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
-                                <span className="material-symbols-outlined">key_visualizer</span>
-                            </div>
-                            <h4 className="font-bold text-slate-900 dark:text-white">Asignar Permiso Específico</h4>
-                        </div>
-                        <div className="space-y-3">
-                            <div className="flex flex-col gap-1.5">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Usuario</label>
-                                <select className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-900 dark:text-white">
-                                    <option>Seleccione un usuario...</option>
-                                    <option>Juan Pérez</option>
-                                    <option>María García</option>
-                                    <option>Carlos López</option>
-                                </select>
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Permiso (Excepción)</label>
-                                <select className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-900 dark:text-white">
-                                    <option>Seleccione un permiso...</option>
-                                    <option>Eliminar Registros</option>
-                                    <option>Exportar Base de Datos</option>
-                                    <option>Acceso a Logs Críticos</option>
-                                    <option>Gestión de API</option>
-                                </select>
-                            </div>
-                            <button className="w-full bg-primary text-white py-2.5 rounded-lg font-bold text-sm hover:shadow-lg hover:shadow-primary/20 transition-all mt-2 active:scale-[0.98]">
-                                Otorgar Excepción
-                            </button>
-                        </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{u.nombre || 'Sin nombre'}</h4>
+                      <p className="text-xs text-slate-400 font-medium">{u.email}</p>
                     </div>
-                    
+                  </div>
+                  <span className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tight border shadow-sm ${ROLE_COLORS[u.role || ''] || 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                    <span className="material-symbols-outlined text-sm">{ROLE_ICONS[u.role || ''] || 'person'}</span>
+                    {u.role}
+                  </span>
                 </div>
-            </div>
-            
+
+                <div className="mt-auto pt-6 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Asignar Nuevo Rol</label>
+                    <div className="flex gap-2">
+                      <select 
+                        disabled={updatingId === u.id}
+                        value={u.roleId || ''}
+                        onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                        className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary outline-none transition-all disabled:opacity-50 appearance-none"
+                      >
+                        <option value="" disabled>Seleccionar Rol</option>
+                        {roles.map(r => (
+                          <option key={r.id} value={r.id}>{r.nombre}</option>
+                        ))}
+                      </select>
+                      {updatingId === u.id && (
+                        <div className="size-9 bg-primary/10 rounded-lg flex items-center justify-center">
+                          <div className="size-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="bg-slate-900 dark:bg-slate-800 rounded-2xl p-8 text-white relative overflow-hidden shadow-xl shadow-slate-900/10">
+           <div className="relative z-10 max-w-2xl">
+              <div className="flex items-center gap-3 text-primary mb-4">
+                 <span className="material-symbols-outlined">security</span>
+                 <h4 className="font-bold text-xl">Gestión de Integridad</h4>
+              </div>
+              <p className="text-slate-300 leading-relaxed">
+                Cada cambio de rol es auditado y se aplica en tiempo real. Los usuarios deberán recargar su sesión para que los nuevos permisos surtan efecto en todas las pestañas abiertas.
+              </p>
+           </div>
+           <span className="material-symbols-outlined absolute -right-8 -bottom-8 text-[160px] opacity-5 pointer-events-none">shield_person</span>
         </div>
       </div>
     </div>

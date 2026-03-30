@@ -16,6 +16,30 @@ interface Permiso {
   descripcion: string;
 }
 
+const CATEGORY_TRANSLATIONS: Record<string, string> = {
+  'assign': 'Gestión de Asignación',
+  'insured': 'Gestión de Aseguradoras',
+  'permission': 'Gestión de Permisos',
+  'report': 'Gestión de Reportes',
+  'role': 'Gestión de Roles',
+  'user': 'Gestión de Usuarios',
+  'worker': 'Gestión de Trabajadores',
+  'billing': 'Gestión de Liquidaciones',
+};
+
+const ACTION_TRANSLATIONS: Record<string, string> = {
+  'list': 'Ver Lista',
+  'create': 'Crear Nuevo',
+  'edit': 'Editar',
+  'delete': 'Eliminar',
+  'view': 'Ver Detalle',
+  'roles': 'Asignar Roles',
+  'permissions': 'Asignar Permisos',
+  'export': 'Exportar Datos',
+  'manage': 'Administrar',
+  'sync': 'Sincronizar',
+};
+
 export default function EditarRolModal({ isOpen, onClose, roleId, roleName, onSaved }: EditarRolModalProps) {
   const [permisos, setPermisos] = useState<Permiso[]>([]);
   const [selectedPerms, setSelectedPerms] = useState<Set<string>>(new Set());
@@ -135,7 +159,9 @@ export default function EditarRolModal({ isOpen, onClose, roleId, roleName, onSa
               <div key={cat} className="space-y-4">
                 <div className="flex items-center gap-2 text-primary border-b border-primary/10 pb-2">
                   <span className="material-symbols-outlined text-sm">category</span>
-                  <h4 className="text-xs font-black uppercase tracking-widest">{cat} Management</h4>
+                  <h4 className="text-xs font-black uppercase tracking-widest">
+                    {CATEGORY_TRANSLATIONS[cat] || `${cat.toUpperCase()} MANAGEMENT`}
+                  </h4>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-2">
                   {permisos
@@ -153,7 +179,7 @@ export default function EditarRolModal({ isOpen, onClose, roleId, roleName, onSa
                         />
                         <div className="flex flex-col">
                           <span className={`text-sm font-bold ${selectedPerms.has(p.id) ? 'text-primary' : 'text-slate-700 dark:text-slate-300'}`}>
-                            {p.clave.split('.')[1]}
+                            {ACTION_TRANSLATIONS[p.clave.split('.')[1]] || p.clave.split('.')[1]}
                           </span>
                           <span className="text-[10px] text-slate-400 group-hover:text-slate-500 transition-colors">
                             {p.clave}

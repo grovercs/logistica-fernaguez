@@ -17,7 +17,8 @@ export default function AltaTrabajadorModal({ isOpen, onClose, onCreated }: Alta
       nuevaEspecialidad: '',
       telefono: '',
       email: '',
-      fecha_incorporacion: ''
+      fecha_incorporacion: '',
+      tarifa_hora: ''
   });
   const [loading, setLoading] = useState(false);
 
@@ -48,7 +49,7 @@ export default function AltaTrabajadorModal({ isOpen, onClose, onCreated }: Alta
       if (!error) {
           if (onCreated) onCreated();
           onClose();
-          setFormData({ nombreCompleto: '', dni: '', especialidad: '', nuevaEspecialidad: '', telefono: '', email: '', fecha_incorporacion: '' });
+          setFormData({ nombreCompleto: '', dni: '', especialidad: '', nuevaEspecialidad: '', telefono: '', email: '', fecha_incorporacion: '', tarifa_hora: '' });
       } else {
           console.error("Error creating trabajador:", error);
           alert("Error al guardar el trabajador.");
@@ -200,6 +201,24 @@ export default function AltaTrabajadorModal({ isOpen, onClose, onCreated }: Alta
                    onChange={(e) => setFormData({...formData, fecha_incorporacion: e.target.value})}
                 />
               </div>
+            </div>
+
+            {/* Tarifa */}
+            <div className="flex flex-col gap-1.5 col-span-full">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tarifa €/hora (Liquidaciones)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span>
+                <input
+                   className="w-full pl-8 pr-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-slate-700 dark:text-slate-300 font-medium"
+                   type="number"
+                   min="0"
+                   step="0.5"
+                   placeholder="0.00"
+                   value={formData.tarifa_hora}
+                   onChange={(e) => setFormData({...formData, tarifa_hora: e.target.value})}
+                />
+              </div>
+              <p className="text-[11px] text-slate-400">Se usará para calcular liquidaciones. Puedes cambiarlo más tarde en el perfil del trabajador.</p>
             </div>
             
           </div>

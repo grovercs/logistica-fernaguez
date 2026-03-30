@@ -3,6 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import EditarOrdenModal from '../components/modals/EditarOrdenModal';
 import EditarReporteModal from '../components/modals/EditarReporteModal';
+import { PrintableOrden } from '../components/PrintableOrden';
+import { useRef } from 'react';
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
 
 export default function OrdenDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +19,8 @@ export default function OrdenDetalle() {
 
   const [reportes, setReportes] = useState<any[]>([]);
   const [trabajadores, setTrabajadores] = useState<any[]>([]);
+  const printRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Computed values from reports
   const totalHoras = reportes.reduce((sum, r) => sum + (Number(r.horas_trabajadas) || 0), 0);
@@ -99,6 +105,40 @@ export default function OrdenDetalle() {
     .filter(r => r.firma_url && r.firma_url.length > 5)
     .sort((a, b) => new Date(b.creado_en || 0).getTime() - new Date(a.creado_en || 0).getTime())[0];
 
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExportPDF = async () => {
+    if (!printRef.current || !orden) return;
+    setIsGeneratingPdf(true);
+    
+    try {
+      const element = printRef.current;
+      const opt = {
+        margin: 0,
+        filename: `Reporte_${orden.id_legible}_${Date.now()}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true,
+          logging: false,
+          letterRendering: true
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      };
+
+      // Ensure images are loaded potentially? html2pdf usually handles it if useCORS is true
+      await html2pdf().from(element).set(opt).save();
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error al generar el PDF. Reintente en unos instantes.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   if (loading) return <div className="p-8 text-center text-slate-500 font-bold">Cargando reporte de orden...</div>;
   if (!orden) return <div className="p-8 text-center text-slate-500">No se encontró la orden.</div>;
 
@@ -140,13 +180,20 @@ export default function OrdenDetalle() {
               <span className="material-symbols-outlined text-[18px]">edit</span>
               Editar
             </button>
-            <button className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+            <button 
+              onClick={handlePrint}
+              className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+            >
               <span className="material-symbols-outlined text-[18px]">print</span>
               Imprimir
             </button>
-            <button className="flex items-center gap-2 bg-primary text-white hover:bg-primary/90 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+            <button 
+              onClick={handleExportPDF}
+              disabled={isGeneratingPdf}
+              className="flex items-center gap-2 bg-primary text-white hover:bg-primary/90 px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+            >
               <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-              Exportar PDF
+              {isGeneratingPdf ? 'Generando...' : 'Exportar PDF'}
             </button>
             {orden.estado !== 'Finalizada' && (
               <button 
@@ -576,6 +623,54 @@ export default function OrdenDetalle() {
            reporteData={selectedReporte}
         />
       )}
+
+      {/* Hidden Printable Area */}
+      <div className="hidden">
+        <div className="block">
+           <PrintableOrden 
+             ref={printRef}
+             orden={orden}
+             reportes={reportes}
+             trabajadores={trabajadores}
+           />
+        </div>
+      </div>
+
+      {/* Print Styles */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .hidden-print, header, aside, nav, button {
+            display: none !important;
+          }
+          #print-area, #print-area * {
+            visibility: visible;
+          }
+          #print-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 210mm;
+            margin: 0;
+            padding: 0;
+          }
+          /* This is a cheat: we wrap our printable component in an ID for the media print selector */
+        }
+      `}</style>
+
+      {/* Re-rendering the printable component specifically for window.print() if needed 
+          Actually, I'll wrap the PrintableOrden in a div that is visible only on print
+      */}
+      <div id="print-area" className="hidden print:block fixed inset-0 z-[9999] bg-white">
+          <PrintableOrden 
+             orden={orden}
+             reportes={reportes}
+             trabajadores={trabajadores}
+           />
+      </div>
+
     </div>
   );
 }

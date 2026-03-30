@@ -11,6 +11,30 @@ interface Role {
   permissions?: string[];
 }
 
+const ACTION_TRANSLATIONS: Record<string, string> = {
+  'list': 'Ver Lista',
+  'create': 'Crear Nuevo',
+  'edit': 'Editar',
+  'delete': 'Eliminar',
+  'view': 'Ver Detalle',
+  'roles': 'Roles',
+  'permissions': 'Permisos',
+  'export': 'Exportar',
+  'manage': 'Administrar',
+  'sync': 'Sincronizar',
+};
+
+const ACTION_COLORS: Record<string, string> = {
+  'create': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400',
+  'edit': 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
+  'delete': 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',
+  'list': 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
+  'view': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400',
+  'roles': 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400',
+  'permissions': 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400',
+  'export': 'bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-400',
+};
+
 export default function Roles() {
   const [isAddRoleOpen, setIsAddRoleOpen] = useState(false);
   const [isEditRoleOpen, setIsEditRoleOpen] = useState(false);
@@ -186,8 +210,8 @@ export default function Roles() {
                                       ) : role.permissions && role.permissions.length > 0 ? (
                                         <>
                                           {role.permissions.slice(0, 3).map((p, i) => (
-                                            <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase">
-                                              {p}
+                                            <span key={i} className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-colors ${ACTION_COLORS[p] || 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'}`}>
+                                              {ACTION_TRANSLATIONS[p] || p}
                                             </span>
                                           ))}
                                           {role.permissions.length > 3 && (

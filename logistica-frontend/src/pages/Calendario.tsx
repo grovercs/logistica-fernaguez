@@ -25,6 +25,7 @@ export default function Calendario() {
     const { data: ordenesData } = await supabase
       .from('ordenes')
       .select('*')
+      .neq('estado', 'Archivado')
       .order('creado_en', { ascending: false });
     if (ordenesData) setOrdenes(ordenesData);
 
@@ -37,7 +38,7 @@ export default function Calendario() {
         horas_trabajadas,
         tecnico_id,
         orden_id,
-        ordenes (
+        ordenes!inner (
           id,
           id_legible,
           cliente,
@@ -45,6 +46,7 @@ export default function Calendario() {
           direccion
         )
       `)
+      .neq('ordenes.estado', 'Archivado')
       .order('fecha_trabajo', { ascending: false });
     if (reportesData) setReportes(reportesData);
   };
