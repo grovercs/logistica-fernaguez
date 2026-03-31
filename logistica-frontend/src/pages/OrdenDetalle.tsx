@@ -454,7 +454,8 @@ export default function OrdenDetalle() {
                                                     const mats = splitted[1]?.trim();
                                                     return (
                                                         <>
-                                                            {work || <span className="italic text-slate-400">Sin descripción del trabajo.</span>}
+                                                            <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Descripción del trabajo:</p>
+                                                            <p className="mb-2">{work || <span className="italic text-slate-400">Sin descripción del trabajo.</span>}</p>
                                                             {mats && (
                                                                 <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                                                                     <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Materiales:</p>
