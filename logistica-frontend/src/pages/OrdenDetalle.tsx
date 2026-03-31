@@ -465,6 +465,48 @@ export default function OrdenDetalle() {
                                                     );
                                                 })()}
                                             </div>
+
+                                            {/* Fotos de esta intervención */}
+                                            {(rep.fotos_urls && rep.fotos_urls.length > 0) && (
+                                                <div className="mt-3">
+                                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[14px] text-orange-500">photo_library</span>
+                                                        Fotos ({rep.fotos_urls.length})
+                                                    </p>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {(rep.fotos_urls as string[]).map((url, i) => (
+                                                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group block">
+                                                                <img
+                                                                    src={url}
+                                                                    alt={`Foto ${i + 1}`}
+                                                                    className="w-full h-20 object-cover rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm group-hover:shadow-md group-hover:scale-[1.02] transition-all"
+                                                                />
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Facturas de esta intervención */}
+                                            {(rep.facturas_urls && rep.facturas_urls.length > 0) && (
+                                                <div className="mt-3">
+                                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[14px] text-amber-500">receipt_long</span>
+                                                        Facturas ({rep.facturas_urls.length})
+                                                    </p>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {(rep.facturas_urls as string[]).map((url, i) => (
+                                                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group block">
+                                                                <img
+                                                                    src={url}
+                                                                    alt={`Factura ${i + 1}`}
+                                                                    className="w-full h-20 object-cover rounded-lg border-2 border-amber-200 dark:border-amber-800 shadow-sm group-hover:shadow-md group-hover:scale-[1.02] transition-all"
+                                                                />
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -475,66 +517,6 @@ export default function OrdenDetalle() {
                                 <p className="text-sm text-slate-500 font-medium">Esperando partes de trabajo de los técnicos...</p>
                             </div>
                         )}
-
-                        {/* Photos gallery from all reports */}
-                        {(() => {
-                            const allFotos = reportes.flatMap(rep => {
-                                const worker = trabajadores.find(t => t.auth_user_id === rep.tecnico_id);
-                                const name = worker ? `${worker.nombre} ${worker.apellidos}` : 'Técnico';
-                                return (rep.fotos_urls || []).map((url: string) => ({ url, name }));
-                            });
-                            if (allFotos.length === 0) return null;
-                            return (
-                                <div className="mt-6">
-                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-[16px] text-orange-500">photo_library</span>
-                                        Fotos de la intervención ({allFotos.length})
-                                    </p>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                        {allFotos.map((f, i) => (
-                                            <a key={i} href={f.url} target="_blank" rel="noopener noreferrer" className="group block">
-                                                <img
-                                                    src={f.url}
-                                                    alt={`Foto ${i + 1} de ${f.name}`}
-                                                    className="w-full h-32 object-cover rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm group-hover:shadow-md group-hover:scale-[1.02] transition-all"
-                                                />
-                                                <p className="text-[10px] text-slate-400 mt-1 truncate">{f.name}</p>
-                                            </a>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })()}
-
-                        {/* Invoices/receipts gallery */}
-                        {(() => {
-                            const allFacturas = reportes.flatMap(rep => {
-                                const worker = trabajadores.find(t => t.auth_user_id === rep.tecnico_id);
-                                const name = worker ? `${worker.nombre} ${worker.apellidos}` : 'Técnico';
-                                return (rep.facturas_urls || []).map((url: string) => ({ url, name }));
-                            });
-                            if (allFacturas.length === 0) return null;
-                            return (
-                                <div className="mt-4">
-                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-[16px] text-amber-500">receipt_long</span>
-                                        Facturas / Albaranes ({allFacturas.length})
-                                    </p>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                        {allFacturas.map((f, i) => (
-                                            <a key={i} href={f.url} target="_blank" rel="noopener noreferrer" className="group block">
-                                                <img
-                                                    src={f.url}
-                                                    alt={`Factura ${i + 1} de ${f.name}`}
-                                                    className="w-full h-32 object-cover rounded-lg border-2 border-amber-200 dark:border-amber-800 shadow-sm group-hover:shadow-md group-hover:scale-[1.02] transition-all"
-                                                />
-                                                <p className="text-[10px] text-slate-400 mt-1 truncate">{f.name}</p>
-                                            </a>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })()}
                       </div>
 
 

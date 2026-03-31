@@ -27,31 +27,55 @@ const MobileOrdenes = () => {
                 .select('nombre_completo, roles(nombre)')
                 .eq('id', userId)
                 .maybeSingle();
-            
+
             const roleName = (profile?.roles as any)?.nombre || 'Trabajador';
             setCurrentUserRole(roleName);
             setCurrentUserName(profile?.nombre_completo || userData?.user?.email?.split('@')[0] || 'Usuario');
 
             // Fetch all relevant orders based on role
-            let query = supabase.from('ordenes').select('*');
-            
-            // Only Technicians (Trabajadores) are restricted to their own orders
-            if (roleName === 'Trabajador') {
-                query = query.eq('tecnico_id', userId);
-            }
+            await fetchOrdenes(userId, roleName);
 
-            const { data, error } = await query.order('creado_en', { ascending: false });
-            
-            if (!error && data) {
-                setOrdenes(data);
-            }
-            
             // Get last active order from localStorage
             setLastActiveId(localStorage.getItem('last_active_order'));
             setLoading(false);
         };
         init();
     }, []);
+
+    // Fetch orders function - can be called to refresh
+    const fetchOrdenes = async (userId: string, roleName: string) => {
+        let query = supabase.from('ordenes').select('*');
+
+        // Only Technicians (Trabajadores) are restricted to their own orders
+        if (roleName === 'Trabajador') {
+            query = query.eq('tecnico_id', userId);
+        }
+
+        const { data, error } = await query.order('creado_en', { ascending: false });
+
+        if (!error && data) {
+            setOrdenes(data);
+        }
+    };
+
+    // Refresh data when page becomes visible (returning from detail page)
+    useEffect(() => {
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                refreshData();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
+        return () => document.removeEventListener('visibilitychange', handleVisibility);
+    }, [currentUserName]);
+
+    const refreshData = async () => {
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData?.user?.id;
+        if (userId) {
+            await fetchOrdenes(userId, currentUserRole);
+        }
+    };
 
     const handleLogout = async () => {
         if (window.confirm('¿Cerrar sesión?')) {
