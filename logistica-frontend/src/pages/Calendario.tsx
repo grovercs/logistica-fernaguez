@@ -274,7 +274,7 @@ export default function Calendario() {
                  return (
                      <div
                         key={idx}
-                        className={`border-r border-b border-slate-100 dark:border-slate-800 p-2 flex flex-col gap-1 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${!dayObj.isCurrentMonth ? 'bg-slate-50/50 dark:bg-slate-800/20 opacity-40' : ''} ${isToday ? 'bg-primary/5' : ''}`}
+                        className={`group border-r border-b border-slate-100 dark:border-slate-800 p-2 flex flex-col gap-1 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${!dayObj.isCurrentMonth ? 'bg-slate-50/50 dark:bg-slate-800/20 opacity-40' : ''} ${isToday ? 'bg-primary/5' : ''}`}
                      >
                          <div className="flex items-center justify-between">
                            <span className={`text-sm ${isToday ? 'font-bold text-primary underline' : 'font-medium'}`}>
@@ -285,7 +285,7 @@ export default function Calendario() {
                                e.stopPropagation();
                                handleDayClick(dayObj.date);
                              }}
-                             className="opacity-0 hover:opacity-100 group-hover:opacity-100 p-1 rounded-full hover:bg-primary/10 text-slate-400 hover:text-primary transition-all"
+                             className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-primary text-slate-400 hover:text-primary transition-all"
                              title="Crear nuevo reporte en esta fecha"
                            >
                              <span className="material-symbols-outlined text-[16px]">add</span>
