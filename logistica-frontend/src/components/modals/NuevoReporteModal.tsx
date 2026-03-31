@@ -5,9 +5,10 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onCreated?: () => void;
+  fechaInicial?: string; // Fecha preseleccionada en formato YYYY-MM-DD
 }
 
-export default function NuevoReporteModal({ isOpen, onClose, onCreated }: Props) {
+export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaInicial }: Props) {
   const [formData, setFormData] = useState({
     referencia: '',
     cliente: '',
@@ -35,15 +36,15 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated }: Props)
        fetchTecnicos();
        fetchAseguradoras();
        setFormData({
-         referencia: '', cliente: '', aseguradora: '', tecnico: '', 
-         fecha: new Date().toISOString().split('T')[0], 
+         referencia: '', cliente: '', aseguradora: '', tecnico: '',
+         fecha: fechaInicial || new Date().toISOString().split('T')[0],
          hora: '10:00', observaciones: '', esUrgente: false,
          asegurado: '', telefono_asegurado: '', email: '',
          persona_contacto: '', telefono_contacto: '', direccion: '',
          otras_ordenes: '',
        });
     }
-  }, [isOpen]);
+  }, [isOpen, fechaInicial]);
 
   const fetchTecnicos = async () => {
     const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos').eq('estado', 'Disponible');

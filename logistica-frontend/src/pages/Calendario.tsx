@@ -5,16 +5,31 @@ import { useNavigate } from 'react-router-dom';
 
 export default function Calendario() {
   const [isNuevoReporteModalOpen, setIsNuevoReporteModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null); // Fecha preseleccionada para el modal
   // ordenes just for the list panel
   const [ordenes, setOrdenes] = useState<any[]>([]);
   // reportes for the calendar dots (includes join to ordenes)
   const [reportes, setReportes] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('');
-  
+
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const navigate = useNavigate();
+
+  // Helper para convertir fecha a formato YYYY-MM-DD
+  const formatDateToISO = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Handler para abrir el modal con una fecha específica
+  const handleDayClick = (date: Date) => {
+    setSelectedDate(formatDateToISO(date));
+    setIsNuevoReporteModalOpen(true);
+  };
 
   useEffect(() => {
     fetchData();
@@ -155,10 +170,14 @@ export default function Calendario() {
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-hidden w-full h-full">
-      <NuevoReporteModal 
-        isOpen={isNuevoReporteModalOpen} 
-        onClose={() => setIsNuevoReporteModalOpen(false)} 
+      <NuevoReporteModal
+        isOpen={isNuevoReporteModalOpen}
+        onClose={() => {
+          setIsNuevoReporteModalOpen(false);
+          setSelectedDate(null);
+        }}
         onCreated={fetchData}
+        fechaInicial={selectedDate || undefined}
       />
       {/* Header */}
       <header className="flex flex-col border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm z-10 w-full">
@@ -253,19 +272,31 @@ export default function Calendario() {
                  const dayOrdenes = getOrdenesForDay(dayObj.date);
 
                  return (
-                     <div 
-                        key={idx} 
+                     <div
+                        key={idx}
                         className={`border-r border-b border-slate-100 dark:border-slate-800 p-2 flex flex-col gap-1 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${!dayObj.isCurrentMonth ? 'bg-slate-50/50 dark:bg-slate-800/20 opacity-40' : ''} ${isToday ? 'bg-primary/5' : ''}`}
                      >
-                         <span className={`text-sm ${isToday ? 'font-bold text-primary underline' : 'font-medium'}`}>
-                            {dayObj.date.getDate()} {isToday ? '(Hoy)' : ''}
-                         </span>
-                         
+                         <div className="flex items-center justify-between">
+                           <span className={`text-sm ${isToday ? 'font-bold text-primary underline' : 'font-medium'}`}>
+                              {dayObj.date.getDate()} {isToday ? '(Hoy)' : ''}
+                           </span>
+                           <button
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleDayClick(dayObj.date);
+                             }}
+                             className="opacity-0 hover:opacity-100 group-hover:opacity-100 p-1 rounded-full hover:bg-primary/10 text-slate-400 hover:text-primary transition-all"
+                             title="Crear nuevo reporte en esta fecha"
+                           >
+                             <span className="material-symbols-outlined text-[16px]">add</span>
+                           </button>
+                         </div>
+
                          <div className="flex-1 mx-1 overflow-y-auto space-y-1 mt-1 pb-1 scrollbar-thin">
                              {/* Reports (work done on this day — most important) */}
                              {dayReportes.map(rep => (
-                                 <div 
-                                    key={rep.id} 
+                                 <div
+                                    key={rep.id}
                                     onClick={() => navigate(`/ordenes/${rep.orden_id}`)}
                                     className={`text-[10px] p-1.5 rounded border-l-4 font-semibold truncate cursor-pointer hover:opacity-80 transition-opacity ${getBadgeTheme(rep.ordenes?.estado)}`}
                                     title={`${rep.ordenes?.id_legible} · ${rep.ordenes?.cliente} · ${rep.horas_trabajadas}h`}
@@ -277,8 +308,8 @@ export default function Calendario() {
                              ))}
                              {/* Orders pinned to creation date */}
                              {dayOrdenes.map(orden => (
-                                 <div 
-                                    key={orden.id} 
+                                 <div
+                                    key={orden.id}
                                     onClick={() => navigate(`/ordenes/${orden.id}`)}
                                     className={`text-[10px] p-1.5 rounded border-l-4 font-semibold truncate cursor-pointer hover:shadow-sm hover:opacity-90 active:opacity-70 transition-all ${getBadgeTheme(orden.estado)}`}
                                     title={`${orden.id_legible} - ${orden.cliente}`}
