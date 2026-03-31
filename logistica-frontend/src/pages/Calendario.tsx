@@ -274,22 +274,14 @@ export default function Calendario() {
                  return (
                      <div
                         key={idx}
-                        className={`group border-r border-b border-slate-100 dark:border-slate-800 p-2 flex flex-col gap-1 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${!dayObj.isCurrentMonth ? 'bg-slate-50/50 dark:bg-slate-800/20 opacity-40' : ''} ${isToday ? 'bg-primary/5' : ''}`}
+                        onClick={() => handleDayClick(dayObj.date)}
+                        className={`relative border-r border-b border-slate-100 dark:border-slate-800 p-2 flex flex-col gap-1 hover:bg-primary/5 dark:hover:bg-primary/10 cursor-pointer transition-colors ${!dayObj.isCurrentMonth ? 'bg-slate-50/50 dark:bg-slate-800/20 opacity-40' : ''} ${isToday ? 'bg-primary/5' : ''}`}
                      >
                          <div className="flex items-center justify-between">
                            <span className={`text-sm ${isToday ? 'font-bold text-primary underline' : 'font-medium'}`}>
                               {dayObj.date.getDate()} {isToday ? '(Hoy)' : ''}
                            </span>
-                           <button
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               handleDayClick(dayObj.date);
-                             }}
-                             className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-primary text-slate-400 hover:text-primary transition-all"
-                             title="Crear nuevo reporte en esta fecha"
-                           >
-                             <span className="material-symbols-outlined text-[16px]">add</span>
-                           </button>
+                           <span className="material-symbols-outlined text-[14px] text-slate-300 dark:text-slate-600 group-hover:text-primary/50">add</span>
                          </div>
 
                          <div className="flex-1 mx-1 overflow-y-auto space-y-1 mt-1 pb-1 scrollbar-thin">
@@ -297,7 +289,10 @@ export default function Calendario() {
                              {dayReportes.map(rep => (
                                  <div
                                     key={rep.id}
-                                    onClick={() => navigate(`/ordenes/${rep.orden_id}`)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/ordenes/${rep.orden_id}`);
+                                    }}
                                     className={`text-[10px] p-1.5 rounded border-l-4 font-semibold truncate cursor-pointer hover:opacity-80 transition-opacity ${getBadgeTheme(rep.ordenes?.estado)}`}
                                     title={`${rep.ordenes?.id_legible} · ${rep.ordenes?.cliente} · ${rep.horas_trabajadas}h`}
                                  >
@@ -310,7 +305,10 @@ export default function Calendario() {
                              {dayOrdenes.map(orden => (
                                  <div
                                     key={orden.id}
-                                    onClick={() => navigate(`/ordenes/${orden.id}`)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/ordenes/${orden.id}`);
+                                    }}
                                     className={`text-[10px] p-1.5 rounded border-l-4 font-semibold truncate cursor-pointer hover:shadow-sm hover:opacity-90 active:opacity-70 transition-all ${getBadgeTheme(orden.estado)}`}
                                     title={`${orden.id_legible} - ${orden.cliente}`}
                                  >
