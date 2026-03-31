@@ -80,7 +80,7 @@ const MobileDetalleOrden = () => {
         const [ordenReq, reportesReq] = await Promise.all([
             supabase.from('ordenes').select('*').eq('id', id).single(),
             (() => {
-                let query = supabase.from('reportes').select('*, perfiles(nombre_completo)').eq('orden_id', id);
+                let query = supabase.from('reportes').select('*').eq('orden_id', id);
                 // Technicians (Trabajadores) only see their own reports
                 if (roleName === 'Trabajador') {
                     query = query.eq('tecnico_id', userId);
@@ -88,16 +88,34 @@ const MobileDetalleOrden = () => {
                 return query.order('creado_en', { ascending: false });
             })()
         ]);
-        
+
+        if (ordenReq.error) {
+            console.error('Error fetching orden:', ordenReq.error);
+        }
+
+        if (reportesReq.error) {
+            console.error('Error fetching reportes:', reportesReq.error);
+        }
+
         if (!ordenReq.error && ordenReq.data) {
             setOrden(ordenReq.data);
             if (ordenReq.data.creado_en) {
                 setFecha(new Date(ordenReq.data.creado_en).toISOString().split('T')[0]);
             }
         }
-        
+
         if (!reportesReq.error && reportesReq.data) {
             setReportes(reportesReq.data);
+        } else {
+            // Fallback: try without any join
+            const { data: fallbackReportes } = await supabase
+                .from('reportes')
+                .select('*')
+                .eq('orden_id', id)
+                .order('creado_en', { ascending: false });
+            if (fallbackReportes) {
+                setReportes(fallbackReportes);
+            }
         }
         setLoading(false);
     };
