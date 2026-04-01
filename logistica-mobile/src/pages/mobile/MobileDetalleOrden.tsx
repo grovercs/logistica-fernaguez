@@ -155,8 +155,7 @@ const MobileDetalleOrden = () => {
     };
 
     const resetForm = () => {
-        console.log('=== RESET FORM ===');
-        console.log('Fotos antes:', fotos);
+        // Clear ALL form state to ensure fresh start
         setReporte(null);
         setTrabajoRealizado('');
         setMaterialUtilizado('');
@@ -166,6 +165,19 @@ const MobileDetalleOrden = () => {
         setFacturaPreviews([]);
         setHasSignature(false);
         setSelectedHora(0);
+        setSelectedMinuto(0);
+        setFecha(new Date().toISOString().split('T')[0]);
+
+        // Clear signature canvas
+        const ctx = canvasRef.current?.getContext('2d');
+        if (ctx && canvasRef.current) {
+            ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        }
+
+        // Reset file input
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        if (facturaInputRef.current) facturaInputRef.current.value = '';
+    };
         setSelectedMinuto(0);
         
         // Reset canvas
@@ -417,11 +429,6 @@ const MobileDetalleOrden = () => {
 
         const parsedHoras = selectedHora + (selectedMinuto / 60);
 
-        console.log('=== GUARDANDO INTERVENCIÓN ===');
-        console.log('tecnico_id:', reporte?.tecnico_id || currentUserId);
-        console.log('fotos:', fotos);
-        console.log('facturas:', facturas);
-
         const reportData: any = {
             orden_id: id,
             // Preserve the original technician when editing
@@ -429,16 +436,14 @@ const MobileDetalleOrden = () => {
             notas: `${trabajoRealizado}\n\nMATERIALES:\n${materialUtilizado}`,
             firma_url: signatureUrl,
             horas_trabajadas: parsedHoras,
-            fotos_urls: fotos,
+            fotos_urls: fotos.length > 0 ? fotos : null,
             creado_en: signatureUrl ? new Date().toISOString() : (reporte?.creado_en || new Date().toISOString()),
             // The following fields require the database migration
             trabajo_realizado: trabajoRealizado,
             material_utilizado: materialUtilizado,
-            facturas_urls: facturas,
+            facturas_urls: facturas.length > 0 ? facturas : null,
             fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
         };
-
-        console.log('reportData.fotos_urls:', reportData.fotos_urls);
 
         const saveReport = async (data: any) => {
             if (reporte?.id) {
