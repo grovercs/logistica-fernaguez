@@ -55,16 +55,16 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
   };
 
   const fetchAseguradoras = async () => {
+    // Seleccionar solo columnas que sabemos que existen
     const { data, error } = await supabase
       .from('aseguradoras')
-      .select('id, nombre, persona_contacto, telefono, email, direccion, cif, estado')
+      .select('id, nombre, persona_contacto, telefono, email, direccion, estado')
       .order('nombre');
 
     if (error) {
       console.error('Error fetching aseguradoras:', error);
     }
     console.log('Aseguradoras cargadas:', data);
-    // Mostrar todos los clientes excepto los marcados como Inactiva
     if (data) setAseguradoras(data);
   };
 
@@ -109,7 +109,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
         telefono_contacto: aseguradoraSeleccionada.telefono || '',
         email: aseguradoraSeleccionada.email || '',
         direccion: aseguradoraSeleccionada.direccion || '',
-        referencia: aseguradoraSeleccionada.cif || '',
+        referencia: '', // CIF no está disponible aún
       });
       fetchOrdenesPrevias(aseguradoraSeleccionada.nombre);
     } else {
