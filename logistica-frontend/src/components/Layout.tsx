@@ -137,8 +137,8 @@ const Layout = () => {
                 }`
               }
             >
-              <Shield className="w-5 h-5 mr-3" />
-              Aseguradoras
+              <Users className="w-5 h-5 mr-3" />
+              Clientes
             </NavLink>
 
             <div className="pt-4 pb-2">

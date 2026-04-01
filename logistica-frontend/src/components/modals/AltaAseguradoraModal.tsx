@@ -53,27 +53,27 @@ export default function AltaAseguradoraModal({ isOpen, onClose, onCreated }: Alt
         {/* Modal Header */}
         <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Añadir Nueva Aseguradora</h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm">Complete el formulario para registrar una nueva compañía.</p>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Añadir Nuevo Cliente</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">Complete el formulario para registrar un nuevo cliente.</p>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors"
           >
             <span className="material-symbols-outlined block">close</span>
           </button>
         </div>
-        
+
         {/* Modal Body (Form) */}
         <div className="p-8 overflow-y-auto max-h-[70vh]">
           <form id="altaAseguradoraForm" onSubmit={handleSubmit} className="grid grid-cols-2 gap-6">
-            
+
             {/* Company Info */}
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Nombre de la Compañía *</label>
-              <input 
-                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" 
-                 placeholder="Ej. Seguros Universales" 
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Nombre del Cliente / Empresa *</label>
+              <input
+                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                 placeholder="Ej. Empresa Ejemplo S.L."
                  type="text"
                  required
                  value={formData.nombre}
@@ -192,7 +192,7 @@ export default function AltaAseguradoraModal({ isOpen, onClose, onCreated }: Alt
              form="altaAseguradoraForm"
              className="px-8 py-2.5 rounded-lg font-bold text-sm bg-primary text-white hover:bg-primary/90 transition-all shadow-sm"
           >
-             {loading ? 'Guardando...' : 'Guardar Aseguradora'}
+             {loading ? 'Guardando...' : 'Guardar Cliente'}
           </button>
         </div>
         

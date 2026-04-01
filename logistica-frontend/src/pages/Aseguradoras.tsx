@@ -46,13 +46,13 @@ export default function Aseguradoras() {
   };
 
   const handleDelete = async (id: string) => {
-      if (window.confirm('¿Estás seguro de que deseas borrar esta aseguradora?')) {
+      if (window.confirm('¿Estás seguro de que deseas borrar este cliente?')) {
           const { error } = await supabase.from('aseguradoras').delete().eq('id', id);
           if (!error) {
               fetchAseguradoras();
           } else {
               console.error('Error deleting:', error);
-              alert('Error al borrar la aseguradora.');
+              alert('Error al borrar el cliente.');
           }
       }
   };
@@ -61,7 +61,7 @@ export default function Aseguradoras() {
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 h-full">
       {/* Header */}
       <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-8 flex items-center justify-between shrink-0 sticky top-0 z-10 w-full">
-        <h2 className="text-xl font-bold tracking-tight">Aseguradoras</h2>
+        <h2 className="text-xl font-bold tracking-tight">Clientes</h2>
         <div className="flex items-center gap-4">
           <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full relative transition-colors">
             <span className="material-symbols-outlined">notifications</span>
@@ -88,15 +88,15 @@ export default function Aseguradoras() {
         {/* Top Actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100">Gestión de Partners</h3>
-            <p className="text-slate-500 text-sm font-medium">Administra las compañías aseguradoras conectadas a la plataforma.</p>
+            <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100">Gestión de Clientes</h3>
+            <p className="text-slate-500 text-sm font-medium">Administra los clientes de la plataforma.</p>
           </div>
-          <button 
+          <button
              onClick={() => setIsAddModalOpen(true)}
              className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg flex items-center gap-2 font-bold text-sm transition-all shadow-lg shadow-primary/20 shrink-0"
           >
             <span className="material-symbols-outlined text-lg">add</span>
-            Añadir Aseguradora
+            Añadir Cliente
           </button>
         </div>
 
@@ -140,11 +140,11 @@ export default function Aseguradoras() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {loading ? (
                     <tr>
-                       <td colSpan={6} className="text-center py-8 text-slate-500">Cargando aseguradoras...</td>
+                       <td colSpan={6} className="text-center py-8 text-slate-500">Cargando clientes...</td>
                     </tr>
                 ) : aseguradoras.length === 0 ? (
                     <tr>
-                       <td colSpan={6} className="text-center py-8 text-slate-500">No hay aseguradoras registradas. Pulsa "Añadir Aseguradora".</td>
+                       <td colSpan={6} className="text-center py-8 text-slate-500">No hay clientes registrados. Pulsa "Añadir Cliente".</td>
                     </tr>
                 ) : (
                     aseguradoras.map(aseguradora => (
@@ -180,17 +180,17 @@ export default function Aseguradoras() {
                           </td>
                           <td className="px-6 py-4 text-right">
                             <div className="flex justify-end gap-2">
-                              <button 
+                              <button
                                 onClick={() => { setAseguradoraToEdit(aseguradora); setIsEditModalOpen(true); }}
                                 className="p-1.5 text-slate-400 hover:text-sky-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                                title="Editar Aseguradora"
+                                title="Editar Cliente"
                               >
                                 <span className="material-symbols-outlined text-[18px] block">edit</span>
                               </button>
-                              <button 
+                              <button
                                 onClick={() => handleDelete(aseguradora.id)}
                                 className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                                title="Borrar Aseguradora"
+                                title="Borrar Cliente"
                               >
                                 <span className="material-symbols-outlined text-[18px] block">delete</span>
                               </button>
@@ -206,7 +206,7 @@ export default function Aseguradoras() {
           {/* Pagination - Only show if more than 10 */}
           {aseguradoras.length > 10 && (
             <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <p className="text-xs text-slate-500 font-medium">Mostrando {aseguradoras.length} de {aseguradoras.length} aseguradoras</p>
+              <p className="text-xs text-slate-500 font-medium">Mostrando {aseguradoras.length} de {aseguradoras.length} clientes</p>
               <div className="flex gap-2">
                 <button disabled className="size-8 flex items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 hover:bg-slate-50 disabled:opacity-50">
                   <span className="material-symbols-outlined text-lg block">chevron_left</span>
@@ -229,21 +229,21 @@ export default function Aseguradoras() {
               <span className="material-symbols-outlined">corporate_fare</span>
             </div>
             <div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Total Partners</p>
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Total Clientes</p>
               <p className="text-2xl font-black">{aseguradoras.length}</p>
             </div>
           </div>
-          
+
           <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
             <div className="size-12 shrink-0 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600">
               <span className="material-symbols-outlined">check_circle</span>
             </div>
             <div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Siniestros Activos</p>
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Órdenes Activas</p>
               <p className="text-2xl font-black">{stats.siniestrosActivos}</p>
             </div>
           </div>
-          
+
           <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
             <div className="size-12 shrink-0 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
               <span className="material-symbols-outlined">trending_up</span>
