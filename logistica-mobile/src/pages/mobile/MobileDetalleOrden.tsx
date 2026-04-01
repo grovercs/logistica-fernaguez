@@ -155,6 +155,8 @@ const MobileDetalleOrden = () => {
     };
 
     const resetForm = () => {
+        console.log('=== RESET FORM ===');
+        console.log('Fotos antes:', fotos);
         setReporte(null);
         setTrabajoRealizado('');
         setMaterialUtilizado('');
@@ -415,6 +417,11 @@ const MobileDetalleOrden = () => {
 
         const parsedHoras = selectedHora + (selectedMinuto / 60);
 
+        console.log('=== GUARDANDO INTERVENCIÓN ===');
+        console.log('tecnico_id:', reporte?.tecnico_id || currentUserId);
+        console.log('fotos:', fotos);
+        console.log('facturas:', facturas);
+
         const reportData: any = {
             orden_id: id,
             // Preserve the original technician when editing
@@ -430,6 +437,8 @@ const MobileDetalleOrden = () => {
             facturas_urls: facturas,
             fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
         };
+
+        console.log('reportData.fotos_urls:', reportData.fotos_urls);
 
         const saveReport = async (data: any) => {
             if (reporte?.id) {
