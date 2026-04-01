@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { compressImage } from '../../lib/compressImage';
 import { uploadToCloudinary } from '../../lib/cloudinary';
+// Cloudinary integration for image uploads
 
 const MobileDetalleOrden = () => {
     const { id } = useParams<{ id: string }>();
