@@ -351,7 +351,7 @@ export default function OrdenDetalle() {
             </section>
 
             {/* Asignaciones de Trabajo */}
-            <AsignacionesSection ordenId={id!} onUpdate={fetchOrden} />
+            <AsignacionesSection ordenId={id!} onUpdate={() => fetchOrden(id!)} />
           </div>
 
           {/* Right Column: Timeline and Details */}
