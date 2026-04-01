@@ -31,6 +31,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
   const [aseguradoras, setAseguradoras] = useState<any[]>([]);
   const [tareasFrecuentes, setTareasFrecuentes] = useState<any[]>([]);
   const [ordenesPrevias, setOrdenesPrevias] = useState<any[]>([]);
+  const [direccionCliente, setDireccionCliente] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -55,16 +56,15 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
   };
 
   const fetchAseguradoras = async () => {
-    // Seleccionar solo columnas que sabemos que existen
+    // Seleccionar todas las columnas necesarias
     const { data, error } = await supabase
       .from('aseguradoras')
-      .select('id, nombre, persona_contacto, telefono, email, direccion, estado')
+      .select('id, nombre, persona_contacto, telefono, email, direccion, estado, cif')
       .order('nombre');
 
     if (error) {
       console.error('Error fetching aseguradoras:', error);
     }
-    console.log('Aseguradoras cargadas:', data);
     if (data) setAseguradoras(data);
   };
 
@@ -100,10 +100,8 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
   const handleAseguradoraChange = (nombreAseguradora: string) => {
     const aseguradoraSeleccionada = aseguradoras.find(a => a.nombre === nombreAseguradora);
 
-    console.log('Aseguradora seleccionada:', aseguradoraSeleccionada);
-
     if (aseguradoraSeleccionada) {
-      const newFormData = {
+      setFormData({
         ...formData,
         aseguradora: nombreAseguradora,
         cliente: aseguradoraSeleccionada.nombre || '',
@@ -111,11 +109,11 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
         asegurado: aseguradoraSeleccionada.persona_contacto || '', // Persona responsable
         telefono_asegurado: aseguradoraSeleccionada.telefono || '', // Teléfono principal
         email: aseguradoraSeleccionada.email || '',
-        direccion: aseguradoraSeleccionada.direccion || '',
-        referencia: '',
-      };
-      console.log('Nuevo formData:', newFormData);
-      setFormData(newFormData);
+        referencia: aseguradoraSeleccionada.cif || '',
+        // NO autocompletar dirección - el usuario puede elegir copiarla
+      });
+      // Guardar la dirección del cliente para mostrar opción de copiarla
+      setDireccionCliente(aseguradoraSeleccionada.direccion || '');
       fetchOrdenesPrevias(aseguradoraSeleccionada.nombre);
     } else {
       // Cliente Particular - limpiar campos
@@ -129,6 +127,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
         direccion: '',
         referencia: '',
       });
+      setDireccionCliente('');
       setOrdenesPrevias([]);
     }
   };
@@ -299,7 +298,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
               <div className="space-y-1.5 md:col-span-2">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[16px] text-slate-400">business</span>
-                  Empresa / Cliente ({aseguradoras.length} disponibles)
+                  Empresa / Cliente
                 </label>
                 <select
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
@@ -366,6 +365,16 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                             </a>
                           )}
                         </div>
+                        {direccionCliente && !formData.direccion && (
+                          <button
+                            type="button"
+                            onClick={() => setFormData({...formData, direccion: direccionCliente})}
+                            className="mt-1 text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">content_copy</span>
+                            Usar dirección del cliente: {direccionCliente}
+                          </button>
+                        )}
                     </div>
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 uppercase">Email del Cliente</label>
