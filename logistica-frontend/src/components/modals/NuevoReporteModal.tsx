@@ -63,7 +63,8 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
     if (error) {
       console.error('Error fetching aseguradoras:', error);
     }
-    // Mostrar todos los clientes, pero marcar los inactivos si es necesario
+    console.log('Aseguradoras cargadas:', data);
+    // Mostrar todos los clientes excepto los marcados como Inactiva
     if (data) setAseguradoras(data);
   };
 
@@ -293,7 +294,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
               <div className="space-y-1.5 md:col-span-2">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[16px] text-slate-400">business</span>
-                  Empresa / Cliente
+                  Empresa / Cliente ({aseguradoras.length} disponibles)
                 </label>
                 <select
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
@@ -301,8 +302,10 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                   onChange={(e) => handleAseguradoraChange(e.target.value)}
                 >
                   <option value="">Cliente Particular</option>
-                  {aseguradoras.filter(a => a.estado !== 'Inactiva').map(a => (
-                     <option key={a.id} value={a.nombre}>{a.nombre}</option>
+                  {aseguradoras.map(a => (
+                     <option key={a.id} value={a.nombre}>
+                       {a.nombre}{a.estado === 'Inactiva' ? ' (Inactiva)' : ''}
+                     </option>
                   ))}
                 </select>
                 <p className="text-xs text-slate-500 mt-1">Al seleccionar una empresa se autocompletarán los datos guardados</p>
