@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 
 interface AltaAseguradoraModalProps {
@@ -19,19 +19,69 @@ export default function AltaAseguradoraModal({ isOpen, onClose, onCreated }: Alt
      estado: 'Activa'
   });
   const [loading, setLoading] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('El archivo es demasiado grande. El tamaño máximo es 5MB.');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor, selecciona un archivo de imagen.');
+        return;
+      }
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadLogo = async (file: File): Promise<string | null> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = `logos/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('logos')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      console.error('Error uploading logo:', uploadError);
+      return null;
+    }
+
+    const { data } = supabase.storage.from('logos').getPublicUrl(filePath);
+    return data.publicUrl;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setLoading(true);
+
+      let logoUrl: string | null = null;
+      if (logoFile) {
+        logoUrl = await uploadLogo(logoFile);
+      }
 
       const { error } = await supabase.from('aseguradoras').insert({
           nombre: formData.nombre,
           persona_contacto: formData.persona_contacto,
           telefono: formData.telefono,
           email: formData.email,
-          estado: formData.estado
+          estado: formData.estado,
+          cif: formData.cif,
+          web: formData.web,
+          direccion: formData.direccion,
+          logo_url: logoUrl
       });
 
       setLoading(false);
@@ -39,9 +89,11 @@ export default function AltaAseguradoraModal({ isOpen, onClose, onCreated }: Alt
           if (onCreated) onCreated();
           onClose();
           setFormData({ nombre: '', cif: '', persona_contacto: '', email: '', telefono: '', web: '', direccion: '', estado: 'Activa' });
+          setLogoFile(null);
+          setLogoPreview(null);
       } else {
           console.error("Error creating aseguradora:", error);
-          alert("Error al guardar la aseguradora.");
+          alert("Error al guardar el cliente.");
       }
   };
 
@@ -150,10 +202,35 @@ export default function AltaAseguradoraModal({ isOpen, onClose, onCreated }: Alt
             <div className="col-span-2 grid grid-cols-2 gap-6 items-center">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Logo de la Compañía</label>
-                <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer group">
-                  <span className="material-symbols-outlined text-3xl text-slate-400 group-hover:text-primary transition-colors">upload_file</span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">PNG, JPG hasta 5MB</span>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  className="hidden"
+                />
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer group"
+                >
+                  {logoPreview ? (
+                    <img src={logoPreview} alt="Logo preview" className="h-16 w-auto object-contain rounded" />
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-3xl text-slate-400 group-hover:text-primary transition-colors">upload_file</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">PNG, JPG hasta 5MB</span>
+                    </>
+                  )}
                 </div>
+                {logoFile && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setLogoFile(null); setLogoPreview(null); }}
+                    className="mt-2 text-xs text-red-500 hover:text-red-600"
+                  >
+                    Quitar logo
+                  </button>
+                )}
               </div>
               
               <div>

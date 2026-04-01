@@ -29,12 +29,15 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
 
   const [tecnicos, setTecnicos] = useState<any[]>([]);
   const [aseguradoras, setAseguradoras] = useState<any[]>([]);
+  const [tareasFrecuentes, setTareasFrecuentes] = useState<any[]>([]);
+  const [ordenesPrevias, setOrdenesPrevias] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
        fetchTecnicos();
        fetchAseguradoras();
+       fetchTareasFrecuentes();
        setFormData({
          referencia: '', cliente: '', aseguradora: '', tecnico: '',
          fecha: fechaInicial || new Date().toISOString().split('T')[0],
@@ -52,8 +55,84 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
   };
 
   const fetchAseguradoras = async () => {
-    const { data } = await supabase.from('aseguradoras').select('id, nombre').eq('estado', 'Activa');
+    const { data } = await supabase.from('aseguradoras').select('id, nombre, persona_contacto, telefono, email, direccion, cif').eq('estado', 'Activa');
     if (data) setAseguradoras(data);
+  };
+
+  const fetchTareasFrecuentes = async () => {
+    const { data } = await supabase.from('tareas_frecuentes').select('id, nombre, descripcion').order('nombre');
+    if (data) setTareasFrecuentes(data);
+  };
+
+  const fetchOrdenesPrevias = async (clienteNombre: string) => {
+    if (!clienteNombre) {
+      setOrdenesPrevias([]);
+      return;
+    }
+    const { data } = await supabase
+      .from('ordenes')
+      .select('id, id_legible, creado_en, estado, descripcion, cliente, aseguradora')
+      .eq('cliente', clienteNombre)
+      .order('creado_en', { ascending: false })
+      .limit(5);
+    if (data) setOrdenesPrevias(data);
+  };
+
+  const handleTareaFrecuente = (tareaNombre: string) => {
+    if (tareaNombre) {
+      const descripcionActual = formData.observaciones.trim();
+      const nuevaDescripcion = descripcionActual
+        ? `${descripcionActual}\n${tareaNombre}`
+        : tareaNombre;
+      setFormData({...formData, observaciones: nuevaDescripcion});
+    }
+  };
+
+  const handleAseguradoraChange = (nombreAseguradora: string) => {
+    const aseguradoraSeleccionada = aseguradoras.find(a => a.nombre === nombreAseguradora);
+
+    if (aseguradoraSeleccionada) {
+      setFormData({
+        ...formData,
+        aseguradora: nombreAseguradora,
+        cliente: aseguradoraSeleccionada.nombre || '',
+        persona_contacto: aseguradoraSeleccionada.persona_contacto || '',
+        telefono_contacto: aseguradoraSeleccionada.telefono || '',
+        email: aseguradoraSeleccionada.email || '',
+        direccion: aseguradoraSeleccionada.direccion || '',
+        referencia: aseguradoraSeleccionada.cif || '',
+      });
+      fetchOrdenesPrevias(aseguradoraSeleccionada.nombre);
+    } else {
+      // Cliente Particular - limpiar campos
+      setFormData({
+        ...formData,
+        aseguradora: '',
+        cliente: '',
+        persona_contacto: '',
+        telefono_contacto: '',
+        email: '',
+        direccion: '',
+        referencia: '',
+      });
+      setOrdenesPrevias([]);
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const getEstadoColor = (estado: string) => {
+    switch (estado?.toLowerCase()) {
+      case 'finalizada': return 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400';
+      case 'en curso': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400';
+      case 'pendiente': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400';
+      case 'urgente': return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400';
+      default: return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
+    }
   };
 
   if (!isOpen) return null;
@@ -166,8 +245,8 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                   <span className="material-symbols-outlined text-[16px] text-slate-400">link</span>
                   Otras Órdenes Vinculadas
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Ej: OB-2023-1254"
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.otras_ordenes}
@@ -175,8 +254,35 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                 />
               </div>
 
+              {/* Histórico de trabajos del cliente */}
+              {ordenesPrevias.length > 0 && (
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px] text-slate-400">history</span>
+                    Trabajos Previos de {formData.aseguradora}
+                  </label>
+                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-3 max-h-40 overflow-y-auto">
+                    {ordenesPrevias.map(orden => (
+                      <div key={orden.id} className="flex items-center justify-between py-2 border-b border-slate-200 dark:border-slate-700 last:border-0">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{orden.id_legible}</span>
+                          <span className="text-xs text-slate-500">{formatDate(orden.creado_en)}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getEstadoColor(orden.estado)}`}>
+                            {orden.estado}
+                          </span>
+                        </div>
+                        <span className="text-xs text-slate-600 dark:text-slate-400 max-w-[200px] truncate">
+                          {orden.descripcion?.substring(0, 50)}{orden.descripcion?.length > 50 ? '...' : ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-500">Mostrando las últimas {ordenesPrevias.length} órdenes de este cliente</p>
+                </div>
+              )}
+
               {/* Empresa / Cliente */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-2">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[16px] text-slate-400">business</span>
                   Empresa / Cliente
@@ -184,34 +290,33 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                 <select
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.aseguradora}
-                  onChange={(e) => setFormData({...formData, aseguradora: e.target.value})}
+                  onChange={(e) => handleAseguradoraChange(e.target.value)}
                 >
                   <option value="">Cliente Particular</option>
                   {aseguradoras.map(a => (
                      <option key={a.id} value={a.nombre}>{a.nombre}</option>
                   ))}
                 </select>
+                <p className="text-xs text-slate-500 mt-1">Al seleccionar una empresa se autocompletarán los datos guardados</p>
               </div>
 
-              {/* Cliente */}
-              <div className="space-y-1.5 md:col-span-2 hidden md:block">
-                <div className="h-px bg-slate-200 dark:bg-slate-800 w-full my-2"></div>
-              </div>
-
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px] text-slate-400">person</span>
-                  {formData.aseguradora ? 'Empresa / Cliente' : 'Nombre del Cliente'}
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder={formData.aseguradora ? "Nombre de la empresa" : "Nombre completo del cliente"}
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
-                  value={formData.cliente}
-                  onChange={(e) => setFormData({...formData, cliente: e.target.value})}
-                />
-              </div>
+              {/* Nombre del Cliente (solo para Particulares) */}
+              {!formData.aseguradora && (
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px] text-slate-400">person</span>
+                    Nombre del Cliente *
+                  </label>
+                  <input
+                    type="text"
+                    required={!formData.aseguradora}
+                    placeholder="Nombre completo del cliente"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
+                    value={formData.cliente}
+                    onChange={(e) => setFormData({...formData, cliente: e.target.value})}
+                  />
+                </div>
+              )}
 
               {/* Contacto en Domicilio / Persona Responsable */}
               <div className="space-y-1.5 md:col-span-2">
@@ -231,7 +336,20 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 uppercase">Dirección Completa de Intervención</label>
-                        <input type="text" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} placeholder="Ej: Calle Gran Vía 123, 1ºA, Madrid" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                        <div className="flex gap-2">
+                          <input type="text" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} placeholder="Ej: Calle Gran Vía 123, 1ºA, Madrid" className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                          {formData.direccion && (
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.direccion)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-2 text-xs font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-1 whitespace-nowrap"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">map</span>
+                              Maps
+                            </a>
+                          )}
+                        </div>
                     </div>
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 uppercase">Email del Cliente</label>
@@ -303,12 +421,33 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                 </select>
               </div>
 
-              {/* Observaciones */}
+              {/* Tareas Frecuentes + Observaciones */}
               <div className="space-y-1.5 md:col-span-2">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[16px] text-slate-400">edit_note</span>
                   Trabajo a Realizar / Observaciones
                 </label>
+
+                {/* Selector de tareas frecuentes */}
+                {tareasFrecuentes.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <span className="text-xs text-slate-500">Tareas frecuentes:</span>
+                    {tareasFrecuentes.slice(0, 6).map(tarea => (
+                      <button
+                        key={tarea.id}
+                        type="button"
+                        onClick={() => handleTareaFrecuente(tarea.nombre)}
+                        className="px-2 py-1 text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full hover:bg-primary hover:text-white transition-colors"
+                      >
+                        + {tarea.nombre}
+                      </button>
+                    ))}
+                    {tareasFrecuentes.length > 6 && (
+                      <span className="text-xs text-slate-400">+{tareasFrecuentes.length - 6} más</span>
+                    )}
+                  </div>
+                )}
+
                 <textarea
                   rows={3}
                   required

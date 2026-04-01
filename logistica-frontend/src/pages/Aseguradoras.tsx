@@ -151,9 +151,13 @@ export default function Aseguradoras() {
                         <tr key={aseguradora.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="size-10 shrink-0 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center p-2">
-                                <span className="text-blue-600 dark:text-blue-400 font-black text-xs uppercase">{aseguradora.nombre.substring(0, 4)}</span>
-                              </div>
+                              {aseguradora.logo_url ? (
+                                <img src={aseguradora.logo_url} alt={aseguradora.nombre} className="size-10 shrink-0 rounded-lg object-contain bg-slate-100 dark:bg-slate-800 p-1" />
+                              ) : (
+                                <div className="size-10 shrink-0 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center p-2">
+                                  <span className="text-blue-600 dark:text-blue-400 font-black text-xs uppercase">{aseguradora.nombre.substring(0, 4)}</span>
+                                </div>
+                              )}
                               <div>
                                 <p className="text-sm font-bold">{aseguradora.nombre}</p>
                                 <p className="text-[10px] text-slate-500">ID: {aseguradora.id.split('-')[0]}</p>

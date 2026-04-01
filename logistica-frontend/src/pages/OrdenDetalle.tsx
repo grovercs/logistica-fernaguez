@@ -333,7 +333,20 @@ export default function OrdenDetalle() {
                     <span className="material-symbols-outlined text-[16px]">home</span>
                     <label className="text-xs font-bold uppercase tracking-wider">Dirección</label>
                   </div>
-                  <p className="text-sm font-medium pl-6 text-slate-700 dark:text-slate-300">{orden.direccion || '-'}</p>
+                  <div className="flex items-center gap-2 pl-6">
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{orden.direccion || '-'}</p>
+                    {orden.direccion && (
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(orden.direccion)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">map</span>
+                        Ver en Maps
+                      </a>
+                    )}
+                  </div>
                 </div>
 
                 {/* Observaciones */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 
 interface EditarAseguradoraModalProps {
@@ -20,6 +20,10 @@ export default function EditarAseguradoraModal({ isOpen, onClose, onUpdated, ase
      estado: 'Activa'
   });
   const [loading, setLoading] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [existingLogo, setExistingLogo] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen && aseguradoraData) {
@@ -33,24 +37,81 @@ export default function EditarAseguradoraModal({ isOpen, onClose, onUpdated, ase
             direccion: aseguradoraData.direccion || '',
             estado: aseguradoraData.estado || 'Activa',
         });
+        setExistingLogo(aseguradoraData.logo_url || null);
+        setLogoPreview(null);
+        setLogoFile(null);
     }
   }, [isOpen, aseguradoraData]);
 
   if (!isOpen) return null;
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('El archivo es demasiado grande. El tamaño máximo es 5MB.');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor, selecciona un archivo de imagen.');
+        return;
+      }
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadLogo = async (file: File): Promise<string | null> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = `logos/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('logos')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      console.error('Error uploading logo:', uploadError);
+      return null;
+    }
+
+    const { data } = supabase.storage.from('logos').getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setLoading(true);
 
+      let logoUrl: string | null | undefined = undefined;
+      if (logoFile) {
+        logoUrl = await uploadLogo(logoFile);
+      } else if (existingLogo) {
+        logoUrl = existingLogo;
+      }
+
+      const updateData: any = {
+          nombre: formData.nombre,
+          persona_contacto: formData.persona_contacto,
+          telefono: formData.telefono,
+          email: formData.email,
+          estado: formData.estado,
+          cif: formData.cif,
+          web: formData.web,
+          direccion: formData.direccion,
+      };
+
+      if (logoUrl !== undefined) {
+        updateData.logo_url = logoUrl;
+      }
+
       const { error } = await supabase
           .from('aseguradoras')
-          .update({
-              nombre: formData.nombre,
-              persona_contacto: formData.persona_contacto,
-              telefono: formData.telefono,
-              email: formData.email,
-              estado: formData.estado
-          })
+          .update(updateData)
           .eq('id', aseguradoraData.id);
 
       setLoading(false);
@@ -59,7 +120,7 @@ export default function EditarAseguradoraModal({ isOpen, onClose, onUpdated, ase
           onClose();
       } else {
           console.error("Error updating aseguradora:", error);
-          alert("Error al actualizar la aseguradora.");
+          alert("Error al actualizar el cliente.");
       }
   };
 
@@ -119,23 +180,57 @@ export default function EditarAseguradoraModal({ isOpen, onClose, onUpdated, ase
             
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Teléfono</label>
-              <input 
-                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" 
-                 placeholder="+34 900 000 000" 
+              <input
+                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                 placeholder="+34 900 000 000"
                  type="tel"
                  value={formData.telefono}
                  onChange={(e) => setFormData({...formData, telefono: e.target.value})}
               />
             </div>
 
+            {/* Logo */}
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Logo</label>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleLogoChange}
+                className="hidden"
+              />
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer group"
+              >
+                {logoPreview || existingLogo ? (
+                  <img src={logoPreview || existingLogo || ''} alt="Logo" className="h-12 w-auto object-contain rounded" />
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-primary transition-colors">upload_file</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">Subir logo</span>
+                  </>
+                )}
+              </div>
+              {(logoPreview || existingLogo) && (
+                <button
+                  type="button"
+                  onClick={() => { setLogoFile(null); setLogoPreview(null); setExistingLogo(null); }}
+                  className="mt-2 text-xs text-red-500 hover:text-red-600"
+                >
+                  Quitar logo
+                </button>
+              )}
+            </div>
+
             <div className="col-span-2">
               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Estado</label>
               <label className="relative inline-flex items-center cursor-pointer">
-                <input 
-                  checked={formData.estado === 'Activa'} 
+                <input
+                  checked={formData.estado === 'Activa'}
                   onChange={(e) => setFormData({...formData, estado: e.target.checked ? 'Activa' : 'Inactiva'})}
-                  className="sr-only peer" 
-                  type="checkbox" 
+                  className="sr-only peer"
+                  type="checkbox"
                 />
                 <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
                 <span className="ms-3 text-sm font-medium text-slate-900 dark:text-slate-300">Activa</span>
