@@ -937,10 +937,7 @@ const MobileDetalleOrden = () => {
                 />
 
                 {/* Modal Content */}
-                <div className="relative w-full max-w-2xl bg-[#f0f2f5] rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full duration-300 max-h-[88vh] flex flex-col mt-8 sm:mt-0">
-
-                    {/* Safe area spacing for mobile */}
-                    <div className="h-2 sm:hidden"></div>
+                <div className="relative w-full max-w-2xl bg-[#f0f2f5] rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full duration-300 max-h-[88vh] flex flex-col mt-6 sm:mt-0">
 
                     {/* Modal Header - Worker Info */}
                     <div className="bg-gradient-to-r from-primary to-primary/80 px-6 py-5 text-white shrink-0 rounded-t-[2.3rem]">
@@ -987,17 +984,6 @@ const MobileDetalleOrden = () => {
 
                     {/* Modal Body */}
                     <div className="overflow-y-auto p-6 pb-32 space-y-6">
-
-                        {/* Tiempo dedicado */}
-                        {viewingReport.horas_trabajadas > 0 && (
-                            <div className="bg-blue-50 rounded-xl p-4 flex items-center gap-3">
-                                <span className="material-symbols-outlined text-blue-600 text-2xl">schedule</span>
-                                <div>
-                                    <p className="text-[10px] font-bold text-blue-600 uppercase">Tiempo dedicado</p>
-                                    <p className="text-lg font-black text-blue-800">{viewingReport.horas_trabajadas} horas</p>
-                                </div>
-                            </div>
-                        )}
 
                         {/* Trabajo realizado */}
                         <div>
