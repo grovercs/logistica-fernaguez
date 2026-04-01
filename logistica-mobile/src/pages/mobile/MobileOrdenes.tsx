@@ -46,10 +46,9 @@ const MobileOrdenes = () => {
     const fetchOrdenes = async (userId: string, roleName: string) => {
         let query = supabase.from('ordenes').select('*');
 
-        // Only Technicians (Trabajadores) are restricted to their own orders
-        if (roleName === 'Trabajador') {
-            query = query.eq('tecnico_id', userId);
-        }
+        // Todos los trabajadores ven TODAS las órdenes
+        // (Antes: solo veían las suyas)
+        // Ahora pueden ver el panorama completo del trabajo
 
         const { data, error } = await query.order('creado_en', { ascending: false });
 

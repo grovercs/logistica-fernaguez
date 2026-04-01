@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import EditarOrdenModal from '../components/modals/EditarOrdenModal';
 import EditarReporteModal from '../components/modals/EditarReporteModal';
+import AsignacionesSection from '../components/AsignacionesSection';
 import { PrintableOrden } from '../components/PrintableOrden';
 import { useRef } from 'react';
 // @ts-ignore
@@ -348,6 +349,9 @@ export default function OrdenDetalle() {
 
               </div>
             </section>
+
+            {/* Asignaciones de Trabajo */}
+            <AsignacionesSection ordenId={id!} onUpdate={fetchOrden} />
           </div>
 
           {/* Right Column: Timeline and Details */}
