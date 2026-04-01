@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { smartCompress } from '../../lib/compressImage';
+import { uploadToCloudinary } from '../../lib/cloudinary';
 
 interface Props {
   isOpen: boolean;
@@ -52,21 +53,12 @@ export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporte
       // Compress image before upload (1280px max, 70% quality)
       const compressedFile = await smartCompress(file);
 
-      const folder = type === 'foto' ? 'visitas' : 'facturas';
-      const fileName = `${folder}/${reporteData.id}/${Date.now()}-${file.name}`;
+      // Upload to Cloudinary
+      const folder = type === 'foto' ? 'logistica/visitas' : 'logistica/facturas';
+      const result = await uploadToCloudinary(compressedFile, folder);
 
-      const { data, error } = await supabase.storage
-        .from('fotos-reportes')
-        .upload(fileName, compressedFile);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('fotos-reportes')
-        .getPublicUrl(data.path);
-
-      if (type === 'foto') setFotos(prev => [...prev, publicUrl]);
-      else setFacturas(prev => [...prev, publicUrl]);
+      if (type === 'foto') setFotos(prev => [...prev, result.secure_url]);
+      else setFacturas(prev => [...prev, result.secure_url]);
     } catch (err: any) {
       alert("Error al subir archivo: " + err.message);
     } finally {

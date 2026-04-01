@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { compressImage } from '../../lib/compressImage';
+import { uploadToCloudinary } from '../../lib/cloudinary';
 
 const MobileDetalleOrden = () => {
     const { id } = useParams<{ id: string }>();
@@ -223,20 +224,9 @@ const MobileDetalleOrden = () => {
                 const sizeKB = Math.round(compressed.size / 1024);
                 console.log(`Compressed ${file.name}: ${Math.round(file.size/1024)}KB → ${sizeKB}KB`);
 
-                // 3. Upload to Supabase Storage
-                const fileName = `${id}/${Date.now()}-${file.name.replace(/[^a-z0-9.]/gi, '_')}`;
-                const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('fotos-reportes')
-                    .upload(fileName, compressed, { contentType: 'image/jpeg', upsert: false });
-
-                if (uploadError) throw uploadError;
-
-                // 4. Get public URL
-                const { data: { publicUrl } } = supabase.storage
-                    .from('fotos-reportes')
-                    .getPublicUrl(uploadData.path);
-
-                newUrls.push(publicUrl);
+                // 3. Upload to Cloudinary
+                const result = await uploadToCloudinary(compressed, 'logistica/visitas');
+                newUrls.push(result.secure_url);
             } catch (err) {
                 console.error('Error uploading photo:', err);
                 alert('Error al subir una foto. Revisa tu conexión e inténtalo de nuevo.');
@@ -260,23 +250,8 @@ const MobileDetalleOrden = () => {
             return;
         }
 
-        // Extract storage path from the public URL
-        // URL format: .../storage/v1/object/public/fotos-reportes/PATH
-        const marker = '/fotos-reportes/';
-        const pathStart = urlToDelete.indexOf(marker);
-        const storagePath = pathStart !== -1 ? urlToDelete.slice(pathStart + marker.length) : null;
-
-        if (storagePath) {
-            const { error } = await supabase.storage
-                .from('fotos-reportes')
-                .remove([storagePath]);
-            if (error) {
-                console.error('Error deleting photo:', error);
-                alert('No se pudo borrar la foto del servidor.');
-                return;
-            }
-        }
-
+        // Note: We don't delete from Cloudinary (requires backend/API secret)
+        // Simply remove from local state - images remain in Cloudinary
         setFotos(prev => prev.filter((_, i) => i !== index));
         setFotoPreviews(prev => prev.filter((_, i) => i !== index));
     };
@@ -292,13 +267,8 @@ const MobileDetalleOrden = () => {
             try {
                 newPreviews.push(URL.createObjectURL(file));
                 const compressed = await compressImage(file, 1600, 0.75); // Good quality for invoices
-                const fileName = `facturas/${id}/${Date.now()}-${file.name.replace(/[^a-z0-9.]/gi, '_')}`;
-                const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('fotos-reportes')
-                    .upload(fileName, compressed, { contentType: 'image/jpeg', upsert: false });
-                if (uploadError) throw uploadError;
-                const { data: { publicUrl } } = supabase.storage.from('fotos-reportes').getPublicUrl(uploadData.path);
-                newUrls.push(publicUrl);
+                const result = await uploadToCloudinary(compressed, 'logistica/facturas');
+                newUrls.push(result.secure_url);
             } catch (err) {
                 console.error('Error uploading invoice:', err);
                 alert('Error al subir la factura.');
@@ -316,13 +286,8 @@ const MobileDetalleOrden = () => {
             setFacturaPreviews(prev => prev.filter((_, i) => i !== index));
             return;
         }
-        const marker = '/fotos-reportes/';
-        const pathStart = urlToDelete.indexOf(marker);
-        const storagePath = pathStart !== -1 ? urlToDelete.slice(pathStart + marker.length) : null;
-        if (storagePath) {
-            const { error } = await supabase.storage.from('fotos-reportes').remove([storagePath]);
-            if (error) { alert('No se pudo borrar la factura.'); return; }
-        }
+        // Note: We don't delete from Cloudinary (requires backend/API secret)
+        // Simply remove from local state
         setFacturas(prev => prev.filter((_, i) => i !== index));
         setFacturaPreviews(prev => prev.filter((_, i) => i !== index));
     };
