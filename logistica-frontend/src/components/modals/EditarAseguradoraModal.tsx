@@ -157,27 +157,27 @@ export default function EditarAseguradoraModal({ isOpen, onClose, onUpdated, ase
             </div>
 
             <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">CIF / NIF</label>
+              <input
+                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                 placeholder="B12345678"
+                 type="text"
+                 value={formData.cif}
+                 onChange={(e) => setFormData({...formData, cif: e.target.value})}
+              />
+            </div>
+
+            <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Persona de Contacto</label>
-              <input 
-                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" 
-                 placeholder="Nombre completo" 
+              <input
+                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                 placeholder="Nombre completo"
                  type="text"
                  value={formData.persona_contacto}
                  onChange={(e) => setFormData({...formData, persona_contacto: e.target.value})}
               />
             </div>
 
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Email de Contacto</label>
-              <input 
-                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" 
-                 placeholder="contacto@empresa.com" 
-                 type="email"
-                 value={formData.email}
-                 onChange={(e) => setFormData({...formData, email: e.target.value})}
-              />
-            </div>
-            
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Teléfono</label>
               <input
@@ -186,6 +186,39 @@ export default function EditarAseguradoraModal({ isOpen, onClose, onUpdated, ase
                  type="tel"
                  value={formData.telefono}
                  onChange={(e) => setFormData({...formData, telefono: e.target.value})}
+              />
+            </div>
+
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Email de Contacto</label>
+              <input
+                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                 placeholder="contacto@empresa.com"
+                 type="email"
+                 value={formData.email}
+                 onChange={(e) => setFormData({...formData, email: e.target.value})}
+              />
+            </div>
+
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Sitio Web</label>
+              <input
+                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                 placeholder="https://www.ejemplo.com"
+                 type="url"
+                 value={formData.web}
+                 onChange={(e) => setFormData({...formData, web: e.target.value})}
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Dirección</label>
+              <input
+                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                 placeholder="Calle, Número, Ciudad, CP"
+                 type="text"
+                 value={formData.direccion}
+                 onChange={(e) => setFormData({...formData, direccion: e.target.value})}
               />
             </div>
 
