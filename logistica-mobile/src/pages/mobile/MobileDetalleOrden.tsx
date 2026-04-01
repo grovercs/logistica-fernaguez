@@ -937,10 +937,10 @@ const MobileDetalleOrden = () => {
                 />
 
                 {/* Modal Content */}
-                <div className="relative w-full max-w-2xl bg-[#f0f2f5] rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full duration-300 max-h-[95vh] flex flex-col">
+                <div className="relative w-full max-w-2xl bg-[#f0f2f5] rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full duration-300 max-h-[92vh] flex flex-col mt-4">
 
                     {/* Modal Header - Worker Info */}
-                    <div className="bg-gradient-to-r from-primary to-primary/80 px-6 py-5 text-white shrink-0">
+                    <div className="bg-gradient-to-r from-primary to-primary/80 px-6 py-5 text-white shrink-0 rounded-t-[2.3rem]">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
