@@ -8,6 +8,7 @@ const MobileOrdenes = () => {
     const [loading, setLoading] = useState(true);
     const [currentUserName, setCurrentUserName] = useState<string>('');
     const [currentUserRole, setCurrentUserRole] = useState<string>('');
+    const [currentUserEspecialidad, setCurrentUserEspecialidad] = useState<string>('');
     const [lastActiveId, setLastActiveId] = useState<string | null>(null);
 
     useEffect(() => {
@@ -31,6 +32,17 @@ const MobileOrdenes = () => {
             const roleName = (profile?.roles as any)?.nombre || 'Trabajador';
             setCurrentUserRole(roleName);
             setCurrentUserName(profile?.nombre_completo || userData?.user?.email?.split('@')[0] || 'Usuario');
+
+            // Fetch User's specialty from trabajadores
+            const { data: trabajador } = await supabase
+                .from('trabajadores')
+                .select('especialidad')
+                .eq('auth_user_id', userId)
+                .maybeSingle();
+
+            if (trabajador?.especialidad) {
+                setCurrentUserEspecialidad(trabajador.especialidad);
+            }
 
             // Fetch all relevant orders based on role
             await fetchOrdenes(userId, roleName);
@@ -88,14 +100,21 @@ const MobileOrdenes = () => {
             {/* User Header */}
             <div className="bg-white shadow-sm px-4 py-3 flex items-center justify-between sticky top-0 z-10">
                 <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-sm uppercase shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white font-black text-sm uppercase shrink-0 shadow-sm">
                         {currentUserName ? currentUserName.charAt(0) : '?'}
                     </div>
                     <div>
                         <p className="text-sm font-bold text-slate-800 leading-tight">
                             {currentUserName}
                         </p>
-                        <p className="text-[10px] text-primary font-bold uppercase tracking-wider">{currentUserRole}</p>
+                        {currentUserEspecialidad ? (
+                            <p className="text-[11px] text-primary font-bold uppercase tracking-wide flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[14px]">work</span>
+                                {currentUserEspecialidad}
+                            </p>
+                        ) : (
+                            <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">{currentUserRole}</p>
+                        )}
                     </div>
                 </div>
                 <button
