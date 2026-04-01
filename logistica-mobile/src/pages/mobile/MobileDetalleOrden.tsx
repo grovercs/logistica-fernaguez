@@ -578,7 +578,6 @@ const MobileDetalleOrden = () => {
                                 // Get technician info from the map, fallback to 'Técnico'
                                 const tecnicoInfo = trabajadoresMap.get(rep.tecnico_id);
                                 const tecnicoName = tecnicoInfo?.nombre || 'Técnico';
-                                const tecnicoEspecialidad = tecnicoInfo?.especialidad || '';
 
                                 return (
                                     <div
