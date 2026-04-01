@@ -16,7 +16,7 @@ const MobileDetalleOrden = () => {
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [currentUserName, setCurrentUserName] = useState<string>('');
     const [currentUserRole, setCurrentUserRole] = useState<string>('');
-    const [trabajadoresMap, setTrabajadoresMap] = useState<Map<string, string>>(new Map());
+    const [trabajadoresMap, setTrabajadoresMap] = useState<Map<string, { nombre: string; especialidad: string }>>(new Map());
 
     // Form state corresponding to the design
     const [fecha, setFecha] = useState('');
@@ -85,8 +85,8 @@ const MobileDetalleOrden = () => {
             supabase.from('ordenes').select('*').eq('id', id).single(),
             // Todos los trabajadores ven TODAS las intervenciones de la orden
             supabase.from('reportes').select('*').eq('orden_id', id).order('creado_en', { ascending: false }),
-            // Fetch all workers to map IDs to names
-            supabase.from('trabajadores').select('auth_user_id, nombre, apellidos')
+            // Fetch all workers to map IDs to names and specialties
+            supabase.from('trabajadores').select('auth_user_id, nombre, apellidos, especialidad')
         ]);
 
         if (ordenReq.error) {
@@ -101,12 +101,15 @@ const MobileDetalleOrden = () => {
             console.error('Error fetching trabajadores:', trabajadoresReq.error);
         }
 
-        // Create map of technician IDs to names
+        // Create map of technician IDs to names and specialties
         if (!trabajadoresReq.error && trabajadoresReq.data) {
-            const map = new Map<string, string>();
+            const map = new Map<string, { nombre: string; especialidad: string }>();
             trabajadoresReq.data.forEach((t: any) => {
                 if (t.auth_user_id && t.nombre) {
-                    map.set(t.auth_user_id, `${t.nombre} ${t.apellidos || ''}`.trim());
+                    map.set(t.auth_user_id, {
+                        nombre: `${t.nombre} ${t.apellidos || ''}`.trim(),
+                        especialidad: t.especialidad || ''
+                    });
                 }
             });
             setTrabajadoresMap(map);
@@ -572,8 +575,10 @@ const MobileDetalleOrden = () => {
                             {reportes.map((rep, idx) => {
                                 const canEdit = currentUserRole === 'Administrador' || currentUserRole === 'Editor' || rep.tecnico_id === currentUserId;
                                 const canDelete = currentUserRole === 'Administrador';
-                                // Get technician name from the map, fallback to 'Técnico'
-                                const tecnicoName = trabajadoresMap.get(rep.tecnico_id) || 'Técnico';
+                                // Get technician info from the map, fallback to 'Técnico'
+                                const tecnicoInfo = trabajadoresMap.get(rep.tecnico_id);
+                                const tecnicoName = tecnicoInfo?.nombre || 'Técnico';
+                                const tecnicoEspecialidad = tecnicoInfo?.especialidad || '';
 
                                 return (
                                     <div
@@ -935,31 +940,51 @@ const MobileDetalleOrden = () => {
                 {/* Modal Content */}
                 <div className="relative w-full max-w-2xl bg-[#f0f2f5] rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full duration-300 max-h-[95vh] flex flex-col">
 
-                    {/* Modal Header */}
-                    <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 shrink-0">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                <span className="material-symbols-outlined text-[20px]">visibility</span>
+                    {/* Modal Header - Worker Info */}
+                    <div className="bg-gradient-to-r from-primary to-primary/80 px-6 py-5 text-white shrink-0">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-2xl">person</span>
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-black tracking-tight">
+                                        {(() => {
+                                            const info = trabajadoresMap.get(viewingReport.tecnico_id);
+                                            return info?.nombre || 'Técnico';
+                                        })()}
+                                    </h2>
+                                    <p className="text-sm text-white/80 font-medium uppercase">
+                                        {(() => {
+                                            const info = trabajadoresMap.get(viewingReport.tecnico_id);
+                                            return info?.especialidad || 'Trabajador';
+                                        })()}
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <h2 className="text-lg font-black text-slate-800 tracking-tight">
-                                    Parte de Trabajo
-                                </h2>
-                                <p className="text-[10px] text-slate-500">
-                                    {trabajadoresMap.get(viewingReport.tecnico_id) || 'Técnico'} • {new Date(viewingReport.fecha_trabajo || viewingReport.creado_en).toLocaleDateString('es-ES')}
-                                </p>
-                            </div>
+                            <button
+                                onClick={() => setViewingReport(null)}
+                                className="text-white/80 hover:text-white active:scale-95 transition-all p-1"
+                            >
+                                <span className="material-symbols-outlined text-[28px]">close</span>
+                            </button>
                         </div>
-                        <button
-                            onClick={() => setViewingReport(null)}
-                            className="text-slate-400 hover:text-slate-600 active:scale-95 transition-all p-1"
-                        >
-                            <span className="material-symbols-outlined text-[28px]">close</span>
-                        </button>
+                        <div className="mt-3 flex items-center gap-4 text-sm text-white/70">
+                            <span className="flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[16px]">calendar_today</span>
+                                {new Date(viewingReport.fecha_trabajo || viewingReport.creado_en).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                            </span>
+                            {viewingReport.horas_trabajadas > 0 && (
+                                <span className="flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[16px]">schedule</span>
+                                    {viewingReport.horas_trabajadas}h
+                                </span>
+                            )}
+                        </div>
                     </div>
 
                     {/* Modal Body */}
-                    <div className="overflow-y-auto p-6 pb-24 space-y-6">
+                    <div className="overflow-y-auto p-6 pb-32 space-y-6">
 
                         {/* Tiempo dedicado */}
                         {viewingReport.horas_trabajadas > 0 && (
@@ -1055,7 +1080,21 @@ const MobileDetalleOrden = () => {
                                 </div>
                             </div>
                         )}
+                    </div>
 
+                    {/* Bottom Action Button */}
+                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#f0f2f5] via-[#f0f2f5] to-transparent pt-8">
+                        <button
+                            onClick={() => {
+                                setViewingReport(null);
+                                resetForm();
+                                setShowForm(true);
+                            }}
+                            className="w-full bg-primary text-white font-black py-4 rounded-2xl shadow-lg shadow-primary/30 active:scale-95 transition-all flex items-center justify-center gap-2"
+                        >
+                            <span className="material-symbols-outlined">add_circle</span>
+                            AÑADIR MI INTERVENCIÓN
+                        </button>
                     </div>
                 </div>
             </div>
