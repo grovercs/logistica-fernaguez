@@ -2,11 +2,21 @@
  * Compresses an image file using the Canvas API before uploading.
  * Resizes to max 1280px on longest side, outputs JPEG at 70% quality.
  * Typical result: 5MB phone photo → ~100-150KB
+ *
+ * @param file - The image file to compress
+ * @param maxPx - Maximum pixels on longest side (default: 1280)
+ * @param quality - JPEG quality 0-1 (default: 0.7 = 70%)
+ * @returns Promise<Blob> - Compressed image blob
  */
-export async function compressImage(file: File, maxPx = 1280, quality = 0.7): Promise<Blob> {
+export async function compressImage(
+  file: File,
+  maxPx: number = 1280,
+  quality: number = 0.7
+): Promise<Blob> {
   return new Promise((resolve, reject) => {
     // Check if file is actually an image
     if (!file.type.startsWith('image/')) {
+      // If not an image, return original file as blob
       resolve(file);
       return;
     }
@@ -47,8 +57,11 @@ export async function compressImage(file: File, maxPx = 1280, quality = 0.7): Pr
 
       canvas.toBlob(
         (blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error('Compression failed'));
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Compression failed'));
+          }
         },
         'image/jpeg',
         quality

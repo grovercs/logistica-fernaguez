@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { smartCompress } from '../../lib/compressImage';
 
 interface Props {
   isOpen: boolean;
@@ -48,12 +49,15 @@ export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporte
     else setUploadingFactura(true);
 
     try {
+      // Compress image before upload (1280px max, 70% quality)
+      const compressedFile = await smartCompress(file);
+
       const folder = type === 'foto' ? 'visitas' : 'facturas';
       const fileName = `${folder}/${reporteData.id}/${Date.now()}-${file.name}`;
-      
+
       const { data, error } = await supabase.storage
         .from('fotos-reportes')
-        .upload(fileName, file);
+        .upload(fileName, compressedFile);
 
       if (error) throw error;
 

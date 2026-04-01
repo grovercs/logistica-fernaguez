@@ -218,7 +218,7 @@ const MobileDetalleOrden = () => {
                 const localPreview = URL.createObjectURL(file);
                 newPreviews.push(localPreview);
 
-                // 2. Compress the image (max 1920px, JPEG 80%)
+                // 2. Compress the image (max 1280px, JPEG 70%)
                 const compressed = await compressImage(file);
                 const sizeKB = Math.round(compressed.size / 1024);
                 console.log(`Compressed ${file.name}: ${Math.round(file.size/1024)}KB → ${sizeKB}KB`);
@@ -291,7 +291,7 @@ const MobileDetalleOrden = () => {
         for (const file of Array.from(files)) {
             try {
                 newPreviews.push(URL.createObjectURL(file));
-                const compressed = await compressImage(file, 2400, 0.9); // Higher quality for invoices
+                const compressed = await compressImage(file, 1600, 0.75); // Good quality for invoices
                 const fileName = `facturas/${id}/${Date.now()}-${file.name.replace(/[^a-z0-9.]/gi, '_')}`;
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('fotos-reportes')
