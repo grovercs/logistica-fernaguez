@@ -144,16 +144,16 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
             </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Reference */}
+              {/* Reference / DNI */}
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px] text-slate-400">tag</span>
-                  Referencia / Póliza *
+                  <span className="material-symbols-outlined text-[16px] text-slate-400">badge</span>
+                  {formData.aseguradora ? 'CIF de la Empresa *' : 'DNI / NIF *'}
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
-                  placeholder="Ej: POL-2023-445"
+                  placeholder={formData.aseguradora ? "Ej: B12345678" : "Ej: 12345678A"}
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.referencia}
                   onChange={(e) => setFormData({...formData, referencia: e.target.value})}
@@ -175,18 +175,18 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                 />
               </div>
 
-              {/* Aseguradora */}
+              {/* Empresa / Cliente */}
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px] text-slate-400">shield</span>
-                  Aseguradora
+                  <span className="material-symbols-outlined text-[16px] text-slate-400">business</span>
+                  Empresa / Cliente
                 </label>
-                <select 
+                <select
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.aseguradora}
                   onChange={(e) => setFormData({...formData, aseguradora: e.target.value})}
                 >
-                  <option value="">Ninguna / Cliente Particular</option>
+                  <option value="">Cliente Particular</option>
                   {aseguradoras.map(a => (
                      <option key={a.id} value={a.nombre}>{a.nombre}</option>
                   ))}
@@ -201,27 +201,27 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
               <div className="space-y-1.5 md:col-span-2">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[16px] text-slate-400">person</span>
-                  Cliente o Representante (Facturación)
+                  {formData.aseguradora ? 'Empresa / Cliente' : 'Nombre del Cliente'}
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
-                  placeholder="Nombre Comercial / Empresa"
+                  placeholder={formData.aseguradora ? "Nombre de la empresa" : "Nombre completo del cliente"}
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.cliente}
                   onChange={(e) => setFormData({...formData, cliente: e.target.value})}
                 />
               </div>
 
-              {/* Data Extension: Asegurado & Contacts */}
+              {/* Contacto en Domicilio / Persona Responsable */}
               <div className="space-y-1.5 md:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Nombre Asegurado</label>
-                        <input type="text" value={formData.asegurado} onChange={e => setFormData({...formData, asegurado: e.target.value})} placeholder="Persona en el domicilio" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                        <label className="text-xs font-bold text-slate-500 uppercase">{formData.aseguradora ? 'Persona Responsable' : 'Contacto en Domicilio'}</label>
+                        <input type="text" value={formData.asegurado} onChange={e => setFormData({...formData, asegurado: e.target.value})} placeholder={formData.aseguradora ? "Persona de contacto en la empresa" : "Persona en el domicilio"} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Teléfono Asegurado</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Teléfono</label>
                         <input type="tel" value={formData.telefono_asegurado} onChange={e => setFormData({...formData, telefono_asegurado: e.target.value})} placeholder="Ej: 600123456" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                 </div>
@@ -234,7 +234,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                         <input type="text" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} placeholder="Ej: Calle Gran Vía 123, 1ºA, Madrid" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Email del Cliente / Asegurado</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Email del Cliente</label>
                         <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="correo@ejemplo.com" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                 </div>
@@ -243,12 +243,12 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
               <div className="space-y-1.5 md:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Persona Contacto (Si diferente)</label>
-                        <input type="text" value={formData.persona_contacto} onChange={e => setFormData({...formData, persona_contacto: e.target.value})} placeholder="Si es distinto al asegurado" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                        <label className="text-xs font-bold text-slate-500 uppercase">Persona de Contacto Adicional</label>
+                        <input type="text" value={formData.persona_contacto} onChange={e => setFormData({...formData, persona_contacto: e.target.value})} placeholder="Otra persona de contacto" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Teléfono Contacto</label>
-                        <input type="tel" value={formData.telefono_contacto} onChange={e => setFormData({...formData, telefono_contacto: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                        <label className="text-xs font-bold text-slate-500 uppercase">Teléfono de Contacto Adicional</label>
+                        <input type="tel" value={formData.telefono_contacto} onChange={e => setFormData({...formData, telefono_contacto: e.target.value})} placeholder="Ej: 600123456" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                 </div>
               </div>
@@ -309,10 +309,10 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                   <span className="material-symbols-outlined text-[16px] text-slate-400">edit_note</span>
                   Trabajo a Realizar / Observaciones
                 </label>
-                <textarea 
+                <textarea
                   rows={3}
                   required
-                  placeholder="Descripción del siniestro, tareas requeridas, etc."
+                  placeholder="Descripción del trabajo, tareas requeridas, etc."
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm resize-none"
                   value={formData.observaciones}
                   onChange={(e) => setFormData({...formData, observaciones: e.target.value})}
