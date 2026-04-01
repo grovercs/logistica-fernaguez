@@ -178,18 +178,6 @@ const MobileDetalleOrden = () => {
         if (fileInputRef.current) fileInputRef.current.value = '';
         if (facturaInputRef.current) facturaInputRef.current.value = '';
     };
-        setSelectedMinuto(0);
-        
-        // Reset canvas
-        const ctx = canvasRef.current?.getContext('2d');
-        ctx?.clearRect(0, 0, canvasRef.current?.width || 0, canvasRef.current?.height || 0);
-
-        // Reset date to today
-        setFecha(new Date().toISOString().split('T')[0]);
-
-        // Open Modal
-        setShowForm(true);
-    };
 
     const loadReportData = (rep: any) => {
         setReporte(rep);
