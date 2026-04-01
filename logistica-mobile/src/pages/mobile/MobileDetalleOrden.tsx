@@ -16,7 +16,8 @@ const MobileDetalleOrden = () => {
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [currentUserName, setCurrentUserName] = useState<string>('');
     const [currentUserRole, setCurrentUserRole] = useState<string>('');
-    
+    const [trabajadoresMap, setTrabajadoresMap] = useState<Map<string, string>>(new Map());
+
     // Form state corresponding to the design
     const [fecha, setFecha] = useState('');
     const [trabajoRealizado, setTrabajoRealizado] = useState('');
@@ -79,10 +80,12 @@ const MobileDetalleOrden = () => {
         setCurrentUserRole(roleName);
         setCurrentUserName(profile?.nombre_completo || userData?.user?.email?.split('@')[0] || 'Trabajador');
 
-        const [ordenReq, reportesReq] = await Promise.all([
+        const [ordenReq, reportesReq, trabajadoresReq] = await Promise.all([
             supabase.from('ordenes').select('*').eq('id', id).single(),
             // Todos los trabajadores ven TODAS las intervenciones de la orden
-            supabase.from('reportes').select('*').eq('orden_id', id).order('creado_en', { ascending: false })
+            supabase.from('reportes').select('*').eq('orden_id', id).order('creado_en', { ascending: false }),
+            // Fetch all workers to map IDs to names
+            supabase.from('trabajadores').select('auth_user_id, nombre, apellidos')
         ]);
 
         if (ordenReq.error) {
@@ -91,6 +94,21 @@ const MobileDetalleOrden = () => {
 
         if (reportesReq.error) {
             console.error('Error fetching reportes:', reportesReq.error);
+        }
+
+        if (trabajadoresReq.error) {
+            console.error('Error fetching trabajadores:', trabajadoresReq.error);
+        }
+
+        // Create map of technician IDs to names
+        if (!trabajadoresReq.error && trabajadoresReq.data) {
+            const map = new Map<string, string>();
+            trabajadoresReq.data.forEach((t: any) => {
+                if (t.auth_user_id && t.nombre) {
+                    map.set(t.auth_user_id, `${t.nombre} ${t.apellidos || ''}`.trim());
+                }
+            });
+            setTrabajadoresMap(map);
         }
 
         if (!ordenReq.error && ordenReq.data) {
@@ -553,7 +571,8 @@ const MobileDetalleOrden = () => {
                             {reportes.map((rep, idx) => {
                                 const canEdit = currentUserRole === 'Administrador' || currentUserRole === 'Editor' || rep.tecnico_id === currentUserId;
                                 const canDelete = currentUserRole === 'Administrador';
-                                const tecnicoName = (rep.perfiles as any)?.nombre_completo || 'Técnico';
+                                // Get technician name from the map, fallback to 'Técnico'
+                                const tecnicoName = trabajadoresMap.get(rep.tecnico_id) || 'Técnico';
 
                                 return (
                                     <div 
