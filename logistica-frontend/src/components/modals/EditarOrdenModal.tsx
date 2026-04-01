@@ -140,15 +140,16 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
           <form id="editarReporteForm" onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
+              {/* Tipo de Cliente: DNI o CIF */}
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px] text-slate-400">tag</span>
-                  Referencia *
+                  <span className="material-symbols-outlined text-[16px] text-slate-400">badge</span>
+                  {formData.aseguradora ? 'CIF de la Empresa' : 'DNI / NIF'}
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej: CLI-2023-445"
+                  placeholder={formData.aseguradora ? "Ej: B12345678" : "Ej: 12345678A"}
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.referencia}
                   onChange={(e) => setFormData({...formData, referencia: e.target.value})}
@@ -169,17 +170,18 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
                 />
               </div>
 
+              {/* Cliente / Empresa */}
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[16px] text-slate-400">business</span>
-                  Empresa / Cliente
+                  {formData.aseguradora ? 'Empresa' : 'Tipo de Cliente'}
                 </label>
                 <select
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.aseguradora}
                   onChange={(e) => setFormData({...formData, aseguradora: e.target.value})}
                 >
-                  <option value="">Sin empresa (cliente particular)</option>
+                  <option value="">Cliente Particular</option>
                   {aseguradoras.map(a => (
                      <option key={a.id} value={a.nombre}>{a.nombre}</option>
                   ))}
@@ -214,26 +216,29 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
               <div className="space-y-1.5 md:col-span-2">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[16px] text-slate-400">person</span>
-                  Cliente o Representante (Facturación) *
+                  {formData.aseguradora ? 'Nombre de la Empresa' : 'Nombre Completo'} *
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
-                  placeholder="Nombre Comercial / Empresa"
+                  placeholder={formData.aseguradora ? "Nombre de la empresa" : "Nombre y apellidos"}
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.cliente}
                   onChange={(e) => setFormData({...formData, cliente: e.target.value})}
                 />
               </div>
 
+              {/* Contacto en el domicilio / Persona responsable */}
               <div className="space-y-1.5 md:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Nombre Contacto</label>
-                        <input type="text" value={formData.asegurado} onChange={e => setFormData({...formData, asegurado: e.target.value})} placeholder="Persona en el domicilio" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                        <label className="text-xs font-bold text-slate-500 uppercase">
+                          {formData.aseguradora ? 'Persona Responsable' : 'Contacto en Domicilio'}
+                        </label>
+                        <input type="text" value={formData.asegurado} onChange={e => setFormData({...formData, asegurado: e.target.value})} placeholder={formData.aseguradora ? "Nombre de la persona de contacto" : "Persona en el domicilio"} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Teléfono Contacto</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Teléfono</label>
                         <input type="tel" value={formData.telefono_asegurado} onChange={e => setFormData({...formData, telefono_asegurado: e.target.value})} placeholder="Ej: 600123456" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                 </div>
