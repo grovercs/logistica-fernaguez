@@ -143,12 +143,12 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[16px] text-slate-400">tag</span>
-                  Referencia / Póliza *
+                  Referencia *
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
-                  placeholder="Ej: POL-2023-445"
+                  placeholder="Ej: CLI-2023-445"
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.referencia}
                   onChange={(e) => setFormData({...formData, referencia: e.target.value})}
@@ -160,8 +160,8 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
                   <span className="material-symbols-outlined text-[16px] text-slate-400">link</span>
                   Otras Órdenes Vinculadas
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Ej: OB-2023-1254"
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.otras_ordenes}
@@ -171,15 +171,15 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
 
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px] text-slate-400">shield</span>
-                  Aseguradora
+                  <span className="material-symbols-outlined text-[16px] text-slate-400">business</span>
+                  Empresa / Cliente
                 </label>
-                <select 
+                <select
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.aseguradora}
                   onChange={(e) => setFormData({...formData, aseguradora: e.target.value})}
                 >
-                  <option value="">Ninguna / Cliente Particular</option>
+                  <option value="">Sin empresa (cliente particular)</option>
                   {aseguradoras.map(a => (
                      <option key={a.id} value={a.nombre}>{a.nombre}</option>
                   ))}
@@ -229,11 +229,11 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
               <div className="space-y-1.5 md:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Nombre Asegurado</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Nombre Contacto</label>
                         <input type="text" value={formData.asegurado} onChange={e => setFormData({...formData, asegurado: e.target.value})} placeholder="Persona en el domicilio" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Teléfono Asegurado</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Teléfono Contacto</label>
                         <input type="tel" value={formData.telefono_asegurado} onChange={e => setFormData({...formData, telefono_asegurado: e.target.value})} placeholder="Ej: 600123456" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                 </div>

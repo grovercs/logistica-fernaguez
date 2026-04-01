@@ -516,15 +516,15 @@ const MobileDetalleOrden = () => {
                          <h2 className="text-lg font-bold text-slate-800 leading-tight mt-1">{orden?.cliente}</h2>
                      </div>
                      <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-1 rounded-lg uppercase">
-                         {orden?.aseguradora || 'Particular'}
+                         {orden?.aseguradora || 'Sin empresa'}
                      </span>
                  </div>
 
-                 {/* Asegurado y Teléfono */}
+                 {/* Contacto y Teléfono */}
                  {(orden?.asegurado || orden?.telefono_asegurado) && (
                      <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
                          <div>
-                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Asegurado</p>
+                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Contacto</p>
                              <p className="text-sm font-semibold text-slate-700 mt-1">{orden?.asegurado || '-'}</p>
                          </div>
                          <div>
@@ -704,8 +704,8 @@ const MobileDetalleOrden = () => {
                             {/* Motivo de la orden (para referencia) */}
                             <div className="pt-2">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight flex justify-between items-center mb-2">
-                                    Motivo de la Orden 
-                                    <span className="text-[9px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded font-black">POL: {orden?.poliza || '-'}</span>
+                                    Motivo de la Orden
+                                    <span className="text-[9px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded font-black">REF: {orden?.poliza || '-'}</span>
                                 </p>
                                 <p className="text-xs text-slate-600 leading-relaxed bg-white/50 p-4 rounded-2xl border border-white shadow-inner italic">
                                     {orden?.descripcion || 'Sin descripción detallada'}

@@ -235,11 +235,11 @@ export default function OrdenDetalle() {
                 {/* Parte de Avería / Poliza */}
                 <div className="p-4 flex flex-col gap-1">
                   <div className="flex items-center gap-2 text-slate-500">
-                    <span className="material-symbols-outlined text-[16px]">location_on</span>
-                    <label className="text-xs font-bold uppercase tracking-wider">Aseguradora / Póliza</label>
+                    <span className="material-symbols-outlined text-[16px]">business</span>
+                    <label className="text-xs font-bold uppercase tracking-wider">Empresa / Referencia</label>
                   </div>
                   <div className="pl-6">
-                    <span className="inline-flex px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 uppercase">{orden.aseguradora} - {orden.poliza || 'N/A'}</span>
+                    <span className="inline-flex px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 uppercase">{orden.aseguradora || 'Sin empresa'} - {orden.poliza || 'N/A'}</span>
                   </div>
                 </div>
 
@@ -263,20 +263,20 @@ export default function OrdenDetalle() {
                   <p className="text-sm font-medium pl-6 text-slate-700 dark:text-slate-300">{orden.otras_ordenes || '-'}</p>
                 </div>
 
-                {/* Asegurado */}
+                {/* Contacto en domicilio */}
                 <div className="p-4 flex flex-col gap-1">
                   <div className="flex items-center gap-2 text-slate-500">
                     <span className="material-symbols-outlined text-[16px]">person</span>
-                    <label className="text-xs font-bold uppercase tracking-wider">Asegurado</label>
+                    <label className="text-xs font-bold uppercase tracking-wider">Contacto en Domicilio</label>
                   </div>
                   <p className="text-sm font-medium pl-6 text-slate-700 dark:text-slate-300">{orden.asegurado || '-'}</p>
                 </div>
 
-                {/* Teléfono Asegurado */}
+                {/* Teléfono Contacto */}
                 <div className="p-4 flex flex-col gap-1">
                   <div className="flex items-center gap-2 text-slate-500">
                     <span className="material-symbols-outlined text-[16px]">call</span>
-                    <label className="text-xs font-bold uppercase tracking-wider">Teléfono Asegurado</label>
+                    <label className="text-xs font-bold uppercase tracking-wider">Teléfono Contacto</label>
                   </div>
                   <p className="text-sm font-medium pl-6 text-slate-700 dark:text-slate-300">{orden.telefono_asegurado || '-'}</p>
                 </div>
