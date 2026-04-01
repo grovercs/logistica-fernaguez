@@ -43,7 +43,7 @@ const MobileOrdenes = () => {
     }, []);
 
     // Fetch orders function - can be called to refresh
-    const fetchOrdenes = async (userId: string, roleName: string) => {
+    const fetchOrdenes = async (_userId: string, _roleName: string) => {
         let query = supabase.from('ordenes').select('*');
 
         // Todos los trabajadores ven TODAS las órdenes
