@@ -55,7 +55,7 @@ export async function uploadToCloudinary(
  * Note: Requires backend for secure deletion, this is a placeholder
  * For now, images are just orphaned (not deleted from Cloudinary)
  */
-export async function deleteFromCloudinary(publicId: string): Promise<boolean> {
+export async function deleteFromCloudinary(_publicId: string): Promise<boolean> {
   // Note: Secure deletion requires the API Secret (backend only)
   // For now, we'll just return true - images remain in Cloudinary
   // In production, implement a Supabase Edge Function for deletion
