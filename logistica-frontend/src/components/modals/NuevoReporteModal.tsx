@@ -100,8 +100,10 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
   const handleAseguradoraChange = (nombreAseguradora: string) => {
     const aseguradoraSeleccionada = aseguradoras.find(a => a.nombre === nombreAseguradora);
 
+    console.log('Aseguradora seleccionada:', aseguradoraSeleccionada);
+
     if (aseguradoraSeleccionada) {
-      setFormData({
+      const newFormData = {
         ...formData,
         aseguradora: nombreAseguradora,
         cliente: aseguradoraSeleccionada.nombre || '',
@@ -109,8 +111,10 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
         telefono_contacto: aseguradoraSeleccionada.telefono || '',
         email: aseguradoraSeleccionada.email || '',
         direccion: aseguradoraSeleccionada.direccion || '',
-        referencia: '', // CIF no está disponible aún
-      });
+        referencia: '',
+      };
+      console.log('Nuevo formData:', newFormData);
+      setFormData(newFormData);
       fetchOrdenesPrevias(aseguradoraSeleccionada.nombre);
     } else {
       // Cliente Particular - limpiar campos
