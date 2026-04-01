@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, CalendarClock, Briefcase, UserPlus, Shield, Key, Database, ClipboardList, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarClock, Briefcase, UserPlus, Shield, Key, Database, ClipboardList, Settings, LogOut, ListChecks } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const Layout = () => {
@@ -139,6 +139,18 @@ const Layout = () => {
             >
               <Users className="w-5 h-5 mr-3" />
               Clientes
+            </NavLink>
+
+            <NavLink
+              to="/tareas-frecuentes"
+              className={({ isActive }) =>
+                `flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
+                  isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
+                }`
+              }
+            >
+              <ListChecks className="w-5 h-5 mr-3" />
+              Tareas Frecuentes
             </NavLink>
 
             <div className="pt-4 pb-2">

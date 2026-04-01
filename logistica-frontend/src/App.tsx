@@ -14,6 +14,7 @@ import Trabajadores from './pages/Trabajadores';
 import Usuarios from './pages/Usuarios';
 import Bd from './pages/Bd';
 import Login from './pages/Login';
+import TareasFrecuentes from './pages/TareasFrecuentes';
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
           <Route path="ordenes/:id" element={<OrdenDetalle />} />
           <Route path="liquidaciones" element={<Liquidaciones />} />
           <Route path="aseguradoras" element={<Aseguradoras />} />
+          <Route path="tareas-frecuentes" element={<TareasFrecuentes />} />
           <Route path="trabajadores" element={<Trabajadores />} />
           <Route path="usuarios" element={<Usuarios />} />
           <Route path="bd" element={<Bd />} />
