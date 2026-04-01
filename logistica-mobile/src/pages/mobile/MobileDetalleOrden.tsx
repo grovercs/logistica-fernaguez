@@ -81,14 +81,8 @@ const MobileDetalleOrden = () => {
 
         const [ordenReq, reportesReq] = await Promise.all([
             supabase.from('ordenes').select('*').eq('id', id).single(),
-            (() => {
-                let query = supabase.from('reportes').select('*').eq('orden_id', id);
-                // Technicians (Trabajadores) only see their own reports
-                if (roleName === 'Trabajador') {
-                    query = query.eq('tecnico_id', userId);
-                }
-                return query.order('creado_en', { ascending: false });
-            })()
+            // Todos los trabajadores ven TODAS las intervenciones de la orden
+            supabase.from('reportes').select('*').eq('orden_id', id).order('creado_en', { ascending: false })
         ]);
 
         if (ordenReq.error) {
