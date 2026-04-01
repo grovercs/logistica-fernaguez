@@ -55,7 +55,15 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
   };
 
   const fetchAseguradoras = async () => {
-    const { data } = await supabase.from('aseguradoras').select('id, nombre, persona_contacto, telefono, email, direccion, cif').eq('estado', 'Activa');
+    const { data, error } = await supabase
+      .from('aseguradoras')
+      .select('id, nombre, persona_contacto, telefono, email, direccion, cif, estado')
+      .order('nombre');
+
+    if (error) {
+      console.error('Error fetching aseguradoras:', error);
+    }
+    // Mostrar todos los clientes, pero marcar los inactivos si es necesario
     if (data) setAseguradoras(data);
   };
 
@@ -293,7 +301,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                   onChange={(e) => handleAseguradoraChange(e.target.value)}
                 >
                   <option value="">Cliente Particular</option>
-                  {aseguradoras.map(a => (
+                  {aseguradoras.filter(a => a.estado !== 'Inactiva').map(a => (
                      <option key={a.id} value={a.nombre}>{a.nombre}</option>
                   ))}
                 </select>
