@@ -19,19 +19,26 @@ export interface CloudinaryUploadResult {
 /**
  * Uploads an image to Cloudinary using unsigned upload
  * @param file - The image file to upload
- * @param folder - Optional folder name (e.g., 'visitas', 'facturas')
+ * @param folder - Folder name (e.g., 'logistica/visitas', 'logistica/facturas')
+ * @param filename - Optional custom filename (without extension)
  * @returns Promise with upload result including URL
  */
 export async function uploadToCloudinary(
   file: File | Blob,
-  folder: string = 'general'
+  folder: string = 'general',
+  filename?: string
 ): Promise<CloudinaryUploadResult> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', UPLOAD_PRESET);
   formData.append('folder', folder);
 
-  // Auto-tagging and optimization
+  // Custom filename for easier identification
+  if (filename) {
+    formData.append('public_id', filename);
+  }
+
+  // Auto-tagging
   formData.append('tags', 'logistica-app');
 
   const response = await fetch(

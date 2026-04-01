@@ -53,9 +53,15 @@ export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporte
       // Compress image before upload (1280px max, 70% quality)
       const compressedFile = await smartCompress(file);
 
-      // Upload to Cloudinary
+      // Generate descriptive filename: OB-2026-1234_2026-04-01_foto_1
+      const ordenId = reporteData?.orden_id || 'unknown';
+      const fecha = new Date().toISOString().split('T')[0];
+      const count = type === 'foto' ? fotos.length + 1 : facturas.length + 1;
+      const filename = `${ordenId}_${fecha}_${type}_${count}`;
+
+      // Upload to Cloudinary with organized folder
       const folder = type === 'foto' ? 'logistica/visitas' : 'logistica/facturas';
-      const result = await uploadToCloudinary(compressedFile, folder);
+      const result = await uploadToCloudinary(compressedFile, folder, filename);
 
       if (type === 'foto') setFotos(prev => [...prev, result.secure_url]);
       else setFacturas(prev => [...prev, result.secure_url]);
