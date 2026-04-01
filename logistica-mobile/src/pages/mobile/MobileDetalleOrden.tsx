@@ -43,6 +43,7 @@ const MobileDetalleOrden = () => {
     const [isDrawing, setIsDrawing] = useState(false);
     const [hasSignature, setHasSignature] = useState(false);
     const [showForm, setShowForm] = useState(false); // Modal control
+    const [viewingReport, setViewingReport] = useState<any>(null); // Report being viewed (read-only)
 
     useEffect(() => {
         if (showForm) {
@@ -575,8 +576,8 @@ const MobileDetalleOrden = () => {
                                 const tecnicoName = trabajadoresMap.get(rep.tecnico_id) || 'Técnico';
 
                                 return (
-                                    <div 
-                                        key={rep.id} 
+                                    <div
+                                        key={rep.id}
                                         className={`p-3 rounded-xl border transition-all relative ${reporte?.id === rep.id ? 'bg-primary/5 border-primary shadow-sm ring-1 ring-primary/20' : 'bg-slate-50 border-slate-100'}`}
                                     >
                                         <div className="flex justify-between items-start mb-1">
@@ -592,7 +593,7 @@ const MobileDetalleOrden = () => {
                                                     {new Date(rep.fecha_trabajo || rep.creado_en).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
                                                 </span>
                                                 {canDelete && (
-                                                    <button 
+                                                    <button
                                                         onClick={(e) => { e.stopPropagation(); handleDeleteReport(rep.id); }}
                                                         className="w-7 h-7 flex items-center justify-center text-red-400 hover:text-red-600 active:scale-90 transition-all"
                                                     >
@@ -601,8 +602,8 @@ const MobileDetalleOrden = () => {
                                                 )}
                                             </div>
                                         </div>
-                                        <div onClick={() => canEdit && loadReportData(rep)} className="cursor-pointer">
-                                            <p className="text-xs font-bold text-slate-800 line-clamp-2 mt-1">
+                                        <div className="mt-1">
+                                            <p className="text-xs font-bold text-slate-800 line-clamp-2">
                                                 {(rep.notas || '').split(/[ \t\n]*(?:MATERIALES:?)[ \t\n]*/i)[0] || <span className="italic text-slate-400 font-normal">(Sin descripción)</span>}
                                             </p>
                                             <div className="mt-2 flex items-center justify-between">
@@ -618,7 +619,22 @@ const MobileDetalleOrden = () => {
                                                         </span>
                                                     )}
                                                 </div>
-                                                {canEdit && <span className="text-primary text-[10px] font-black underline underline-offset-2 uppercase">Ver/Editar</span>}
+                                            </div>
+                                            <div className="flex gap-2 mt-3">
+                                                <button
+                                                    onClick={() => setViewingReport(rep)}
+                                                    className="flex-1 bg-primary/10 text-primary text-[10px] font-black py-2 rounded-lg hover:bg-primary/20 active:scale-95 transition-all"
+                                                >
+                                                    VER DETALLE
+                                                </button>
+                                                {canEdit && (
+                                                    <button
+                                                        onClick={() => loadReportData(rep)}
+                                                        className="flex-1 bg-primary text-white text-[10px] font-black py-2 rounded-lg hover:bg-primary/90 active:scale-95 transition-all"
+                                                    >
+                                                        EDITAR
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -905,6 +921,144 @@ const MobileDetalleOrden = () => {
                 </div>
             </div>
         </div>
+        )}
+
+        {/* MODAL DE VISUALIZACIÓN (SOLO LECTURA) */}
+        {viewingReport && (
+            <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+                {/* Backdrop */}
+                <div
+                    className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                    onClick={() => setViewingReport(null)}
+                />
+
+                {/* Modal Content */}
+                <div className="relative w-full max-w-2xl bg-[#f0f2f5] rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full duration-300 max-h-[95vh] flex flex-col">
+
+                    {/* Modal Header */}
+                    <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 shrink-0">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                <span className="material-symbols-outlined text-[20px]">visibility</span>
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-black text-slate-800 tracking-tight">
+                                    Parte de Trabajo
+                                </h2>
+                                <p className="text-[10px] text-slate-500">
+                                    {trabajadoresMap.get(viewingReport.tecnico_id) || 'Técnico'} • {new Date(viewingReport.fecha_trabajo || viewingReport.creado_en).toLocaleDateString('es-ES')}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setViewingReport(null)}
+                            className="text-slate-400 hover:text-slate-600 active:scale-95 transition-all p-1"
+                        >
+                            <span className="material-symbols-outlined text-[28px]">close</span>
+                        </button>
+                    </div>
+
+                    {/* Modal Body */}
+                    <div className="overflow-y-auto p-6 pb-24 space-y-6">
+
+                        {/* Tiempo dedicado */}
+                        {viewingReport.horas_trabajadas > 0 && (
+                            <div className="bg-blue-50 rounded-xl p-4 flex items-center gap-3">
+                                <span className="material-symbols-outlined text-blue-600 text-2xl">schedule</span>
+                                <div>
+                                    <p className="text-[10px] font-bold text-blue-600 uppercase">Tiempo dedicado</p>
+                                    <p className="text-lg font-black text-blue-800">{viewingReport.horas_trabajadas} horas</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Trabajo realizado */}
+                        <div>
+                            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-2">Trabajo Realizado</h3>
+                            <div className="bg-white rounded-xl p-4 border border-slate-200">
+                                <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                                    {viewingReport.trabajo_realizado || (viewingReport.notas || '').split(/[ \t\n]*(?:MATERIALES:?)[ \t\n]*/i)[0] || 'Sin descripción'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Materiales utilizados */}
+                        {viewingReport.material_utilizado && (
+                            <div>
+                                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-2">Materiales Utilizados</h3>
+                                <div className="bg-white rounded-xl p-4 border border-slate-200">
+                                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewingReport.material_utilizado}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Fotos del trabajo */}
+                        {viewingReport.fotos_urls && Array.isArray(viewingReport.fotos_urls) && viewingReport.fotos_urls.length > 0 && (
+                            <div>
+                                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-2">
+                                    Fotos del Trabajo ({viewingReport.fotos_urls.length})
+                                </h3>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {viewingReport.fotos_urls.map((url: string, i: number) => (
+                                        <a
+                                            key={i}
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block aspect-square rounded-xl overflow-hidden border border-slate-200 bg-white"
+                                        >
+                                            <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover hover:scale-105 transition-transform" />
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Facturas */}
+                        {viewingReport.facturas_urls && Array.isArray(viewingReport.facturas_urls) && viewingReport.facturas_urls.length > 0 && (
+                            <div>
+                                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-2">
+                                    Facturas/Recibos ({viewingReport.facturas_urls.length})
+                                </h3>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {viewingReport.facturas_urls.map((url: string, i: number) => (
+                                        <a
+                                            key={i}
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block aspect-square rounded-xl overflow-hidden border border-amber-200 bg-white"
+                                        >
+                                            <img src={url} alt={`Factura ${i + 1}`} className="w-full h-full object-cover hover:scale-105 transition-transform" />
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Firma */}
+                        {viewingReport.firma_url && typeof viewingReport.firma_url === 'string' && viewingReport.firma_url.startsWith('http') && (
+                            <div>
+                                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-2">Firma del Cliente</h3>
+                                <div className="bg-white rounded-xl p-4 border border-slate-200 flex justify-center">
+                                    <img src={viewingReport.firma_url} alt="Firma" className="max-h-32 object-contain" />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Notas adicionales del notes field if different */}
+                        {viewingReport.notas && !viewingReport.trabajo_realizado && (
+                            <div>
+                                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-2">Notas</h3>
+                                <div className="bg-slate-100 rounded-xl p-4">
+                                    <p className="text-sm text-slate-600 whitespace-pre-wrap">{viewingReport.notas}</p>
+                                </div>
+                            </div>
+                        )}
+
+                    </div>
+                </div>
+            </div>
         )}
     </div>
 );
