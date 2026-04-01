@@ -107,8 +107,9 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
         ...formData,
         aseguradora: nombreAseguradora,
         cliente: aseguradoraSeleccionada.nombre || '',
-        persona_contacto: aseguradoraSeleccionada.persona_contacto || '',
-        telefono_contacto: aseguradoraSeleccionada.telefono || '',
+        // Mapear campos de la BD a los campos del formulario
+        asegurado: aseguradoraSeleccionada.persona_contacto || '', // Persona responsable
+        telefono_asegurado: aseguradoraSeleccionada.telefono || '', // Teléfono principal
         email: aseguradoraSeleccionada.email || '',
         direccion: aseguradoraSeleccionada.direccion || '',
         referencia: '',
@@ -122,8 +123,8 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
         ...formData,
         aseguradora: '',
         cliente: '',
-        persona_contacto: '',
-        telefono_contacto: '',
+        asegurado: '',
+        telefono_asegurado: '',
         email: '',
         direccion: '',
         referencia: '',
