@@ -544,6 +544,17 @@ const MobileDetalleOrden = () => {
                      <p className="text-sm font-semibold text-slate-700 mt-1">{orden?.direccion || 'No especificada'}</p>
                  </div>
 
+                 {/* Trabajo a Realizar */}
+                 {orden?.descripcion && (
+                     <div className="pt-3 border-t border-slate-100 bg-blue-50/50 -mx-4 px-4 py-3">
+                         <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest leading-tight flex items-center gap-1">
+                             <span className="material-symbols-outlined text-[14px]">assignment</span>
+                             Trabajo a Realizar
+                         </p>
+                         <p className="text-sm font-medium text-slate-800 mt-1 whitespace-pre-wrap">{orden.descripcion}</p>
+                     </div>
+                 )}
+
                  {/* Contacto Alternativo */}
                  {(orden?.persona_contacto || orden?.telefono_contacto) && (
                      <div className="pt-3 border-t border-slate-100 bg-orange-50/50 p-3 rounded-lg border border-orange-100">
