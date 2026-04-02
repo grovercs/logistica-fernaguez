@@ -24,7 +24,6 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
     persona_contacto: '',
     telefono_contacto: '',
     direccion: '',
-    otras_ordenes: '',
   });
 
   const [tecnicos, setTecnicos] = useState<any[]>([]);
@@ -45,7 +44,6 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
          hora: '10:00', observaciones: '', esUrgente: false,
          asegurado: '', telefono_asegurado: '', email: '',
          persona_contacto: '', telefono_contacto: '', direccion: '',
-         otras_ordenes: '',
        });
     }
   }, [isOpen, fechaInicial]);
@@ -175,7 +173,6 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
          persona_contacto: formData.persona_contacto,
          telefono_contacto: formData.telefono_contacto,
          direccion: formData.direccion,
-         otras_ordenes: formData.otras_ordenes,
          descripcion: formData.observaciones,
          estado: formData.esUrgente ? 'Urgente' : (formData.tecnico ? 'En Curso' : 'Pendiente'),
          tecnico_id: formData.tecnico || null,
@@ -236,11 +233,31 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
             </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Reference / DNI */}
+              {/* Empresa / Cliente */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-slate-400">business</span>
+                  Empresa / Cliente
+                </label>
+                <select
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
+                  value={formData.aseguradora}
+                  onChange={(e) => handleAseguradoraChange(e.target.value)}
+                >
+                  <option value="">Cliente Particular</option>
+                  {aseguradoras.map(a => (
+                     <option key={a.id} value={a.nombre}>
+                       {a.nombre}{a.estado === 'Inactiva' ? ' (Inactiva)' : ''}
+                     </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* CIF / DNI */}
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[16px] text-slate-400">badge</span>
-                  {formData.aseguradora ? 'CIF de la Empresa *' : 'DNI / NIF *'}
+                  {formData.aseguradora ? 'CIF de la Empresa' : 'DNI / NIF'}
                 </label>
                 <input
                   type="text"
@@ -249,21 +266,6 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.referencia}
                   onChange={(e) => setFormData({...formData, referencia: e.target.value})}
-                />
-              </div>
-
-              {/* Otras Ordenes */}
-              <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px] text-slate-400">link</span>
-                  Otras Órdenes Vinculadas
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: OB-2023-1254"
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
-                  value={formData.otras_ordenes}
-                  onChange={(e) => setFormData({...formData, otras_ordenes: e.target.value})}
                 />
               </div>
 
@@ -293,27 +295,6 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                   <p className="text-xs text-slate-500">Mostrando las últimas {ordenesPrevias.length} órdenes de este cliente</p>
                 </div>
               )}
-
-              {/* Empresa / Cliente */}
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px] text-slate-400">business</span>
-                  Empresa / Cliente
-                </label>
-                <select
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
-                  value={formData.aseguradora}
-                  onChange={(e) => handleAseguradoraChange(e.target.value)}
-                >
-                  <option value="">Cliente Particular</option>
-                  {aseguradoras.map(a => (
-                     <option key={a.id} value={a.nombre}>
-                       {a.nombre}{a.estado === 'Inactiva' ? ' (Inactiva)' : ''}
-                     </option>
-                  ))}
-                </select>
-                <p className="text-xs text-slate-500 mt-1">Al seleccionar una empresa se autocompletarán los datos guardados</p>
-              </div>
 
               {/* Nombre del Cliente (solo para Particulares) */}
               {!formData.aseguradora && (
