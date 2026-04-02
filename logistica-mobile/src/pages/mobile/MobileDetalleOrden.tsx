@@ -559,8 +559,11 @@ const MobileDetalleOrden = () => {
                            <span className="material-symbols-outlined text-[18px]">history</span>
                            Intervenciones Realizadas ({reportes.length})
                         </h3>
-                        <button 
-                            onClick={resetForm}
+                        <button
+                            onClick={() => {
+                                resetForm();
+                                setShowForm(true);
+                            }}
                             className="bg-primary hover:bg-primary/90 text-white text-[11px] font-black px-4 py-2 rounded-xl flex items-center gap-2 shadow-sm active:scale-95 transition-all"
                         >
                             <span className="material-symbols-outlined text-[16px]">add</span>
