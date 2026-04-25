@@ -1,0 +1,15 @@
+ESTADO ACTUAL LOGISTICA FERNAGUEZ - 26/04/2026
+
+LOGROS RECIENTES:
+1. Panel de Administración 100% Responsivo (Menú, Tablas, Calendario, Liquidaciones).
+2. Notificaciones WhatsApp (UltraMsg) integradas y funcionales.
+3. Fix en Fechas de Órdenes (Fecha mínima hoy).
+4. PrintableOrden.tsx mejorado (Fotos por técnico + especialidad).
+5. Despliegue automático GitHub -> Netlify funcionando.
+
+PENDIENTE:
+- Ajuste fino tabla Trabajadores.tsx (en móviles).
+- Backup multimedia pesado en Bd.tsx (verificar Drive).
+
+PARA CONTINUAR:
+"Continuar Logística Fernaguez: Responsividad y WhatsApp"
