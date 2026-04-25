@@ -198,10 +198,9 @@ export default function AltaAseguradoraModal({ isOpen, onClose, onCreated }: Alt
               />
             </div>
             
-            {/* Logo & Status */}
             <div className="col-span-2 grid grid-cols-2 gap-6 items-center">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Logo de la Compañía</label>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Logo de la Empresa</label>
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -247,7 +246,7 @@ export default function AltaAseguradoraModal({ isOpen, onClose, onCreated }: Alt
                     <span className="ms-3 text-sm font-medium text-slate-900 dark:text-slate-300">Activa</span>
                   </label>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Determina si la compañía estará disponible inmediatamente.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Determina si la empresa estará disponible inmediatamente.</p>
               </div>
             </div>
             

@@ -103,21 +103,21 @@ export default function Trabajadores() {
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 h-full">
       {/* Header */}
-      <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 shrink-0 sticky top-0 z-10 w-full">
-        <div className="flex items-center gap-4">
-          <h2 className="text-xl font-bold">Gestión de Trabajadores</h2>
-        </div>
-        <div className="flex items-center gap-4">
-          <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
-            <span className="material-symbols-outlined">notifications</span>
-          </button>
-          <button 
-             onClick={() => setIsAddModalOpen(true)}
-             className="bg-primary text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-primary/90 transition-all shadow-sm"
-          >
-            <span className="material-symbols-outlined">person_add</span>
-            Añadir Trabajador
-          </button>
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 w-full backdrop-blur-md">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between px-4 sm:px-8 py-4 gap-4">
+          <h2 className="text-xl font-black tracking-tight">Trabajadores</h2>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button 
+               onClick={() => setIsAddModalOpen(true)}
+               className="flex-1 sm:flex-none bg-primary text-white px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+            >
+              <span className="material-symbols-outlined text-[18px]">person_add</span>
+              Añadir Trabajador
+            </button>
+            <button className="p-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
+              <span className="material-symbols-outlined">notifications</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -147,16 +147,16 @@ export default function Trabajadores() {
         </div>
 
         {/* Workers Table */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm w-full">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm w-full">
           <div className="overflow-x-auto">
-             <table className="w-full text-left border-collapse min-w-[900px]">
+             <table className="w-full text-left border-collapse min-w-full">
                <thead>
                  <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
-                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Trabajador</th>
-                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Especialidad</th>
-                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
-                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Rendimiento</th>
-                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
+                   <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Trabajador</th>
+                   <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Especialidad</th>
+                   <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center hidden sm:table-cell">Estado</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center hidden md:table-cell">Rendimiento</th>
+                   <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">

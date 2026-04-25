@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { notifyNewOrder } from '../lib/whatsapp';
 
 interface Asignacion {
   id: string;
@@ -8,6 +9,7 @@ interface Asignacion {
   trabajador?: {
     nombre: string;
     apellidos: string;
+    telefono?: string;
   };
   fecha_asignacion: string;
   hora_programada: string;
@@ -18,10 +20,11 @@ interface Asignacion {
 
 interface Props {
   ordenId: string;
+  orden?: any; // Objeto de la orden para las notificaciones
   onUpdate?: () => void;
 }
 
-export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
+export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props) {
   const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
   const [trabajadores, setTrabajadores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +33,7 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
 
   // Form state
   const [formTrabajador, setFormTrabajador] = useState('');
-  const [formFecha, setFormFecha] = useState(new Date().toISOString().split('T')[0]);
+  const [formFecha, setFormFecha] = useState(new Date().toLocaleDateString('en-CA'));
   const [formHora, setFormHora] = useState('10:00');
   const [formNotas, setFormNotas] = useState('');
 
@@ -62,7 +65,7 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
       if (trabajadorIds.length > 0) {
         const { data: trabajadoresData } = await supabase
           .from('trabajadores')
-          .select('auth_user_id, nombre, apellidos')
+          .select('auth_user_id, nombre, apellidos, telefono')
           .in('auth_user_id', trabajadorIds);
 
         if (trabajadoresData) {
@@ -82,7 +85,7 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
   const fetchTrabajadores = async () => {
     const { data } = await supabase
       .from('trabajadores')
-      .select('auth_user_id, nombre, apellidos')
+      .select('auth_user_id, nombre, apellidos, telefono')
       .eq('estado', 'Disponible');
     if (data) setTrabajadores(data);
   };
@@ -106,12 +109,27 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
         estado: 'pendiente'
       });
 
-    setSaving(false);
-
     if (error) {
       console.error('Error asignando:', error);
-      alert('Error al asignar trabajador. ¿Está creada la tabla orden_asignaciones?');
+      alert('Error al asignar trabajador.');
+      setSaving(false);
     } else {
+      // NOTIFICACIÓN WHATSAPP
+      const selectedWorker = trabajadores.find(t => t.auth_user_id === formTrabajador);
+      if (selectedWorker && selectedWorker.telefono && orden) {
+        try {
+           console.log("Enviando notificación WhatsApp...");
+           await notifyNewOrder(selectedWorker.telefono, {
+             ...orden,
+             // Podemos añadir las notas de la asignación al mensaje si queremos
+             descripcion: `${orden.descripcion}\n\n*Notas de asignación:* ${formNotas}`
+           });
+        } catch (wsErr) {
+           console.error("Error al enviar WhatsApp:", wsErr);
+        }
+      }
+
+      setSaving(false);
       setShowAddForm(false);
       setFormTrabajador('');
       setFormNotas('');
@@ -188,7 +206,7 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
                 <option value="">Seleccionar...</option>
                 {trabajadores.map(t => (
                   <option key={t.auth_user_id} value={t.auth_user_id}>
-                    {t.nombre} {t.apellidos}
+                    {t.nombre} {t.apellidos} {t.telefono ? `(${t.telefono})` : '(Sin tel)'}
                   </option>
                 ))}
               </select>
@@ -217,7 +235,7 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
                 disabled={saving}
                 className="flex-1 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-50"
               >
-                {saving ? 'Guardando...' : 'Guardar'}
+                {saving ? 'Guardando...' : 'Guardar y Notificar'}
               </button>
               <button
                 type="button"

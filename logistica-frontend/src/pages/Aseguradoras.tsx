@@ -10,7 +10,7 @@ export default function Aseguradoras() {
   const [aseguradoras, setAseguradoras] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({
-    siniestrosActivos: 0,
+    intervencionesActivas: 0,
     tasaResolucion: 0
   });
 
@@ -39,7 +39,7 @@ export default function Aseguradoras() {
           const tasa = total > 0 ? (finalizadas / total) * 100 : 0;
           
           setStats({
-              siniestrosActivos: total,
+              intervencionesActivas: total,
               tasaResolucion: Math.round(tasa * 10) / 10
           });
       }
@@ -60,42 +60,44 @@ export default function Aseguradoras() {
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 h-full">
       {/* Header */}
-      <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-8 flex items-center justify-between shrink-0 sticky top-0 z-10 w-full">
-        <h2 className="text-xl font-bold tracking-tight">Clientes</h2>
-        <div className="flex items-center gap-4">
-          <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full relative transition-colors">
-            <span className="material-symbols-outlined">notifications</span>
-            <span className="absolute top-2 right-2 size-2 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
-          </button>
-          <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-800 mx-2"></div>
-          <div className="flex items-center gap-3 pl-2">
-            <div className="text-right">
-              <p className="text-xs font-bold">Admin Usuario</p>
-              <p className="text-[10px] text-slate-500 font-medium">Administrador</p>
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 w-full backdrop-blur-md">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-8 h-16">
+          <h2 className="text-xl font-black tracking-tight">Clientes</h2>
+          <div className="flex items-center gap-3">
+            <button className="p-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors relative">
+              <span className="material-symbols-outlined">notifications</span>
+              <span className="absolute top-2.5 right-2.5 size-2 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+            </button>
+            <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-800 hidden sm:block"></div>
+            <div className="flex items-center gap-3 pl-1 sm:pl-2">
+              <div className="text-right hidden sm:block">
+                <p className="text-xs font-black uppercase tracking-tight">Admin</p>
+                <p className="text-[10px] text-slate-500 font-bold">Logística</p>
+              </div>
+              <img 
+                 className="size-9 rounded-xl bg-slate-200 object-cover border-2 border-white dark:border-slate-800 shadow-sm" 
+                 alt="User profile" 
+                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuBH00mXjg6hMuGH_H3WM48ZkGeSf5qZCDbAYunKkRdHkaVOse-O6QCuhB-0pJF6nbR5bRmFgJjnCS2fep1rwts8trl2dM4M6rpfcUnny164iO2NsaaI39hDGvv9ESZbNElGirGf_-XjUsF4VrFYvSnTYJ6gEftlZ0C0F2x-2Gb6jqtCJX5SyZqoA0m0BoZmJshis_b5_xAjbON1eQUdTQrcci591-3OGLMFHLRQAT4mkZFqZI_DcFQgXKm7DvXkDfxVNL7CtjDlP1I"
+              />
             </div>
-            <img 
-               className="size-10 rounded-full bg-slate-200 object-cover" 
-               alt="User profile" 
-               src="https://lh3.googleusercontent.com/aida-public/AB6AXuBH00mXjg6hMuGH_H3WM48ZkGeSf5qZCDbAYunKkRdHkaVOse-O6QCuhB-0pJF6nbR5bRmFgJjnCS2fep1rwts8trl2dM4M6rpfcUnny164iO2NsaaI39hDGvv9ESZbNElGirGf_-XjUsF4VrFYvSnTYJ6gEftlZ0C0F2x-2Gb6jqtCJX5SyZqoA0m0BoZmJshis_b5_xAjbON1eQUdTQrcci591-3OGLMFHLRQAT4mkZFqZI_DcFQgXKm7DvXkDfxVNL7CtjDlP1I"
-            />
           </div>
         </div>
       </header>
 
       {/* Content Area */}
-      <div className="p-8 space-y-6 overflow-y-auto max-w-7xl mx-auto w-full">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 max-w-7xl mx-auto w-full">
         
         {/* Top Actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100">Gestión de Clientes</h3>
-            <p className="text-slate-500 text-sm font-medium">Administra los clientes de la plataforma.</p>
+            <h3 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">Gestión de Clientes</h3>
+            <p className="text-slate-500 text-sm font-medium mt-1">Administra las cuentas de clientes.</p>
           </div>
           <button
              onClick={() => setIsAddModalOpen(true)}
-             className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg flex items-center gap-2 font-bold text-sm transition-all shadow-lg shadow-primary/20 shrink-0"
+             className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-primary/20 shrink-0"
           >
-            <span className="material-symbols-outlined text-lg">add</span>
+            <span className="material-symbols-outlined text-[18px]">add</span>
             Añadir Cliente
           </button>
         </div>
@@ -124,79 +126,76 @@ export default function Aseguradoras() {
         </div>
 
         {/* Table */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden w-full">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden w-full">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[900px]">
+            <table className="w-full text-left border-collapse min-w-full">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Compañía</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Persona de Contacto</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Teléfono</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Estado</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider"></th>
+                  <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cliente / Empresa</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden lg:table-cell">CIF / NIF</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">Contacto</th>
+                  <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Estado</th>
+                  <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {loading ? (
                     <tr>
-                       <td colSpan={6} className="text-center py-8 text-slate-500">Cargando clientes...</td>
+                       <td colSpan={5} className="text-center py-12 text-slate-400 font-bold animate-pulse">Cargando clientes...</td>
                     </tr>
                 ) : aseguradoras.length === 0 ? (
                     <tr>
-                       <td colSpan={6} className="text-center py-8 text-slate-500">No hay clientes registrados. Pulsa "Añadir Cliente".</td>
+                       <td colSpan={5} className="text-center py-12 text-slate-400 font-medium italic">No hay clientes registrados.</td>
                     </tr>
                 ) : (
                     aseguradoras.map(aseguradora => (
-                        <tr key={aseguradora.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                          <td className="px-6 py-4">
+                        <tr key={aseguradora.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
+                          <td className="px-4 sm:px-6 py-4">
                             <div className="flex items-center gap-3">
-                              {aseguradora.logo_url ? (
-                                <img src={aseguradora.logo_url} alt={aseguradora.nombre} className="size-10 shrink-0 rounded-lg object-contain bg-slate-100 dark:bg-slate-800 p-1" />
-                              ) : (
-                                <div className="size-10 shrink-0 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center p-2">
-                                  <span className="text-blue-600 dark:text-blue-400 font-black text-xs uppercase">{aseguradora.nombre.substring(0, 4)}</span>
-                                </div>
-                              )}
-                              <div>
-                                <p className="text-sm font-bold">{aseguradora.nombre}</p>
-                                <p className="text-[10px] text-slate-500">ID: {aseguradora.id.split('-')[0]}</p>
+                              <div className="size-10 shrink-0 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center p-2 border border-blue-200 dark:border-blue-700/50">
+                                <span className="text-blue-600 dark:text-blue-400 font-black text-[10px] uppercase">{aseguradora.nombre.substring(0, 3)}</span>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold truncate max-w-[150px] sm:max-w-none">{aseguradora.nombre}</p>
+                                <p className="text-[10px] text-slate-500 font-mono hidden sm:block">ID: {aseguradora.id.split('-')[0]}</p>
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4">
-                            <p className="text-sm font-medium">{aseguradora.persona_contacto || '-'}</p>
+                          <td className="px-6 py-4 hidden lg:table-cell">
+                            <p className="text-xs font-bold text-slate-500">{aseguradora.cif || '-'}</p>
                           </td>
-                          <td className="px-6 py-4 text-sm font-medium whitespace-nowrap">{aseguradora.telefono || '-'}</td>
-                          <td className="px-6 py-4 text-sm text-slate-500">{aseguradora.email || '-'}</td>
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 hidden md:table-cell">
+                            <p className="text-xs font-medium text-slate-600 dark:text-slate-400">{aseguradora.persona_contacto || '-'}</p>
+                            <p className="text-[10px] text-slate-400">{aseguradora.telefono || ''}</p>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4 text-center">
                             {aseguradora.estado === 'Activa' ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 whitespace-nowrap">
-                                  <span className="size-1.5 rounded-full bg-green-500"></span>
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 whitespace-nowrap">
+                                  <span className="size-1.5 rounded-full bg-emerald-500"></span>
                                   Activa
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 whitespace-nowrap">
                                   <span className="size-1.5 rounded-full bg-slate-400"></span>
                                   Inactiva
                                 </span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex justify-end gap-2">
+                          <td className="px-4 sm:px-6 py-4 text-right">
+                            <div className="flex justify-end gap-1.5">
                               <button
                                 onClick={() => { setAseguradoraToEdit(aseguradora); setIsEditModalOpen(true); }}
-                                className="p-1.5 text-slate-400 hover:text-sky-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                                title="Editar Cliente"
+                                className="size-8 flex items-center justify-center text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                                title="Editar"
                               >
-                                <span className="material-symbols-outlined text-[18px] block">edit</span>
+                                <span className="material-symbols-outlined text-[18px]">edit</span>
                               </button>
                               <button
                                 onClick={() => handleDelete(aseguradora.id)}
-                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                                title="Borrar Cliente"
+                                className="size-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                                title="Borrar"
                               >
-                                <span className="material-symbols-outlined text-[18px] block">delete</span>
+                                <span className="material-symbols-outlined text-[18px]">delete</span>
                               </button>
                             </div>
                           </td>
@@ -243,8 +242,8 @@ export default function Aseguradoras() {
               <span className="material-symbols-outlined">check_circle</span>
             </div>
             <div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Órdenes Activas</p>
-              <p className="text-2xl font-black">{stats.siniestrosActivos}</p>
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Intervenciones Activas</p>
+              <p className="text-2xl font-black">{stats.intervencionesActivas}</p>
             </div>
           </div>
 

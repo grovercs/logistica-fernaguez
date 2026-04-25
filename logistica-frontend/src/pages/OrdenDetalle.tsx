@@ -6,8 +6,6 @@ import EditarReporteModal from '../components/modals/EditarReporteModal';
 import AsignacionesSection from '../components/AsignacionesSection';
 import { PrintableOrden } from '../components/PrintableOrden';
 import { useRef } from 'react';
-// @ts-ignore
-import html2pdf from 'html2pdf.js';
 
 export default function OrdenDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -21,7 +19,6 @@ export default function OrdenDetalle() {
   const [reportes, setReportes] = useState<any[]>([]);
   const [trabajadores, setTrabajadores] = useState<any[]>([]);
   const printRef = useRef<HTMLDivElement>(null);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Computed values from reports
   const totalHoras = reportes.reduce((sum, r) => sum + (Number(r.horas_trabajadas) || 0), 0);
@@ -39,7 +36,7 @@ export default function OrdenDetalle() {
     const [ordenReq, reportesReq, trabReq] = await Promise.all([
       supabase.from('ordenes').select('*').eq('id', orderId).single(),
       supabase.from('reportes').select('*').eq('orden_id', orderId),
-      supabase.from('trabajadores').select('auth_user_id, nombre, apellidos')
+      supabase.from('trabajadores').select('auth_user_id, nombre, apellidos, especialidad')
     ]);
       
     if (!ordenReq.error && ordenReq.data) {
@@ -110,36 +107,6 @@ export default function OrdenDetalle() {
     window.print();
   };
 
-  const handleExportPDF = async () => {
-    if (!printRef.current || !orden) return;
-    setIsGeneratingPdf(true);
-    
-    try {
-      const element = printRef.current;
-      const opt = {
-        margin: 0,
-        filename: `Reporte_${orden.id_legible}_${Date.now()}.pdf`,
-        image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true,
-          logging: false,
-          letterRendering: true
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-      };
-
-      // Ensure images are loaded potentially? html2pdf usually handles it if useCORS is true
-      await html2pdf().from(element).set(opt).save();
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('Error al generar el PDF. Reintente en unos instantes.');
-    } finally {
-      setIsGeneratingPdf(false);
-    }
-  };
-
   if (loading) return <div className="p-8 text-center text-slate-500 font-bold">Cargando reporte de orden...</div>;
   if (!orden) return <div className="p-8 text-center text-slate-500">No se encontró la orden.</div>;
 
@@ -183,18 +150,10 @@ export default function OrdenDetalle() {
             </button>
             <button 
               onClick={handlePrint}
-              className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+              className="flex items-center gap-2 bg-primary text-white hover:bg-primary/90 px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-lg shadow-primary/20"
             >
               <span className="material-symbols-outlined text-[18px]">print</span>
-              Imprimir
-            </button>
-            <button 
-              onClick={handleExportPDF}
-              disabled={isGeneratingPdf}
-              className="flex items-center gap-2 bg-primary text-white hover:bg-primary/90 px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
-            >
-              <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-              {isGeneratingPdf ? 'Generando...' : 'Exportar PDF'}
+              Imprimir Reporte
             </button>
             {orden.estado !== 'Finalizada' && (
               <button 
@@ -383,7 +342,7 @@ export default function OrdenDetalle() {
             </section>
 
             {/* Asignaciones de Trabajo */}
-            <AsignacionesSection ordenId={id!} onUpdate={() => fetchOrden(id!)} />
+            <AsignacionesSection ordenId={id!} orden={orden} onUpdate={() => fetchOrden(id!)} />
           </div>
 
           {/* Right Column: Timeline and Details */}
@@ -658,11 +617,11 @@ export default function OrdenDetalle() {
       {/* Print Styles */}
       <style>{`
         @media print {
+          body {
+            background: white !important;
+          }
           body * {
             visibility: hidden;
-          }
-          .hidden-print, header, aside, nav, button {
-            display: none !important;
           }
           #print-area, #print-area * {
             visibility: visible;
@@ -671,11 +630,8 @@ export default function OrdenDetalle() {
             position: absolute;
             left: 0;
             top: 0;
-            width: 210mm;
-            margin: 0;
-            padding: 0;
+            width: 100%;
           }
-          /* This is a cheat: we wrap our printable component in an ID for the media print selector */
         }
       `}</style>
 

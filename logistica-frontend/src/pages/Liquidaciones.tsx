@@ -206,54 +206,59 @@ export default function Liquidaciones() {
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 h-full">
       {/* Header */}
-      <header className="h-16 flex-shrink-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 sticky top-0 z-10 w-full backdrop-blur-md">
-        <h2 className="text-xl font-bold">Liquidaciones</h2>
-        <div className="flex items-center gap-3">
-          <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg transition-colors shadow-sm">
-            <span className="material-symbols-outlined text-lg">table_view</span>
-            Exportar Excel
-          </button>
-          <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
-            <span className="material-symbols-outlined">notifications</span>
-          </button>
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 w-full backdrop-blur-md">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between px-4 sm:px-8 py-4 gap-4">
+          <h2 className="text-xl font-black tracking-tight">Liquidaciones</h2>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button 
+              onClick={exportToExcel} 
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-emerald-600/20"
+            >
+              <span className="material-symbols-outlined text-lg">table_view</span>
+              Exportar Excel
+            </button>
+            <button className="p-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
+              <span className="material-symbols-outlined">notifications</span>
+            </button>
+          </div>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-5 max-w-7xl mx-auto w-full">
 
         {/* Filters */}
-        <section className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Desde</label>
-              <input value={desde} onChange={e => setDesde(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none" type="date" />
+        <section className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 items-end">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Desde</label>
+              <input value={desde} onChange={e => setDesde(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-11 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" type="date" />
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hasta</label>
-              <input value={hasta} onChange={e => setHasta(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none" type="date" />
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Hasta</label>
+              <input value={hasta} onChange={e => setHasta(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-11 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" type="date" />
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Trabajador</label>
-              <select value={trabajadorFilter} onChange={e => setTrabajadorFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none">
-                <option value="">Todos los trabajadores</option>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Trabajador</label>
+              <select value={trabajadorFilter} onChange={e => setTrabajadorFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-11 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer">
+                <option value="">Todos</option>
                 {Object.entries(perfilesMap).map(([id, { nombre }]) => (
                   <option key={id} value={id}>{nombre}</option>
                 ))}
               </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Obra / Referencia</label>
-              <input value={obraFilter} onChange={e => setObraFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none" placeholder="Ej: OT-2023-0041" type="text" />
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Obra / Ref</label>
+              <input value={obraFilter} onChange={e => setObraFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm h-11 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="Buscar..." type="text" />
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estado Pago</label>
-              <select value={estadoFilter} onChange={e => setEstadoFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Estado Pago</label>
+              <select value={estadoFilter} onChange={e => setEstadoFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm h-11 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer">
                 <option value="">Todos</option>
-                <option value="Pendiente">Pendiente</option>
-                <option value="Procesada">Procesada</option>
+                <option value="Pendiente">⏳ Pendiente</option>
+                <option value="Procesada">✓ Procesada</option>
               </select>
             </div>
-            <button onClick={() => { setDesde(''); setHasta(''); setTrabajadorFilter(''); setObraFilter(''); setEstadoFilter(''); }} className="h-10 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-1.5">
+            <button onClick={() => { setDesde(''); setHasta(''); setTrabajadorFilter(''); setObraFilter(''); setEstadoFilter(''); }} className="h-11 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-black uppercase tracking-widest rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2">
               <span className="material-symbols-outlined text-sm">filter_alt_off</span>
               Limpiar
             </button>
@@ -289,14 +294,14 @@ export default function Liquidaciones() {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-fit">
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl w-full sm:w-fit overflow-x-auto scrollbar-none">
           {tabs.map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${
                 tab === t.key
-                  ? 'bg-white dark:bg-slate-900 text-primary shadow-sm'
+                  ? 'bg-white dark:bg-slate-900 text-primary shadow-lg shadow-black/5'
                   : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >

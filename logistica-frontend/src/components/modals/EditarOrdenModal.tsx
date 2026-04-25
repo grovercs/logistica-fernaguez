@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { notifyNewOrder } from '../../lib/whatsapp';
 
 interface Props {
   isOpen: boolean;
@@ -63,7 +64,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
   }, [isOpen, ordenData]);
 
   const fetchTecnicos = async () => {
-    const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos').eq('estado', 'Disponible');
+    const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, telefono').eq('estado', 'Disponible');
     if (data) setTecnicos(data);
   };
 
@@ -103,14 +104,44 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
       })
       .eq('id', ordenData.id);
 
-    setLoading(false);
     if (!error) {
+       // Auto-registro de Cliente Particular si no se seleccionó una aseguradora
+       if (!formData.aseguradora && formData.cliente) {
+         try {
+           await supabase.from('aseguradoras').upsert({
+             nombre: formData.cliente,
+             telefono: formData.telefono_asegurado || formData.telefono_contacto,
+             email: formData.email,
+             direccion: formData.direccion,
+             estado: 'Activa'
+           }, { onConflict: 'nombre' });
+         } catch (err) {
+           console.warn("No se pudo auto-registrar el cliente.", err);
+         }
+       }
+
        if (onUpdated) onUpdated();
-       onClose();
+        
+        // Notificación WhatsApp al técnico si se asignó uno nuevo o cambió
+        if (formData.tecnico && formData.tecnico !== ordenData.tecnico_id) {
+          const selectedTecnico = tecnicos.find(t => (t.auth_user_id || t.id) === formData.tecnico);
+          if (selectedTecnico && selectedTecnico.telefono) {
+             notifyNewOrder(selectedTecnico.telefono, {
+               id: ordenData.id_legible,
+               id_legible: ordenData.id_legible,
+               cliente: formData.cliente,
+               direccion: formData.direccion,
+               descripcion: formData.observaciones
+             });
+          }
+        }
+
+        onClose();
     } else {
        console.error("Error updating order", error);
        alert("Error al actualizar la orden.");
     }
+    setLoading(false);
   };
 
   return (
@@ -148,7 +179,6 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder={formData.aseguradora ? "Ej: B12345678" : "Ej: 12345678A"}
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.referencia}
@@ -313,7 +343,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
                 <textarea 
                   rows={3}
                   required
-                  placeholder="Descripción del siniestro, tareas requeridas, etc."
+                  placeholder="Descripción del encargo, tareas requeridas, etc."
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm resize-none"
                   value={formData.observaciones}
                   onChange={(e) => setFormData({...formData, observaciones: e.target.value})}

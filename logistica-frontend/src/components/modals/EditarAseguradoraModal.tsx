@@ -224,7 +224,7 @@ export default function EditarAseguradoraModal({ isOpen, onClose, onUpdated, ase
 
             {/* Logo */}
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Logo</label>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Logo de la Empresa</label>
               <input
                 type="file"
                 ref={fileInputRef}

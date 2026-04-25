@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { notifyNewOrder } from '../../lib/whatsapp';
 
 interface Props {
   isOpen: boolean;
@@ -40,7 +41,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
        fetchTareasFrecuentes();
        setFormData({
          referencia: '', cliente: '', aseguradora: '', tecnico: '',
-         fecha: fechaInicial || new Date().toISOString().split('T')[0],
+         fecha: fechaInicial || new Date().toLocaleDateString('en-CA'),
          hora: '10:00', observaciones: '', esUrgente: false,
          asegurado: '', telefono_asegurado: '', email: '',
          persona_contacto: '', telefono_contacto: '', direccion: '',
@@ -49,7 +50,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
   }, [isOpen, fechaInicial]);
 
   const fetchTecnicos = async () => {
-    const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos').eq('estado', 'Disponible');
+    const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, telefono').eq('estado', 'Disponible');
     if (data) setTecnicos(data);
   };
 
@@ -179,14 +180,43 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
          creado_en: createdAt
       });
 
-    setLoading(false);
     if (!error) {
+       // Auto-registro de Cliente Particular si no se seleccionó una aseguradora
+       if (!formData.aseguradora && formData.cliente) {
+         try {
+           await supabase.from('aseguradoras').upsert({
+             nombre: formData.cliente,
+             telefono: formData.telefono_asegurado || formData.telefono_contacto,
+             email: formData.email,
+             direccion: formData.direccion,
+             estado: 'Activa'
+           }, { onConflict: 'nombre' });
+         } catch (err) {
+           console.warn("No se pudo auto-registrar el cliente.", err);
+         }
+       }
+
+       // Notificación WhatsApp al técnico
+       if (formData.tecnico) {
+         const selectedTecnico = tecnicos.find(t => (t.auth_user_id || t.id) === formData.tecnico);
+         if (selectedTecnico && selectedTecnico.telefono) {
+            notifyNewOrder(selectedTecnico.telefono, {
+              id: id_legible,
+              id_legible,
+              cliente: formData.cliente,
+              direccion: formData.direccion,
+              descripcion: formData.observaciones
+            });
+         }
+       }
+
        if (onCreated) onCreated();
        onClose();
     } else {
        console.error("Error creating order", error);
        alert("Error al crear la orden.");
     }
+    setLoading(false);
   };
 
   return (
@@ -261,7 +291,6 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder={formData.aseguradora ? "Ej: B12345678" : "Ej: 12345678A"}
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.referencia}

@@ -8,6 +8,8 @@ export default function Dashboard() {
   const [counts, setCounts] = useState({ pendientes: 0, enCurso: 0, finalizadas: 0 });
   const [weeklyActivity, setWeeklyActivity] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
   const [dailyAgenda, setDailyAgenda] = useState<any[]>([]);
+  const [urgentes, setUrgentes] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
@@ -22,7 +24,8 @@ export default function Dashboard() {
       fetchOrdenes(),
       fetchStats(),
       fetchWeeklyActivity(),
-      fetchDailyAgenda()
+      fetchDailyAgenda(),
+      fetchUrgentes()
     ]);
     setLoading(false);
   };
@@ -55,7 +58,6 @@ export default function Dashboard() {
   };
 
   const fetchWeeklyActivity = async () => {
-    // Get last 7 days of completed orders
     const today = new Date();
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
@@ -69,7 +71,6 @@ export default function Dashboard() {
       const countsPerDay = [0, 0, 0, 0, 0, 0, 0];
       data.forEach(o => {
         const d = new Date(o.creado_en).getDay(); 
-        // Sunday is 0, Mon is 1... Adjust to Mon-Sun (0-6)
         const dayIdx = d === 0 ? 6 : d - 1;
         countsPerDay[dayIdx]++;
       });
@@ -78,7 +79,7 @@ export default function Dashboard() {
   };
 
   const fetchDailyAgenda = async () => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toLocaleDateString('en-CA');
     const { data } = await supabase
       .from('reportes')
       .select('*, perfiles(nombre_completo), ordenes(id_legible, cliente, estado)')
@@ -87,195 +88,264 @@ export default function Dashboard() {
     
     setDailyAgenda(data || []);
   };
+  
+  const fetchUrgentes = async () => {
+    const { data } = await supabase
+      .from('ordenes')
+      .select('id, id_legible, cliente, creado_en')
+      .eq('estado', 'Urgente')
+      .order('creado_en', { ascending: false });
+    
+    setUrgentes(data || []);
+  };
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto w-full">
+    <div className="flex-1 flex flex-col w-full min-h-screen">
       {/* Header */}
-      <header className="h-16 flex items-center justify-between px-8 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10 w-full">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white">Dashboard Principal</h2>
-        <div className="flex items-center gap-6">
-          <div className="relative w-64">
+      <header className="h-auto min-h-[64px] flex flex-col sm:flex-row items-center justify-between px-4 sm:px-8 py-4 sm:py-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10 w-full gap-4">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white self-start sm:self-auto">Dashboard Principal</h2>
+        <div className="flex items-center gap-4 sm:gap-6 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-64">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
-            <input className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/50 placeholder:text-slate-500" placeholder="Buscar órdenes, técnicos..." type="text"/>
+            <input className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/50 placeholder:text-slate-500" placeholder="Buscar órdenes..." type="text"/>
           </div>
-          <div className="flex items-center gap-3">
-            <button className="size-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-primary/10 hover:text-primary transition-all relative">
+          <div className="flex items-center gap-3 relative">
+            <button 
+              onClick={() => setShowNotifications(!showNotifications)}
+              className={`size-10 rounded-xl flex items-center justify-center transition-all relative ${
+                showNotifications ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-primary/10 hover:text-primary'
+              }`}
+            >
               <span className="material-symbols-outlined text-xl">notifications</span>
-              <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>
+              {urgentes.length > 0 && (
+                <span className="absolute -top-1 -right-1 size-5 bg-red-500 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white dark:border-slate-900 animate-bounce">
+                  {urgentes.length}
+                </span>
+              )}
             </button>
+
+            {/* Dropdown de Notificaciones */}
+            {showNotifications && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setShowNotifications(false)}></div>
+                <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-30 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
+                    <h3 className="font-bold text-sm">Órdenes Urgentes</h3>
+                    <span className="bg-red-100 text-red-600 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Crítico</span>
+                  </div>
+                  <div className="max-h-96 overflow-y-auto">
+                    {urgentes.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400">
+                        <span className="material-symbols-outlined text-4xl block mb-2 opacity-20">check_circle</span>
+                        <p className="text-xs">No hay alertas urgentes</p>
+                      </div>
+                    ) : (
+                      urgentes.map(o => (
+                        <div 
+                          key={o.id} 
+                          onClick={() => {
+                            navigate(`/ordenes/${o.id}`);
+                            setShowNotifications(false);
+                          }}
+                          className="p-4 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
+                        >
+                          <div className="flex justify-between items-start mb-1">
+                            <p className="text-sm font-bold text-slate-800 dark:text-white group-hover:text-primary transition-colors">{o.id_legible}</p>
+                            <span className="text-[10px] text-slate-400">{new Date(o.creado_en).toLocaleDateString()}</span>
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 truncate">{o.cliente}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </header>
       
-      <div className="p-8 space-y-8 max-w-7xl mx-auto w-full">
+      <div className="p-4 sm:p-8 space-y-6 sm:space-y-8 max-w-7xl mx-auto w-full flex-1">
         {/* Summary Cards */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
-            <div className="size-12 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+            <div className="size-12 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
               <span className="material-symbols-outlined">pending_actions</span>
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Pendientes</p>
-              <p className="text-2xl font-bold">{loading ? '...' : counts.pendientes}</p>
-              <p className="text-xs text-slate-400 font-medium">Requieren atención</p>
+              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">Pendientes</p>
+              <p className="text-2xl font-black text-slate-800 dark:text-white">{loading ? '...' : counts.pendientes}</p>
             </div>
           </div>
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
-            <div className="size-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+            <div className="size-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
               <span className="material-symbols-outlined">sync</span>
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">En Proceso</p>
-              <p className="text-2xl font-bold">{loading ? '...' : counts.enCurso}</p>
-              <p className="text-xs text-slate-400 font-medium">Intervenciones activas</p>
+              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">En Proceso</p>
+              <p className="text-2xl font-black text-slate-800 dark:text-white">{loading ? '...' : counts.enCurso}</p>
             </div>
           </div>
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
-            <div className="size-12 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-all hover:shadow-md sm:col-span-2 lg:col-span-1">
+            <div className="size-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600">
               <span className="material-symbols-outlined">check_circle</span>
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Finalizadas</p>
-              <p className="text-2xl font-bold">{loading ? '...' : counts.finalizadas}</p>
-              <p className="text-xs text-green-600 font-medium flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs">done_all</span> Listas para cierre
-              </p>
+              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">Finalizadas</p>
+              <p className="text-2xl font-black text-slate-800 dark:text-white">{loading ? '...' : counts.finalizadas}</p>
             </div>
           </div>
         </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: Activity & Table */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Weekly Activity Chart */}
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-              <div className="flex items-center justify-between mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+          {/* Activity & Table */}
+          <div className="lg:col-span-2 space-y-6 sm:space-y-8">
+            {/* Chart */}
+            <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-base font-bold">Actividad Semanal</h3>
-                  <p className="text-xs text-slate-500">Órdenes creadas en los últimos 7 días</p>
+                  <h3 className="text-base font-black text-slate-800 dark:text-white">Actividad Semanal</h3>
+                  <p className="text-xs text-slate-500 font-medium">Nuevas órdenes registradas</p>
                 </div>
-                <span className="text-sm font-bold text-primary">{weeklyActivity.reduce((a: number, b: number) => a + b, 0)} Registros</span>
               </div>
-              <div className="flex items-end justify-between h-40 gap-2 px-2">
+              <div className="flex items-end justify-between h-40 gap-1.5 sm:gap-3 px-1">
                 {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day, i) => {
                   const val = weeklyActivity[i];
                   const max = Math.max(...weeklyActivity, 1);
                   const height = (val / max) * 100;
                   return (
-                    <div key={day} className="flex-1 flex flex-col items-center gap-2 group">
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
+                    <div key={day} className="flex-1 flex flex-col items-center gap-3 group">
+                      <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-xl relative flex items-end overflow-hidden h-full">
                         <div 
-                           className="w-full bg-primary/40 group-hover:bg-primary transition-all duration-500" 
+                           className="w-full bg-primary/40 group-hover:bg-primary transition-all duration-500 rounded-t-lg" 
                            style={{ height: `${height}%` }}
-                           title={`${val} órdenes`}
                         ></div>
+                        {val > 0 && (
+                          <span className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all bg-slate-800 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">
+                            {val}
+                          </span>
+                        )}
                       </div>
-                      <span className="text-[10px] font-bold text-slate-500">{day}</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{day}</span>
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            {/* Recent Orders */}
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                <h3 className="text-base font-bold">Órdenes Recientes</h3>
-                <button className="text-sm font-medium text-primary hover:underline">Ver todas</button>
+            {/* Recent Orders Table */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <h3 className="text-base font-black text-slate-800 dark:text-white">Órdenes Recientes</h3>
+                <Link to="/ordenes" className="text-xs font-bold text-primary hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-colors">Ver todas</Link>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 font-medium">
+                <table className="w-full text-left text-sm min-w-full">
+                  <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 font-bold uppercase text-[10px] tracking-widest">
                     <tr>
-                      <th className="px-6 py-3">ID OT</th>
-                      <th className="px-6 py-3">Cliente</th>
-                      <th className="px-6 py-3">Servicio</th>
-                      <th className="px-6 py-3">Estado</th>
-                      <th className="px-6 py-3 text-right">Acción</th>
+                      <th className="px-4 sm:px-6 py-4">ID OT</th>
+                      <th className="px-4 sm:px-6 py-4">Cliente</th>
+                      <th className="px-4 sm:px-6 py-4 hidden sm:table-cell">Servicio</th>
+                      <th className="px-4 sm:px-6 py-4">Estado</th>
+                      <th className="px-4 sm:px-6 py-4 text-right">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {loading ? (
-                      <tr><td colSpan={5} className="px-6 py-4 text-center text-slate-500 font-medium">Cargando órdenes desde Supabase...</td></tr>
-                    ) : ordenes.length === 0 ? (
-                      <tr><td colSpan={5} className="px-6 py-4 text-center text-slate-500">No hay órdenes recientes registradas.</td></tr>
-                    ) : (
-                      ordenes.map((orden: any) => (
-                        <tr key={orden.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                          <td className="px-6 py-4 font-bold">{orden.id_legible}</td>
-                          <td className="px-6 py-4">{orden.cliente}</td>
-                          <td className="px-6 py-4 text-slate-500">{orden.descripcion || 'Sin servicio específico'}</td>
-                          <td className="px-6 py-4">
-                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                              orden.estado === 'Urgente' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                              orden.estado === 'En revisión' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                              orden.estado === 'Pendiente de firma' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
-                              orden.estado === 'Pendiente' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-500' :
-                              orden.estado === 'En Curso' ? 'bg-primary/10 text-primary' :
-                              orden.estado === 'Finalizada' ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-500' :
-                              'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                            }`}>
-                              {orden.estado}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <Link to={`/ordenes/${orden.id}`} className="text-slate-400 hover:text-primary transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg p-2 inline-flex">
-                              <span className="material-symbols-outlined text-lg">visibility</span>
-                            </Link>
-                          </td>
-                        </tr>
-                      ))
-                    )}
+                      <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 animate-pulse">Cargando...</td></tr>
+                    ) : ordenes.map((orden: any) => (
+                      <tr key={orden.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                        <td className="px-4 sm:px-6 py-4 font-black text-slate-900 dark:text-white whitespace-nowrap">{orden.id_legible}</td>
+                        <td className="px-4 sm:px-6 py-4 font-semibold text-slate-700 dark:text-slate-300">
+                          <div className="max-w-[120px] sm:max-w-none truncate">{orden.cliente}</div>
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 text-slate-500 max-w-[200px] truncate hidden sm:table-cell">{orden.descripcion || '---'}</td>
+                        <td className="px-4 sm:px-6 py-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                            orden.estado === 'Urgente' ? 'bg-red-100 text-red-700' :
+                            orden.estado === 'Finalizada' ? 'bg-green-100 text-green-700' :
+                            'bg-blue-100 text-blue-700'
+                          }`}>
+                            {orden.estado}
+                          </span>
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 text-right">
+                          <Link to={`/ordenes/${orden.id}`} className="size-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-primary hover:bg-primary/10 transition-all inline-flex items-center justify-center">
+                            <span className="material-symbols-outlined text-lg">visibility</span>
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Quick Access Calendar / Tasks */}
-          <div className="space-y-8">
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-              <h3 className="text-base font-bold mb-6">Intervenciones de Hoy</h3>
-              <div className="space-y-4">
+          {/* Right Column */}
+          <div className="space-y-6 sm:space-y-8">
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <h3 className="text-base font-black text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">event_available</span>
+                Agenda de Hoy
+              </h3>
+              <div className="space-y-5">
                 {dailyAgenda.length === 0 ? (
-                  <p className="text-xs text-slate-500 text-center py-4 italic">No hay intervenciones registradas para hoy.</p>
+                  <div className="py-12 text-center">
+                    <div className="size-16 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
+                      <span className="material-symbols-outlined text-slate-200 text-3xl">calendar_today</span>
+                    </div>
+                    <p className="text-xs text-slate-400 font-medium italic">Sin intervenciones hoy</p>
+                  </div>
                 ) : (
                   dailyAgenda.map((item: any) => (
-                    <div key={item.id} className="flex gap-4 group cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 p-1 rounded-lg transition-colors" onClick={() => navigate?.(`/ordenes/${item.orden_id}`)}>
+                    <div 
+                      key={item.id} 
+                      className="flex gap-4 group cursor-pointer"
+                      onClick={() => navigate(`/ordenes/${item.orden_id}`)}
+                    >
                       <div className="flex flex-col items-center">
-                        <span className="text-[10px] font-bold text-primary">{new Date(item.creado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        <div className="w-px h-full bg-slate-100 dark:bg-slate-800 my-2"></div>
+                        <span className="text-[10px] font-black text-primary">{new Date(item.creado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <div className="w-0.5 flex-1 bg-slate-100 dark:bg-slate-800 my-1 rounded-full"></div>
                       </div>
-                      <div className={`flex-1 p-3 rounded-lg border-l-4 shadow-sm ${
-                        item.ordenes?.estado === 'Urgente' ? 'border-red-500 bg-red-50 dark:bg-red-900/10' :
-                        item.ordenes?.estado === 'Finalizada' ? 'border-green-500 bg-green-50 dark:bg-green-900/10' :
-                        'border-primary bg-slate-50 dark:bg-slate-800/50'
-                      }`}>
-                        <p className="text-xs font-bold truncate">{item.ordenes?.cliente}</p>
-                        <p className="text-[10px] text-slate-500 truncate">{item.perfiles?.nombre_completo || 'Técnico'}</p>
+                      <div className="flex-1 pb-4">
+                        <div className="p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 hover:border-primary/30 transition-all">
+                          <p className="text-xs font-black text-slate-800 dark:text-white mb-1 truncate">{item.ordenes?.cliente}</p>
+                          <div className="flex items-center gap-1 text-[10px] text-slate-500 font-bold">
+                            <span className="material-symbols-outlined text-[12px]">engineering</span>
+                            {item.perfiles?.nombre_completo || 'Técnico'}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))
                 )}
               </div>
-              <Link to="/calendario" className="w-full mt-6 py-2 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors flex items-center justify-center">
-                Abrir Calendario Completo
+              <Link to="/calendario" className="w-full mt-2 py-3 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 transition-all flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined text-lg">calendar_month</span>
+                Calendario Completo
               </Link>
             </div>
-            {/* Quick Actions */}
-            <div className="bg-primary p-6 rounded-xl shadow-lg shadow-primary/20 text-white relative overflow-hidden">
+
+            {/* Quick Actions Card */}
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 rounded-2xl shadow-xl shadow-blue-600/20 text-white relative overflow-hidden group">
               <div className="relative z-10">
-                <h3 className="text-base font-bold mb-2">Nueva Orden</h3>
-                <p className="text-white/80 text-sm mb-6">Asigna una nueva orden de trabajo de forma rápida.</p>
+                <div className="size-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <span className="material-symbols-outlined text-white text-2xl">add_task</span>
+                </div>
+                <h3 className="text-xl font-black mb-2 tracking-tight">Nueva Orden</h3>
+                <p className="text-white/70 text-sm mb-8 font-medium leading-relaxed">Asigna una nueva orden de trabajo ahora mismo de forma rápida y sencilla.</p>
                 <button 
                   onClick={() => setIsModalOpen(true)}
-                  className="bg-white text-primary px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-100 transition-all"
+                  className="w-full bg-white text-blue-600 px-6 py-4 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-black/10 hover:bg-blue-50 hover:translate-y-[-2px] transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
-                  <span className="material-symbols-outlined">add</span>
-                  Crear Ahora
+                  <span className="material-symbols-outlined font-bold">add</span>
+                  Crear Reporte
                 </button>
               </div>
-              <span className="material-symbols-outlined absolute -bottom-4 -right-4 text-9xl text-white/10 select-none">post_add</span>
+              {/* Background Shapes */}
+              <div className="absolute top-[-20%] right-[-10%] size-40 bg-white/10 rounded-full blur-2xl"></div>
+              <div className="absolute bottom-[-10%] left-[-10%] size-40 bg-indigo-400/20 rounded-full blur-2xl"></div>
             </div>
           </div>
         </div>

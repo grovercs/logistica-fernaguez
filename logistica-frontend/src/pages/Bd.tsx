@@ -375,33 +375,38 @@ export default function Bd() {
       )}
 
       {/* Header - Harmonized with Dashboard.tsx */}
-      <header className="h-16 shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-8 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-4">
-             <div className="size-10 bg-primary/10 rounded-lg flex items-center justify-center text-primary border border-primary/10"><span className="material-symbols-outlined text-2xl">database</span></div>
-             <h2 className="text-lg font-bold text-slate-900 dark:text-white">Gestión de Base de Datos</h2>
-        </div>
-        <div className="flex items-center gap-3">
-             <span className="px-3 py-1 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-xs font-bold border border-green-100 dark:border-green-800 rounded-lg flex items-center gap-2">
-                 <span className="size-2 bg-green-500 rounded-full animate-pulse"></span> SISTEMA ACTIVO
-             </span>
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 w-full backdrop-blur-md">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-8 h-16">
+          <div className="flex items-center gap-3">
+               <div className="size-9 bg-primary/10 rounded-xl flex items-center justify-center text-primary border border-primary/20"><span className="material-symbols-outlined text-xl">database</span></div>
+               <h2 className="text-lg font-black tracking-tight">Base de Datos</h2>
+          </div>
+          <div className="flex items-center gap-2">
+               <span className="hidden sm:flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-100 dark:border-emerald-800 rounded-full">
+                   <span className="size-1.5 bg-emerald-500 rounded-full animate-pulse"></span> SISTEMA ACTIVO
+               </span>
+               <span className="sm:hidden size-3 bg-emerald-500 rounded-full animate-pulse border-2 border-white dark:border-slate-900 shadow-sm"></span>
+          </div>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto w-full">
         {/* Navigation - Standard Tabs */}
-        <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8">
-          <nav className="flex space-x-8">
-            {[
-                {id: 'backup', label: 'Protección', icon: 'shield_lock'},
-                {id: 'restaurar', label: 'Rescate', icon: 'medical_services'},
-                {id: 'compactar', label: 'Optimizar', icon: 'cleaning_services'},
-                {id: 'archivados', label: 'Historial', icon: 'inventory_2'}
-            ].map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`py-4 border-b-2 font-medium text-sm transition-all flex items-center gap-2 ${activeTab === tab.id ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                    <span className="material-symbols-outlined text-xl">{tab.icon}</span> {tab.label}
-                </button>
-            ))}
-          </nav>
+        <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto px-4 sm:px-8">
+            <nav className="flex space-x-6 sm:space-x-8 overflow-x-auto no-scrollbar scroll-smooth">
+              {[
+                  {id: 'backup', label: 'Protección', icon: 'shield_lock'},
+                  {id: 'restaurar', label: 'Rescate', icon: 'medical_services'},
+                  {id: 'compactar', label: 'Optimizar', icon: 'cleaning_services'},
+                  {id: 'archivados', label: 'Historial', icon: 'inventory_2'}
+              ].map(tab => (
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`py-4 border-b-2 font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2 shrink-0 ${activeTab === tab.id ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                      <span className="material-symbols-outlined text-lg">{tab.icon}</span> {tab.label}
+                  </button>
+              ))}
+            </nav>
+          </div>
         </div>
 
         <div className="p-8 max-w-7xl mx-auto w-full space-y-8">
