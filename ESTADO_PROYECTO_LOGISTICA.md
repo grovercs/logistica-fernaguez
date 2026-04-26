@@ -34,21 +34,25 @@ Logística Fernaguez es un sistema de gestión integral (ERP/CRM):
 
 ---
 
-## 3. Estado de la Implementación
+## 3. Estado de la Implementación (Actualizado 26-04-2026)
+
+### 🛠️ Bugs Recientes Corregidos
+- **Pantalla en Blanco (Deep Links)**: Se resolvió el fallo en la app móvil (`MobileDetalleOrden.tsx`). Ahora permite abrir órdenes tanto por su ID interno (UUID) como por su ID legible (`OB-2026-...`).
+- **Falla en WhatsApp**: Se añadió logging detallado y un botón de **"Re-notificar"** manual en el panel administrativo. Se corrigió un error que impedía ver a todos los técnicos al asignar órdenes.
+- **Manejo de Errores**: La app móvil ahora muestra un mensaje amigable si una orden no se encuentra, en lugar de quedarse cargando infinitamente.
 
 **Archivos Clave modificados recientemente:**
-1. `logistica-frontend/src/pages/Calendario.tsx` (Responsividad filtros).
-2. `logistica-frontend/src/pages/Dashboard.tsx` (Tablas adaptables).
-3. `logistica-frontend/src/components/PrintableOrden.tsx` (Fotos y especialidades).
-4. `logistica-frontend/src/components/modals/EditarOrdenModal.tsx` (WhatsApp y fechas).
-5. `logistica-frontend/src/components/Layout.tsx` (Menú móvil).
+1. `logistica-mobile/src/pages/mobile/MobileDetalleOrden.tsx` (Solución enlaces y pantalla blanca).
+2. `logistica-frontend/src/lib/whatsapp.ts` (Logging y robustez).
+3. `logistica-frontend/src/components/modals/EditarOrdenModal.tsx` (Botón re-notificar y lista técnicos).
+4. `logistica-frontend/src/components/modals/NuevoReporteModal.tsx` (Lista técnicos completa).
 
 ---
 
 ## 4. Próximos Pasos Pendientes
-- [ ] **Trabajadores.tsx**: La tabla de trabajadores todavía tiene un ancho mínimo que puede mejorar en pantallas muy pequeñas (se intentó corregir pero hubo errores de edición).
-- [ ] **Pruebas en Campo**: Verificar que los técnicos reciban correctamente el link de la app móvil por WhatsApp y puedan abrir la orden.
-- [ ] **Optimización Multimedia**: Revisar el cargador de imágenes en `Bd.tsx` para asegurar que el backup a Drive no falle con volúmenes muy grandes de datos.
+- [ ] **Trabajadores.tsx**: La tabla de trabajadores todavía tiene un ancho mínimo que puede mejorar en pantallas muy pequeñas.
+- [ ] **Validación con Usuario**: Confirmar si los mensajes de WhatsApp ya llegan correctamente (depende de la conexión de la instancia de UltraMsg).
+- [ ] **Optimización Multimedia**: Revisar el cargador de imágenes en `Bd.tsx` para asegurar que el backup a Drive no falle.
 
 ---
 
