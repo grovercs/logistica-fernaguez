@@ -1,0 +1,1 @@
+npx openclaw configure --set gateway.models.default="ollama/qwen2.5-coder:3b" --set gateway.auth.admin_ids="5703152430"

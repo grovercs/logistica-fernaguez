@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:admin.appvielha.com)",
+      "WebFetch(domain:app.appvielha.com)"
+    ]
+  }
+}

@@ -62,7 +62,9 @@ const MobileOrdenes = () => {
         // (Antes: solo veían las suyas)
         // Ahora pueden ver el panorama completo del trabajo
 
-        const { data, error } = await query.order('creado_en', { ascending: false });
+        const { data, error } = await query
+            .neq('estado', 'Finalizada')
+            .order('creado_en', { ascending: false });
 
         if (!error && data) {
             setOrdenes(data);

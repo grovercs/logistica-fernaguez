@@ -64,7 +64,11 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
   }, [isOpen, ordenData]);
 
   const fetchTecnicos = async () => {
-    const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, telefono').eq('estado', 'Disponible');
+    // Traer todos los técnicos que no estén de baja para poder asignarles órdenes incluso si están "En Obra"
+    const { data } = await supabase
+      .from('trabajadores')
+      .select('id, auth_user_id, nombre, apellidos, telefono, estado')
+      .neq('estado', 'Baja');
     if (data) setTecnicos(data);
   };
 
@@ -126,13 +130,14 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
         if (formData.tecnico && formData.tecnico !== ordenData.tecnico_id) {
           const selectedTecnico = tecnicos.find(t => (t.auth_user_id || t.id) === formData.tecnico);
           if (selectedTecnico && selectedTecnico.telefono) {
+             console.log("WhatsApp: Detectado cambio de técnico, enviando notificación...");
              notifyNewOrder(selectedTecnico.telefono, {
                id: ordenData.id_legible,
                id_legible: ordenData.id_legible,
                cliente: formData.cliente,
                direccion: formData.direccion,
                descripcion: formData.observaciones
-             });
+             }).catch(err => console.error("Error enviando WhatsApp automático:", err));
           }
         }
 
@@ -140,6 +145,40 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
     } else {
        console.error("Error updating order", error);
        alert("Error al actualizar la orden.");
+    }
+    setLoading(false);
+  };
+
+  const handleManualWhatsApp = async () => {
+    if (!formData.tecnico) {
+      alert("Asigna un técnico primero para enviar la notificación.");
+      return;
+    }
+
+    const selectedTecnico = tecnicos.find(t => (t.auth_user_id || t.id) === formData.tecnico);
+    if (!selectedTecnico || !selectedTecnico.telefono) {
+      alert("El técnico seleccionado no tiene un teléfono configurado.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await notifyNewOrder(selectedTecnico.telefono, {
+        id: ordenData.id_legible,
+        id_legible: ordenData.id_legible,
+        cliente: formData.cliente,
+        direccion: formData.direccion,
+        descripcion: formData.observaciones
+      });
+
+      if (result.sent === "true" || result.success) {
+        alert("✅ Notificación de WhatsApp enviada correctamente.");
+      } else {
+        alert("⚠️ El mensaje se registró pero UltraMsg devolvió un estado inesperado. Revisa el panel de UltraMsg.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("❌ Error al conectar con el servicio de WhatsApp.");
     }
     setLoading(false);
   };
@@ -354,7 +393,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
           </form>
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-end items-center gap-3">
           <button 
             type="button"
             onClick={onClose}
@@ -362,6 +401,17 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
           >
             Cancelar
           </button>
+
+          <button 
+            type="button"
+            onClick={handleManualWhatsApp}
+            disabled={loading}
+            className="px-5 py-2.5 bg-green-500 text-white rounded-xl font-bold shadow-lg shadow-green-500/30 hover:bg-green-600 hover:shadow-green-500/40 focus:ring-4 focus:ring-green-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[20px]">chat</span>
+            {loading ? '...' : 'Re-notificar'}
+          </button>
+
           <button 
             type="submit"
             disabled={loading}

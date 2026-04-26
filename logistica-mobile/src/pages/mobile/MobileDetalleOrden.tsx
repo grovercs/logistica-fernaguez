@@ -70,6 +70,8 @@ const MobileDetalleOrden = () => {
 
         if (!userId) return;
 
+        setLoading(true);
+
         // Get User Profile and Role
         const { data: profile } = await supabase
             .from('perfiles')
@@ -81,25 +83,43 @@ const MobileDetalleOrden = () => {
         setCurrentUserRole(roleName);
         setCurrentUserName(profile?.nombre_completo || userData?.user?.email?.split('@')[0] || 'Trabajador');
 
-        const [ordenReq, reportesReq, trabajadoresReq] = await Promise.all([
-            supabase.from('ordenes').select('*').eq('id', id).single(),
-            // Todos los trabajadores ven TODAS las intervenciones de la orden
-            supabase.from('reportes').select('*').eq('orden_id', id).order('creado_en', { ascending: false }),
-            // Fetch all workers to map IDs to names and specialties
+        // 1. Try to find the order by UUID or Legible ID
+        let currentOrden = null;
+        let fetchError = null;
+
+        // Check if ID looks like a UUID
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '');
+
+        if (isUUID) {
+            const { data, error } = await supabase.from('ordenes').select('*').eq('id', id).maybeSingle();
+            currentOrden = data;
+            fetchError = error;
+        }
+
+        // If not found or not UUID, try by id_legible
+        if (!currentOrden) {
+            const { data, error } = await supabase.from('ordenes').select('*').eq('id_legible', id).maybeSingle();
+            currentOrden = data;
+            if (error) fetchError = error;
+        }
+
+        if (!currentOrden) {
+            console.error('Orden no encontrada:', id, fetchError);
+            alert('No se pudo encontrar la orden especificada.');
+            setLoading(false);
+            return;
+        }
+
+        const realId = currentOrden.id; // The real UUID
+
+        // 2. Fetch reports and workers using the REAL ID
+        const [reportesReq, trabajadoresReq] = await Promise.all([
+            supabase.from('reportes').select('*').eq('orden_id', realId).order('creado_en', { ascending: false }),
             supabase.from('trabajadores').select('auth_user_id, nombre, apellidos, especialidad')
         ]);
 
-        if (ordenReq.error) {
-            console.error('Error fetching orden:', ordenReq.error);
-        }
-
-        if (reportesReq.error) {
-            console.error('Error fetching reportes:', reportesReq.error);
-        }
-
-        if (trabajadoresReq.error) {
-            console.error('Error fetching trabajadores:', trabajadoresReq.error);
-        }
+        if (reportesReq.error) console.error('Error fetching reportes:', reportesReq.error);
+        if (trabajadoresReq.error) console.error('Error fetching trabajadores:', trabajadoresReq.error);
 
         // Create map of technician IDs to names and specialties
         if (!trabajadoresReq.error && trabajadoresReq.data) {
@@ -115,26 +135,25 @@ const MobileDetalleOrden = () => {
             setTrabajadoresMap(map);
         }
 
-        if (!ordenReq.error && ordenReq.data) {
-            setOrden(ordenReq.data);
-            if (ordenReq.data.creado_en) {
-                setFecha(new Date(ordenReq.data.creado_en).toISOString().split('T')[0]);
-            }
+        setOrden(currentOrden);
+        if (currentOrden.creado_en) {
+            setFecha(new Date(currentOrden.creado_en).toISOString().split('T')[0]);
         }
 
         if (!reportesReq.error && reportesReq.data) {
             setReportes(reportesReq.data);
         } else {
-            // Fallback: try without any join
+            // Fallback for reports
             const { data: fallbackReportes } = await supabase
                 .from('reportes')
                 .select('*')
-                .eq('orden_id', id)
+                .eq('orden_id', realId)
                 .order('creado_en', { ascending: false });
             if (fallbackReportes) {
                 setReportes(fallbackReportes);
             }
         }
+
         setLoading(false);
     };
 
@@ -492,6 +511,29 @@ const MobileDetalleOrden = () => {
     };
 
     if (loading) return <div className="p-8 text-center text-slate-500 font-bold mt-20">Cargando...</div>;
+
+    if (!orden) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-[#f0f2f5] p-6 text-center">
+                <div className="bg-white p-8 rounded-[2.5rem] shadow-xl max-w-sm w-full border border-slate-100">
+                    <div className="bg-red-50 text-red-500 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <span className="material-symbols-outlined text-[40px]">search_off</span>
+                    </div>
+                    <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Orden no encontrada</h2>
+                    <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+                        No hemos podido localizar la orden <span className="font-bold text-slate-700">#{id}</span>. Es posible que haya sido eliminada o que el enlace sea incorrecto.
+                    </p>
+                    <button 
+                        onClick={() => navigate('/m/ordenes')}
+                        className="w-full py-4 bg-primary text-white rounded-2xl font-black shadow-lg shadow-primary/30 active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                        <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                        VOLVER A MIS ÓRDENES
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="bg-[#f0f2f5] min-h-[100dvh] font-sans pb-10">

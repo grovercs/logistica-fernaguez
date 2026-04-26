@@ -1,0 +1,1 @@
+npx openclaw configure --set channels.telegram.botToken="7993538428:AAHWpCHtYVr1KQhUiloldJ5Z9eu9aKNQ4m0"

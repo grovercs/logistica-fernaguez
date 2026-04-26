@@ -20,6 +20,7 @@ export const sendWhatsAppMessage = async (phone: string, message: string) => {
   }
 
   try {
+    console.log(`WhatsApp: Intentando enviar a ${cleanPhone} vía instancia ${INSTANCE_ID}...`);
     const response = await fetch(`https://api.ultramsg.com/${INSTANCE_ID}/messages/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -31,11 +32,15 @@ export const sendWhatsAppMessage = async (phone: string, message: string) => {
     });
     
     const data = await response.json();
-    console.log("WhatsApp: Mensaje enviado", data);
+    if (data.sent === "true" || data.success) {
+      console.log("WhatsApp: ✅ Mensaje enviado con éxito", data);
+    } else {
+      console.warn("WhatsApp: ⚠️ API respondió con error o estado no enviado", data);
+    }
     return data;
   } catch (error) {
-    console.error("WhatsApp: Error al enviar mensaje", error);
-    return { error: "API connection failed" };
+    console.error("WhatsApp: ❌ Error crítico de conexión", error);
+    return { error: "API connection failed", details: error };
   }
 };
 

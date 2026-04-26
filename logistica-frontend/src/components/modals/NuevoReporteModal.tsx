@@ -50,7 +50,11 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
   }, [isOpen, fechaInicial]);
 
   const fetchTecnicos = async () => {
-    const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, telefono').eq('estado', 'Disponible');
+    // Cargar todos los técnicos activos para poder asignarles órdenes futuras incluso si están ocupados ahora
+    const { data } = await supabase
+      .from('trabajadores')
+      .select('id, auth_user_id, nombre, apellidos, telefono')
+      .neq('estado', 'Baja');
     if (data) setTecnicos(data);
   };
 
@@ -200,13 +204,14 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
        if (formData.tecnico) {
          const selectedTecnico = tecnicos.find(t => (t.auth_user_id || t.id) === formData.tecnico);
          if (selectedTecnico && selectedTecnico.telefono) {
+            console.log("WhatsApp: Enviando notificación de nueva orden...");
             notifyNewOrder(selectedTecnico.telefono, {
               id: id_legible,
               id_legible,
               cliente: formData.cliente,
               direccion: formData.direccion,
               descripcion: formData.observaciones
-            });
+            }).catch(err => console.error("Error enviando WhatsApp automático:", err));
          }
        }
 

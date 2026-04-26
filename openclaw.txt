@@ -1,0 +1,43 @@
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "ollama/qwen2.5-coder:3b"
+      }
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "b61244ff7469e54f0f50aff9b8ef952bc55e2"
+    }
+  },
+  "plugins": {
+    "entries": {
+      "ollama": {
+        "enabled": true
+      }
+    }
+  },
+  "meta": {
+    "lastTouchedVersion": "2026.4.10",
+    "lastTouchedAt": "2026-04-12T07:52:52.084Z"
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "groups": {
+        "*": {
+          "requireMention": true
+        }
+      },
+      "botToken": "7993538428:AAHWpCHtYVr1KQhUiloldJ5Z9eu9>    }
+  },
+  "wizard": {
+    "lastRunAt": "2026-04-12T07:52:51.728Z",
+    "lastRunVersion": "2026.4.10",
+    "lastRunCommand": "configure",
+    "lastRunMode": "local"
+  }
+}
