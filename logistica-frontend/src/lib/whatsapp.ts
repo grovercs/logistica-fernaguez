@@ -10,6 +10,7 @@ const TOKEN = import.meta.env.VITE_WHATSAPP_TOKEN || '';
 export const sendWhatsAppMessage = async (phone: string, message: string) => {
   if (!INSTANCE_ID || !TOKEN) {
     console.warn("WhatsApp: Credenciales no configuradas (INSTANCE_ID o TOKEN).");
+    alert("⚠️ Error: Las credenciales de WhatsApp no están configuradas en este entorno.");
     return { error: "Missing credentials" };
   }
   
