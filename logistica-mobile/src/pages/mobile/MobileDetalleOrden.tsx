@@ -68,9 +68,14 @@ const MobileDetalleOrden = () => {
         const userId = userData?.user?.id || null;
         setCurrentUserId(userId);
 
-        if (!userId) return;
+        if (!userId) {
+            console.log("No hay usuario autenticado, redirigiendo...");
+            setLoading(false);
+            return;
+        }
 
         setLoading(true);
+        console.log("Buscando orden con ID:", cleanId);
 
         // Get User Profile and Role
         const { data: profile } = await supabase
@@ -87,7 +92,6 @@ const MobileDetalleOrden = () => {
         let currentOrden = null;
         let fetchError = null;
 
-        const cleanId = (id || '').trim();
         // Check if ID looks like a UUID
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
 
@@ -97,19 +101,19 @@ const MobileDetalleOrden = () => {
             fetchError = error;
         }
 
-        // If not found or not UUID, try by id_legible (case insensitive search for better reliability)
+        // If not found or not UUID, try by id_legible
         if (!currentOrden) {
             const { data, error } = await supabase
                 .from('ordenes')
                 .select('*')
-                .ilike('id_legible', cleanId)
+                .eq('id_legible', cleanId)
                 .maybeSingle();
             currentOrden = data;
             if (error) fetchError = error;
         }
 
         if (!currentOrden) {
-            console.error('Orden no encontrada:', cleanId, fetchError);
+            console.error('Orden no encontrada en Supabase:', cleanId, fetchError);
             setOrden(null);
             setLoading(false);
             return;
@@ -130,12 +134,13 @@ const MobileDetalleOrden = () => {
         if (!trabajadoresReq.error && trabajadoresReq.data) {
             const map = new Map<string, { nombre: string; especialidad: string }>();
             trabajadoresReq.data.forEach((t: any) => {
-                if (t.auth_user_id && t.nombre) {
-                    map.set(t.auth_user_id, {
-                        nombre: `${t.nombre} ${t.apellidos || ''}`.trim(),
-                        especialidad: t.especialidad || ''
-                    });
-                }
+                const info = {
+                    nombre: `${t.nombre} ${t.apellidos || ''}`.trim(),
+                    especialidad: t.especialidad || ''
+                };
+                // Mapeamos por ambos IDs para máxima compatibilidad
+                if (t.id) map.set(t.id, info);
+                if (t.auth_user_id) map.set(t.auth_user_id, info);
             });
             setTrabajadoresMap(map);
         }

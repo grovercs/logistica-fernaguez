@@ -60,24 +60,23 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       .order('creado_en', { ascending: false });
 
     if (!error && data) {
-      // Fetch worker names separately
-      const trabajadorIds = data.map(a => a.trabajador_id).filter(Boolean);
-      if (trabajadorIds.length > 0) {
-        const { data: trabajadoresData } = await supabase
-          .from('trabajadores')
-          .select('auth_user_id, nombre, apellidos, telefono')
-          .in('auth_user_id', trabajadorIds);
+      // 2. Cargamos todos los trabajadores para poder cruzar los datos
+      const { data: rawTrab } = await supabase
+        .from('trabajadores')
+        .select('id, auth_user_id, nombre, apellidos');
 
-        if (trabajadoresData) {
-          const merged = data.map(a => ({
-            ...a,
-            trabajador: trabajadoresData.find(t => t.auth_user_id === a.trabajador_id)
-          }));
-          setAsignaciones(merged);
-        }
-      } else {
-        setAsignaciones(data);
-      }
+      // 3. Cruzamos los datos manualmente (mucho más fiable)
+      const mergedAsignaciones = (data || []).map(asig => {
+        const trabajador = rawTrab?.find(t => 
+          t.id === asig.trabajador_id || t.auth_user_id === asig.trabajador_id
+        );
+        return {
+          ...asig,
+          trabajador
+        };
+      });
+
+      setAsignaciones(mergedAsignaciones);
     }
     setLoading(false);
   };
@@ -85,7 +84,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
   const fetchTrabajadores = async () => {
     const { data } = await supabase
       .from('trabajadores')
-      .select('auth_user_id, nombre, apellidos, telefono')
+      .select('id, auth_user_id, nombre, apellidos, telefono')
       .eq('estado', 'Disponible');
     if (data) setTrabajadores(data);
   };
@@ -98,30 +97,48 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
     }
 
     setSaving(true);
-    const { error } = await supabase
-      .from('orden_asignaciones')
-      .insert({
-        orden_id: ordenId,
-        trabajador_id: formTrabajador,
-        fecha_asignacion: formFecha,
-        hora_programada: formHora,
-        notas: formNotas,
-        estado: 'pendiente'
-      });
+    
+    try {
+      // 1. Limpiamos cualquier asignación previa para esta orden (evita 409)
+      await supabase
+        .from('orden_asignaciones')
+        .delete()
+        .eq('orden_id', ordenId);
 
-    if (error) {
-      console.error('Error asignando:', error);
-      alert('Error al asignar trabajador.');
-      setSaving(false);
-    } else {
+      // 2. Insertamos la nueva asignación
+      const { error: assignError } = await supabase
+        .from('orden_asignaciones')
+        .insert({
+          orden_id: ordenId,
+          trabajador_id: formTrabajador,
+          fecha_asignacion: formFecha,
+          hora_programada: formHora,
+          notas: formNotas,
+          estado: 'pendiente'
+        });
+
+      if (assignError) throw assignError;
+
+      // 3. Sincronizamos la tabla principal de ordenes
+      const { error: updateError } = await supabase
+        .from('ordenes')
+        .update({ tecnico_id: formTrabajador })
+        .eq('id', ordenId);
+
+      if (updateError) throw updateError;
+      
+      console.log("✅ Asignación completada con éxito");
+
       // NOTIFICACIÓN WHATSAPP
-      const selectedWorker = trabajadores.find(t => t.auth_user_id === formTrabajador);
+      const selectedWorker = trabajadores.find(t => t.id === formTrabajador);
       if (selectedWorker && selectedWorker.telefono && orden) {
         try {
            console.log("Enviando notificación WhatsApp...");
            await notifyNewOrder(selectedWorker.telefono, {
-             ...orden,
-             // Podemos añadir las notas de la asignación al mensaje si queremos
+             id: ordenId, // Usamos el UUID de la orden para el deep link
+             id_legible: orden.id_legible,
+             cliente: orden.cliente,
+             direccion: orden.direccion,
              descripcion: `${orden.descripcion}\n\n*Notas de asignación:* ${formNotas}`
            });
         } catch (wsErr) {
@@ -135,6 +152,13 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       setFormNotas('');
       fetchAsignaciones();
       onUpdate?.();
+
+    } catch (error: any) {
+      console.error('Error detallado en asignación:', error);
+      const errorMsg = error.message || 'Error desconocido';
+      const errorDetail = error.details || '';
+      alert(`Error al asignar: ${errorMsg} ${errorDetail ? `(${errorDetail})` : ''}`);
+      setSaving(false);
     }
   };
 
@@ -205,7 +229,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
               >
                 <option value="">Seleccionar...</option>
                 {trabajadores.map(t => (
-                  <option key={t.auth_user_id} value={t.auth_user_id}>
+                  <option key={t.id} value={t.auth_user_id || t.id}>
                     {t.nombre} {t.apellidos} {t.telefono ? `(${t.telefono})` : '(Sin tel)'}
                   </option>
                 ))}

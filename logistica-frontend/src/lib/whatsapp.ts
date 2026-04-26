@@ -48,6 +48,7 @@ export const sendWhatsAppMessage = async (phone: string, message: string) => {
  * Genera un mensaje predefinido para una nueva orden.
  */
 export const notifyNewOrder = async (phone: string, orden: any) => {
+  console.log("Generando notificación WhatsApp para ID:", orden.id, "ID Legible:", orden.id_legible);
   const msg = `🚀 *NUEVA ORDEN ASIGNADA* \n\n` +
               `📍 *ID:* ${orden.id_legible}\n` +
               `👤 *Cliente:* ${orden.cliente}\n` +

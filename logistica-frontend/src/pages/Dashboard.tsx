@@ -80,13 +80,41 @@ export default function Dashboard() {
 
   const fetchDailyAgenda = async () => {
     const todayStr = new Date().toLocaleDateString('en-CA');
-    const { data } = await supabase
-      .from('reportes')
-      .select('*, perfiles(nombre_completo), ordenes(id_legible, cliente, estado)')
-      .eq('fecha_trabajo', todayStr)
-      .limit(5);
     
-    setDailyAgenda(data || []);
+    // Obtenemos las órdenes programadas para hoy
+    const { data: ordenesHoy } = await supabase
+      .from('ordenes')
+      .select('id, id_legible, cliente, tecnico_id, hora_programada, estado')
+      .eq('fecha_programada', todayStr)
+      .limit(10);
+    
+    if (ordenesHoy && ordenesHoy.length > 0) {
+      // Obtenemos los técnicos para ponerles nombre
+      const tecnicoIds = ordenesHoy.map(o => o.tecnico_id).filter(Boolean);
+      let tecnicosMap: Record<string, string> = {};
+      
+      if (tecnicoIds.length > 0) {
+        const { data: trabData } = await supabase
+          .from('trabajadores')
+          .select('id, nombre, apellidos')
+          .in('id', tecnicoIds);
+        
+        if (trabData) {
+          trabData.forEach(t => {
+            tecnicosMap[t.id] = `${t.nombre} ${t.apellidos}`;
+          });
+        }
+      }
+
+      const agendaConNombres = ordenesHoy.map(o => ({
+        ...o,
+        nombre_tecnico: o.tecnico_id ? tecnicosMap[o.tecnico_id] : 'Sin asignar'
+      }));
+
+      setDailyAgenda(agendaConNombres);
+    } else {
+      setDailyAgenda([]);
+    }
   };
   
   const fetchUrgentes = async () => {
@@ -302,18 +330,20 @@ export default function Dashboard() {
                     <div 
                       key={item.id} 
                       className="flex gap-4 group cursor-pointer"
-                      onClick={() => navigate(`/ordenes/${item.orden_id}`)}
+                      onClick={() => navigate(`/ordenes/${item.id}`)}
                     >
                       <div className="flex flex-col items-center">
-                        <span className="text-[10px] font-black text-primary">{new Date(item.creado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="text-[10px] font-black text-primary">
+                          {item.hora_programada ? item.hora_programada.substring(0, 5) : '--:--'}
+                        </span>
                         <div className="w-0.5 flex-1 bg-slate-100 dark:bg-slate-800 my-1 rounded-full"></div>
                       </div>
                       <div className="flex-1 pb-4">
                         <div className="p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 hover:border-primary/30 transition-all">
-                          <p className="text-xs font-black text-slate-800 dark:text-white mb-1 truncate">{item.ordenes?.cliente}</p>
+                          <p className="text-xs font-black text-slate-800 dark:text-white mb-1 truncate">{item.cliente}</p>
                           <div className="flex items-center gap-1 text-[10px] text-slate-500 font-bold">
                             <span className="material-symbols-outlined text-[12px]">engineering</span>
-                            {item.perfiles?.nombre_completo || 'Técnico'}
+                            {item.nombre_tecnico}
                           </div>
                         </div>
                       </div>

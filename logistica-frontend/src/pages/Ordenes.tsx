@@ -25,14 +25,38 @@ export default function Ordenes() {
 
   const fetchOrdenes = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    // 1. Cargamos las órdenes
+    const { data: rawOrdenes, error } = await supabase
       .from('ordenes')
       .select('*')
       .neq('estado', 'Archivado')
-      .order('creado_en', { ascending: false });
+      .order('creado_en', { ascending: false, nullsFirst: false });
 
-    if (error) console.error("Error fetching orders", error);
-    else setOrdenes(data || []);
+    // 2. Cargamos los técnicos para poder cruzar los datos
+    const { data: rawTecnicos } = await supabase
+      .from('trabajadores')
+      .select('id, auth_user_id, nombre, apellidos, telefono');
+
+    if (!error && rawOrdenes) {
+      // 3. Cruzamos los datos manualmente (más fiable si no hay FKs en BD)
+      const mergedData = rawOrdenes.map(orden => {
+        // Buscamos al técnico por su ID o por su AuthID (por si acaso hay mezclas)
+        const tecnicoObj = rawTecnicos?.find(t => t.id === orden.tecnico_id || t.auth_user_id === orden.tecnico_id);
+        return {
+          ...orden,
+          tecnico: tecnicoObj 
+        };
+      });
+
+      // Ordenación estricta por fecha
+      mergedData.sort((a, b) => {
+        const timeA = a.creado_en ? new Date(a.creado_en).getTime() : 0;
+        const timeB = b.creado_en ? new Date(b.creado_en).getTime() : 0;
+        return timeB - timeA;
+      });
+
+      setOrdenes(mergedData);
+    }
     setLoading(false);
   };
 
@@ -42,11 +66,17 @@ export default function Ordenes() {
   };
 
   const filteredOrdenes = ordenes.filter(o => {
-    const matchesSearch = (o.id_legible?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          o.cliente?.toLowerCase().includes(searchTerm.toLowerCase()));
+    const searchLower = searchTerm.toLowerCase();
+    
+    // Búsqueda más robusta (ID, Cliente, Dirección, etc.)
+    const matchesSearch = searchTerm === '' || 
+      (o.id_legible && o.id_legible.toLowerCase().includes(searchLower)) || 
+      (o.cliente && o.cliente.toLowerCase().includes(searchLower)) ||
+      (o.direccion && o.direccion.toLowerCase().includes(searchLower));
+      
     const matchesEstado = filterEstado === '' || o.estado === filterEstado;
     const matchesTecnico = filterTecnico === '' || o.tecnico_id === filterTecnico;
-    const matchesFecha = filterFecha === '' || (o.creado_en && o.creado_en.startsWith(filterFecha));
+    const matchesFecha = filterFecha === '' || (o.fecha_programada && o.fecha_programada.startsWith(filterFecha));
     
     return matchesSearch && matchesEstado && matchesTecnico && matchesFecha;
   });
@@ -64,8 +94,8 @@ export default function Ordenes() {
       return;
     }
 
-    // Buscamos el teléfono del técnico en la lista que ya tenemos
-    const selectedTecnico = tecnicos.find(t => (t.auth_user_id || t.id) === orden.tecnico_id);
+    // Buscamos el técnico por cualquiera de sus IDs (interno o auth)
+    const selectedTecnico = tecnicos.find(t => t.id === orden.tecnico_id || t.auth_user_id === orden.tecnico_id);
     if (!selectedTecnico || !selectedTecnico.telefono) {
       alert("El técnico asignado no tiene un teléfono configurado.");
       return;
@@ -74,7 +104,7 @@ export default function Ordenes() {
     setLoading(true);
     try {
       const result = await notifyNewOrder(selectedTecnico.telefono, {
-        id: orden.id_legible,
+        id: orden.id,
         id_legible: orden.id_legible,
         cliente: orden.cliente,
         direccion: orden.direccion,
@@ -166,7 +196,7 @@ export default function Ordenes() {
                 >
                     <option value="">Técnico</option>
                     {tecnicos.map((t: any) => (
-                        <option key={t.auth_user_id} value={t.auth_user_id}>{t.nombre}</option>
+                        <option key={t.id} value={t.id}>{t.nombre}</option>
                     ))}
                 </select>
 
@@ -197,18 +227,19 @@ export default function Ordenes() {
                 <thead className="bg-slate-100 dark:bg-slate-800 text-slate-500 font-black tracking-widest uppercase text-[10px]">
                 <tr>
                     <th className="px-4 sm:px-6 py-5">ID OT</th>
-                    <th className="px-4 sm:px-6 py-5">Fecha</th>
-                    <th className="px-4 sm:px-6 py-5">Cliente</th>
-                    <th className="px-4 sm:px-6 py-5 hidden lg:table-cell">Descripción</th>
+                    <th className="px-4 sm:px-6 py-5">Intervención</th>
+                    <th className="px-4 sm:px-6 py-5">Cliente / Dirección</th>
+                    <th className="px-4 sm:px-6 py-5">Técnico</th>
                     <th className="px-4 sm:px-6 py-5 text-center">Estado</th>
-                    <th className="px-4 sm:px-6 py-5 text-right">Detalle</th>
+                    <th className="px-4 sm:px-6 py-5">Creado</th>
+                    <th className="px-4 sm:px-6 py-5 text-right">Acción</th>
                 </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {loading ? (
-                    <tr><td colSpan={6} className="px-6 py-20 text-center text-slate-400 font-bold animate-pulse">Consultando base de datos...</td></tr>
+                    <tr><td colSpan={8} className="px-6 py-20 text-center text-slate-400 font-bold animate-pulse">Consultando base de datos...</td></tr>
                 ) : filteredOrdenes.length === 0 ? (
-                    <tr><td colSpan={6} className="px-6 py-20 text-center text-slate-400 font-medium italic">No se encontraron resultados</td></tr>
+                    <tr><td colSpan={8} className="px-6 py-20 text-center text-slate-400 font-medium italic">No se encontraron resultados</td></tr>
                 ) : (
                     filteredOrdenes.map((orden: any) => (
                     <tr key={orden.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group">
@@ -218,12 +249,28 @@ export default function Ordenes() {
                             </Link>
                         </td>
                         <td className="px-4 sm:px-6 py-5 text-slate-500 font-bold whitespace-nowrap">
-                            {new Date(orden.creado_en).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
+                            {orden.fecha_programada ? new Date(orden.fecha_programada).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }) : '---'}
                         </td>
                         <td className="px-4 sm:px-6 py-5">
-                            <div className="max-w-[120px] sm:max-w-none truncate font-bold text-slate-700 dark:text-slate-200">{orden.cliente}</div>
+                            <div className="font-bold text-slate-700 dark:text-slate-200 truncate max-w-[150px] sm:max-w-[250px]">{orden.cliente}</div>
+                            <div className="text-[11px] text-slate-400 font-medium mt-0.5">{orden.direccion || 'Sin dirección'}</div>
                         </td>
-                        <td className="px-4 sm:px-6 py-5 text-slate-400 max-w-xs truncate font-medium hidden lg:table-cell">{orden.descripcion || 'Sin descripción'}</td>
+                        <td className="px-4 sm:px-6 py-5">
+                            {(() => {
+                                const t = Array.isArray(orden.tecnico) ? orden.tecnico[0] : orden.tecnico;
+                                if (!t) return <span className="text-xs text-slate-300 italic">No asignado</span>;
+                                return (
+                                    <div className="flex items-center gap-2">
+                                        <div className="size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-black uppercase">
+                                            {t.nombre?.charAt(0)}
+                                        </div>
+                                        <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
+                                            {t.nombre}
+                                        </span>
+                                    </div>
+                                );
+                            })()}
+                        </td>
                         <td className="px-4 sm:px-6 py-5 text-center">
                         <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
                             orden.estado === 'Urgente' ? 'bg-red-100 text-red-700 dark:bg-red-900/30' :
@@ -237,7 +284,17 @@ export default function Ordenes() {
                             {orden.estado}
                         </span>
                         </td>
-                        <td className="px-4 sm:px-6 py-5 text-right flex justify-end gap-2">
+                        <td className="px-4 sm:px-6 py-5 text-slate-400 text-[10px] font-bold">
+                            {(() => {
+                                const diff = new Date().getTime() - new Date(orden.creado_en).getTime();
+                                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                                if (days === 0) return 'Hoy';
+                                if (days === 1) return 'Ayer';
+                                if (days < 0) return 'Recién';
+                                return `${days}d`;
+                            })()}
+                        </td>
+                        <td className="px-4 sm:px-6 py-5 text-right">
                           {orden.tecnico_id && (
                             <button 
                                 onClick={(e) => {

@@ -107,6 +107,26 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
       .eq('id', ordenData.id);
 
     if (!error) {
+       // Si el técnico ha cambiado o es nuevo, creamos la asignación oficial
+       if (formData.tecnico && formData.tecnico !== ordenData.tecnico_id) {
+         const { data: existing } = await supabase
+           .from('orden_asignaciones')
+           .select('id')
+           .eq('orden_id', ordenData.id)
+           .eq('trabajador_id', formData.tecnico)
+           .maybeSingle();
+
+         if (!existing) {
+           await supabase.from('orden_asignaciones').insert({
+             orden_id: ordenData.id,
+             trabajador_id: formData.tecnico,
+             fecha_asignacion: formData.fecha,
+             hora_programada: formData.hora,
+             estado: 'pendiente'
+           });
+         }
+       }
+
        // Auto-registro de Cliente Particular si no se seleccionó una aseguradora
        if (!formData.aseguradora && formData.cliente) {
          try {
@@ -126,11 +146,11 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
         
         // Notificación WhatsApp al técnico si se asignó uno nuevo o cambió
         if (formData.tecnico && formData.tecnico !== ordenData.tecnico_id) {
-          const selectedTecnico = tecnicos.find(t => (t.auth_user_id || t.id) === formData.tecnico);
+          const selectedTecnico = tecnicos.find(t => t.id === formData.tecnico);
           if (selectedTecnico && selectedTecnico.telefono) {
              console.log("WhatsApp: Detectado cambio de técnico, enviando notificación...");
-             notifyNewOrder(selectedTecnico.telefono, {
-               id: ordenData.id_legible,
+              await notifyNewOrder(selectedTecnico.telefono, {
+               id: ordenData.id, // ID interno real
                id_legible: ordenData.id_legible,
                cliente: formData.cliente,
                direccion: formData.direccion,
@@ -153,7 +173,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
       return;
     }
 
-    const selectedTecnico = tecnicos.find(t => (t.auth_user_id || t.id) === formData.tecnico);
+    const selectedTecnico = tecnicos.find(t => t.id === formData.tecnico || t.auth_user_id === formData.tecnico);
     if (!selectedTecnico || !selectedTecnico.telefono) {
       alert("El técnico seleccionado no tiene un teléfono configurado.");
       return;
@@ -162,7 +182,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
     setLoading(true);
     try {
       const result = await notifyNewOrder(selectedTecnico.telefono, {
-        id: ordenData.id_legible,
+        id: ordenData.id,
         id_legible: ordenData.id_legible,
         cliente: formData.cliente,
         direccion: formData.direccion,
@@ -367,7 +387,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
                 >
                   <option value="">-- Sin Asignar (Pendiente) --</option>
                   {tecnicos.map(t => (
-                      <option key={t.id} value={t.auth_user_id || t.id}>{t.nombre} {t.apellidos}</option>
+                      <option key={t.id} value={t.id}>{t.nombre} {t.apellidos}</option>
                   ))}
                 </select>
               </div>

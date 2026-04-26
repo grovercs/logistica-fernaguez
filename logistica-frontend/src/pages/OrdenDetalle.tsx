@@ -361,11 +361,12 @@ export default function OrdenDetalle() {
                        Creada: {new Date(orden.creado_en).toLocaleDateString('es-ES')}
                        <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-[10px] uppercase">
                          {(() => {
-                           const diff = new Date().getTime() - new Date(orden.creado_en).getTime();
-                           const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                           if (days === 0) return 'Hoy';
-                           if (days === 1) return 'Ayer';
-                           return `Hace ${days} días`;
+                            const diff = new Date().getTime() - new Date(orden.creado_en).getTime();
+                            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                            if (days === 0) return 'Hoy';
+                            if (days === 1) return 'Ayer';
+                            if (days < 0) return 'Recién';
+                            return `Hace ${days} días`;
                          })()}
                        </span>
                      </span>
