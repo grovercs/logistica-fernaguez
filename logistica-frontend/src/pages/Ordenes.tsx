@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ClipboardList, Plus, Search, Filter, X } from 'lucide-react';
 import NuevoReporteModal from '../components/modals/NuevoReporteModal';
+import { notifyNewOrder } from '../lib/whatsapp';
 
 export default function Ordenes() {
   const [ordenes, setOrdenes] = useState<any[]>([]);
@@ -36,7 +37,7 @@ export default function Ordenes() {
   };
 
   const fetchTecnicos = async () => {
-    const { data } = await supabase.from('trabajadores').select('auth_user_id, nombre, apellidos');
+    const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, telefono');
     setTecnicos(data || []);
   };
 
@@ -55,6 +56,41 @@ export default function Ordenes() {
     setFilterEstado('');
     setFilterTecnico('');
     setFilterFecha('');
+  };
+
+  const handleManualWhatsApp = async (orden: any) => {
+    if (!orden.tecnico_id) {
+      alert("Asigna un técnico primero para enviar la notificación.");
+      return;
+    }
+
+    // Buscamos el teléfono del técnico en la lista que ya tenemos
+    const selectedTecnico = tecnicos.find(t => (t.auth_user_id || t.id) === orden.tecnico_id);
+    if (!selectedTecnico || !selectedTecnico.telefono) {
+      alert("El técnico asignado no tiene un teléfono configurado.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await notifyNewOrder(selectedTecnico.telefono, {
+        id: orden.id_legible,
+        id_legible: orden.id_legible,
+        cliente: orden.cliente,
+        direccion: orden.direccion,
+        descripcion: orden.descripcion
+      });
+
+      if (result.sent === "true" || result.success) {
+        alert("✅ Notificación enviada a " + selectedTecnico.nombre);
+      } else {
+        alert("⚠️ Revisa el panel de UltraMsg, el mensaje no se pudo confirmar.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("❌ Error al conectar con WhatsApp.");
+    }
+    setLoading(false);
   };
 
   return (
@@ -201,10 +237,22 @@ export default function Ordenes() {
                             {orden.estado}
                         </span>
                         </td>
-                        <td className="px-4 sm:px-6 py-5 text-right">
-                        <Link to={`/ordenes/${orden.id}`} className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-primary hover:bg-primary/10 transition-all inline-flex items-center justify-center">
-                            <Search className="size-4" />
-                        </Link>
+                        <td className="px-4 sm:px-6 py-5 text-right flex justify-end gap-2">
+                          {orden.tecnico_id && (
+                            <button 
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    handleManualWhatsApp(orden);
+                                }}
+                                className="size-9 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-all inline-flex items-center justify-center"
+                                title="Re-notificar WhatsApp"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">chat</span>
+                            </button>
+                          )}
+                          <Link to={`/ordenes/${orden.id}`} className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-primary hover:bg-primary/10 transition-all inline-flex items-center justify-center">
+                              <Search className="size-4" />
+                          </Link>
                         </td>
                     </tr>
                     ))
