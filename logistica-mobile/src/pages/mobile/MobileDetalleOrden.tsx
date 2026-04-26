@@ -730,7 +730,7 @@ const MobileDetalleOrden = () => {
                     />
 
                     {/* Modal Content (Bottom Sheet on mobile) */}
-                    <div className="relative w-full max-w-2xl bg-[#f0f2f5] rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full duration-300 max-h-[95vh] flex flex-col">
+                    <div className="relative w-full max-w-2xl bg-[#f0f2f5] rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full duration-300 max-h-[calc(100dvh-60px)] flex flex-col mb-0 sm:mb-4">
                         
                         {/* Modal Header */}
                         <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-100 shrink-0">
