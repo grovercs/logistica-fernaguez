@@ -38,9 +38,11 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
        fetchTecnicos();
        fetchAseguradoras();
        
-       let fechaObj = new Date(ordenData.creado_en);
-       let fecha = isNaN(fechaObj.getTime()) ? '' : fechaObj.toISOString().split('T')[0];
-       let hora = isNaN(fechaObj.getTime()) ? '' : fechaObj.toTimeString().split(' ')[0].substring(0, 5);
+       // Usar fecha_programada si existe, si no fallback a creado_en
+       const dateSource = ordenData.fecha_programada || ordenData.creado_en;
+       let fechaObj = new Date(dateSource);
+       let fecha = isNaN(fechaObj.getTime()) ? '' : (ordenData.fecha_programada || fechaObj.toISOString().split('T')[0]);
+       let hora = ordenData.hora_programada || (isNaN(fechaObj.getTime()) ? '' : fechaObj.toTimeString().split(' ')[0].substring(0, 5));
 
        setFormData({
          referencia: ordenData.poliza || '',
@@ -50,7 +52,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
          fecha: fecha,
          hora: hora,
          observaciones: ordenData.descripcion || '',
-         esUrgente: false, // You might have a specific flag in DB
+         esUrgente: false, 
          asegurado: ordenData.asegurado || '',
          telefono_asegurado: ordenData.telefono_asegurado || '',
          email: ordenData.email || '',
@@ -83,11 +85,6 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
     e.preventDefault();
     setLoading(true);
 
-    let createdAt = ordenData.creado_en;
-    if (formData.fecha) {
-        createdAt = new Date(`${formData.fecha}T${formData.hora || '12:00'}:00`).toISOString();
-    }
-
     const { error } = await supabase
       .from('ordenes')
       .update({
@@ -104,7 +101,8 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
          descripcion: formData.observaciones,
          estado: formData.estado,
          tecnico_id: formData.tecnico || null,
-         creado_en: createdAt
+         fecha_programada: formData.fecha,
+         hora_programada: formData.hora
       })
       .eq('id', ordenData.id);
 

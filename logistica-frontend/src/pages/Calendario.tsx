@@ -150,7 +150,11 @@ export default function Calendario() {
   // Orders always appear on their creation date
   const getOrdenesForDay = (dayDate: Date) => {
     return ordenes.filter(o => {
-      const d = new Date(o.creado_en);
+      // Prioridad: 1. fecha_programada, 2. creado_en (fallback para órdenes antiguas)
+      const dateStr = o.fecha_programada || o.creado_en;
+      if (!dateStr) return false;
+
+      const d = new Date(dateStr);
       if (
         d.getDate() !== dayDate.getDate() ||
         d.getMonth() !== dayDate.getMonth() ||

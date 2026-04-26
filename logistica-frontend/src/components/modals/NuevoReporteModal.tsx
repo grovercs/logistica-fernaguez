@@ -181,7 +181,9 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
          descripcion: formData.observaciones,
          estado: formData.esUrgente ? 'Urgente' : (formData.tecnico ? 'En Curso' : 'Pendiente'),
          tecnico_id: formData.tecnico || null,
-         creado_en: createdAt
+         fecha_programada: formData.fecha,
+         hora_programada: formData.hora,
+         creado_en: new Date().toISOString()
       });
 
     if (!error) {
