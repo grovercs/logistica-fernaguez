@@ -63,6 +63,9 @@ const MobileDetalleOrden = () => {
     }, [id]);
 
     const fetchOrden = async () => {
+        if (!id) return;
+        const cleanId = id.trim();
+        
         // Get the current logged-in user
         const { data: userData } = await supabase.auth.getUser();
         const userId = userData?.user?.id || null;
