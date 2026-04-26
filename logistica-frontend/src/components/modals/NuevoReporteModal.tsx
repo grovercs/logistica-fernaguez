@@ -42,7 +42,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
        fetchAseguradoras();
        fetchTareasFrecuentes();
        setFormData({
-         referencia: '', cliente: '', tecnico: '',
+         referencia: '', cliente: '', cif_nif: '', tecnico: '',
          fecha: fechaInicial || new Date().toLocaleDateString('en-CA'),
          hora: '10:00', observaciones: '', esUrgente: false,
          asegurado: '', telefono_asegurado: '', email: '',
