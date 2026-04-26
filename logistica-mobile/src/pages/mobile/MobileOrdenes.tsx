@@ -64,7 +64,7 @@ const MobileOrdenes = () => {
 
         const { data, error } = await query
             .neq('estado', 'Finalizada')
-            .order('created_at', { ascending: false });
+            .order('creado_en', { ascending: false });
 
         if (!error && data) {
             setOrdenes(data);

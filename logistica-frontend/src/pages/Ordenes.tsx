@@ -28,7 +28,7 @@ export default function Ordenes() {
       .from('ordenes')
       .select('*')
       .neq('estado', 'Archivado')
-      .order('created_at', { ascending: false });
+      .order('creado_en', { ascending: false });
 
     if (error) console.error("Error fetching orders", error);
     else setOrdenes(data || []);
