@@ -35,7 +35,7 @@ export default function Dashboard() {
       .from('ordenes')
       .select('*')
       .neq('estado', 'Archivado')
-      .order('creado_en', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(5);
 
     setOrdenes(data || []);
