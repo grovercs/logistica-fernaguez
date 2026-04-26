@@ -8,12 +8,15 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<MobileLayout />}>
-          <Route path="m/login" element={<MobileLogin />} />
-          <Route path="m/ordenes" element={<MobileOrdenes />} />
-          <Route path="m/ordenes/:id" element={<MobileDetalleOrden />} />
-          <Route path="*" element={<Navigate to="/m/login" replace />} />
+        <Route path="/m" element={<MobileLayout />}>
+          <Route path="login" element={<MobileLogin />} />
+          <Route path="ordenes" element={<MobileOrdenes />} />
+          <Route path="ordenes/:id" element={<MobileDetalleOrden />} />
+          <Route path="" element={<Navigate to="ordenes" replace />} />
+          <Route path="*" element={<Navigate to="login" replace />} />
         </Route>
+        <Route path="/" element={<Navigate to="/m/ordenes" replace />} />
+        <Route path="*" element={<Navigate to="/m/ordenes" replace />} />
       </Routes>
     </BrowserRouter>
   );

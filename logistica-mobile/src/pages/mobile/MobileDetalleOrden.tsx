@@ -43,6 +43,8 @@ const MobileDetalleOrden = () => {
     const [isDrawing, setIsDrawing] = useState(false);
     const [hasSignature, setHasSignature] = useState(false);
     const [showForm, setShowForm] = useState(false); // Modal control
+    const [canSign, setCanSign] = useState(false); // Enable signature pad
+    const [isFinished, setIsFinished] = useState(true); // Explicit status feedback
     const [viewingReport, setViewingReport] = useState<any>(null); // Report being viewed (read-only)
 
     useEffect(() => {
@@ -401,8 +403,6 @@ const MobileDetalleOrden = () => {
     };
 
     const clearSignature = () => {
-        if (!window.confirm('¿Estás seguro de que deseas borrar la firma actual? Deberás firmar de nuevo.')) return;
-        
         if (reporte?.firma_url) {
             setReporte({...reporte, firma_url: null});
         }
@@ -411,6 +411,7 @@ const MobileDetalleOrden = () => {
             ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
         }
         setHasSignature(false);
+        setCanSign(false); // Disable again after clear
     };
 
     // --- Submit Logic ---
@@ -503,10 +504,8 @@ const MobileDetalleOrden = () => {
             return;
         }
         
-        // AUTOMATION:
-        // 1. If there is a signature, set to 'En revisión'
-        // 2. If no signature but was 'Pendiente', set to 'En Curso'
-        const newEstado = signatureUrl ? 'En revisión' : 'En Curso';
+        // 2. Update Order Status
+        const newEstado = isFinished ? 'En revisión' : 'En Curso';
         
         await supabase
             .from('ordenes')
@@ -514,6 +513,20 @@ const MobileDetalleOrden = () => {
                 estado: newEstado,
             })
             .eq('id', id);
+
+        // 3. Sync with Assignment status
+        // We find the assignment for this technician in this order and mark it accordingly
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData.user) {
+            await supabase
+                .from('orden_asignaciones')
+                .update({ 
+                    estado: isFinished ? 'completado' : 'en_progreso' 
+                })
+                .eq('orden_id', id)
+                .eq('trabajador_id', userData.user.id)
+                .neq('estado', 'completado'); // Only update if not already completed
+        }
 
         setSubmitting(false);
         alert("¡Reporte guardado correctamente!");
@@ -930,7 +943,7 @@ const MobileDetalleOrden = () => {
                                 )}
                                 <canvas 
                                     ref={canvasRef}
-                                    className="w-full h-full relative z-10 cursor-crosshair"
+                                    className={`w-full h-full relative z-10 cursor-crosshair transition-all ${!canSign ? 'pointer-events-none grayscale opacity-30' : ''}`}
                                     onMouseDown={startDrawing}
                                     onMouseUp={stopDrawing}
                                     onMouseOut={stopDrawing}
@@ -948,15 +961,57 @@ const MobileDetalleOrden = () => {
                     </div>
                     <div className="flex justify-between items-center px-1">
                         <p className="text-[10px] text-slate-400 italic">Obligatorio para cerrar el parte</p>
-                        <button onClick={clearSignature} className="flex items-center gap-1 text-primary font-bold text-xs">
-                            <span className="material-symbols-outlined text-[14px]">ink_eraser</span>
-                            Limpiar
-                        </button>
+                        <div className="flex gap-2">
+                            <button 
+                                type="button"
+                                onClick={() => setCanSign(!canSign)}
+                                className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all shadow-sm ${canSign ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}
+                            >
+                                <span className="material-symbols-outlined text-[16px]">{canSign ? 'lock_open' : 'edit_square'}</span>
+                                {canSign ? 'BLOQUEAR' : 'FIRMAR'}
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={clearSignature}
+                                className="text-xs font-bold text-red-500 flex items-center gap-1 bg-red-50 border border-red-100 px-3 py-1.5 rounded-lg transition-all"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                                LIMPIAR
+                            </button>
+                        </div>
                     </div>
                 </div>
 
+                {/* ESTADO FINAL DE LA VISITA */}
+                <div className="space-y-4 pt-4 border-t border-slate-100 mt-4">
+                    <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Estado tras esta visita</h2>
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setIsFinished(false)}
+                            className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${!isFinished ? 'border-amber-500 bg-amber-50 text-amber-700 shadow-md' : 'border-slate-100 bg-white text-slate-400 opacity-60'}`}
+                        >
+                            <span className="material-symbols-outlined text-2xl">pending_actions</span>
+                            <span className="text-[11px] font-black uppercase">Sigue en Curso</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setIsFinished(true)}
+                            className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${isFinished ? 'border-green-500 bg-green-50 text-green-700 shadow-md' : 'border-slate-100 bg-white text-slate-400 opacity-60'}`}
+                        >
+                            <span className="material-symbols-outlined text-2xl">task_alt</span>
+                            <span className="text-[11px] font-black uppercase">Trabajo Terminado</span>
+                        </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 italic text-center px-4">
+                        {isFinished 
+                            ? "La orden pasará a 'En revisión' para que el administrador la finalice." 
+                            : "La orden seguirá activa como 'En Curso' para futuras visitas."}
+                    </p>
+                </div>
+
                 {/* MAIN ACTIONS */}
-                <div className="space-y-4 pt-6">
+                <div className="space-y-4 pt-8">
                     <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFotoUpload} />
                     
                     {fotoPreviews.length > 0 && (

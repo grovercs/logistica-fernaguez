@@ -10,6 +10,7 @@ const MobileOrdenes = () => {
     const [currentUserRole, setCurrentUserRole] = useState<string>('');
     const [currentUserEspecialidad, setCurrentUserEspecialidad] = useState<string>('');
     const [lastActiveId, setLastActiveId] = useState<string | null>(null);
+    const [trabajadoresMap, setTrabajadoresMap] = useState<Map<string, { nombre: string; especialidad: string }>>(new Map());
 
     useEffect(() => {
         const init = async () => {
@@ -46,6 +47,21 @@ const MobileOrdenes = () => {
 
             // Fetch all relevant orders based on role
             await fetchOrdenes(userId, roleName);
+
+            // Fetch workers to map them
+            const { data: workers } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, especialidad');
+            if (workers) {
+                const map = new Map();
+                workers.forEach(w => {
+                    const info = { 
+                        nombre: `${w.nombre} ${w.apellidos || ''}`.trim(), 
+                        especialidad: w.especialidad || '' 
+                    };
+                    if (w.id) map.set(w.id, info);
+                    if (w.auth_user_id) map.set(w.auth_user_id, info);
+                });
+                setTrabajadoresMap(map);
+            }
 
             // Get last active order from localStorage
             setLastActiveId(localStorage.getItem('last_active_order'));
@@ -164,17 +180,56 @@ const MobileOrdenes = () => {
                                         {orden.estado}
                                     </span>
                                 </div>
-                                <h3 className="font-semibold text-slate-800">{orden.cliente}</h3>
+                                 <h3 className="font-bold text-slate-800 text-lg leading-tight">{orden.cliente}</h3>
+                                
+                                {/* Technician Assigned */}
+                                {(() => {
+                                    const tecnicoInfo = trabajadoresMap.get(orden.tecnico_id);
+                                    if (tecnicoInfo) {
+                                        return (
+                                            <div className="mt-2 flex items-center gap-2 bg-primary/5 p-2 rounded-lg border border-primary/10">
+                                                <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-[10px] font-black shrink-0">
+                                                    {tecnicoInfo.nombre.charAt(0)}
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-[11px] font-black text-primary uppercase leading-none">{tecnicoInfo.nombre}</span>
+                                                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter mt-0.5">{tecnicoInfo.especialidad}</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    } else if (orden.tecnico) {
+                                        // Fallback to name string if ID mapping fails
+                                        return (
+                                            <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                                <span className="material-symbols-outlined text-[16px] text-slate-400">person</span>
+                                                <span className="text-[11px] font-bold text-slate-600 uppercase leading-none">{orden.tecnico}</span>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
+
                                 {orden.direccion && (
-                                    <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-[13px]">location_on</span>
+                                    <p className="text-[12px] font-medium text-slate-600 mt-3 flex items-start gap-1.5 leading-tight">
+                                        <span className="material-symbols-outlined text-[16px] text-primary shrink-0">location_on</span>
                                         {orden.direccion}
                                     </p>
                                 )}
-                                <p className="text-[10px] text-slate-400 mt-3 pt-2 border-t border-slate-100 flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-[14px]">schedule</span> 
-                                    {new Date(orden.creado_en).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                </p>
+
+                                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
+                                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[16px]">event</span> 
+                                        {(() => {
+                                            if (!orden.fecha_programada) return 'S/F';
+                                            const d = new Date(orden.fecha_programada);
+                                            return isNaN(d.getTime()) ? 'S/F' : d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+                                        })()}
+                                    </p>
+                                    <p className="text-[11px] font-black text-primary bg-primary/10 px-2 py-1 rounded-md flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[16px]">schedule</span> 
+                                        {orden.hora_programada || '--:--'}
+                                    </p>
+                                </div>
                             </Link>
                         );
                     })
