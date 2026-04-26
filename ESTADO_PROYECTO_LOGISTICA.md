@@ -15,6 +15,14 @@ Logística Fernaguez es un sistema de gestión integral (ERP/CRM):
 
 ## 2. Hitos Logrados (Sesión Abril 2026)
 
+### 📱 Mejoras en App Móvil (Sesión Tarde 26/04/2026)
+- **Firma Segura**: Implementado bloqueo de panel de firma por defecto (`canSign`) para evitar trazos accidentales durante el scroll.
+- **Feedback del Técnico**: Nuevo selector para que el trabajador indique explícitamente si el trabajo está "Terminado" (🟠) o "En Curso" (🟢).
+- **Sincronización Total**: Al guardar un parte, se actualiza automáticamente el estado de la **Asignación** del técnico (`completado`/`en_progreso`) y el estado general de la **Orden** (`En revisión`).
+- **Favicons Diferenciados**: Icono de herramientas (🛠️) para móvil y rayo (⚡) para admin para facilitar el uso en navegador.
+- **Entorno Local**: Configuración de `.env` en la carpeta móvil para desarrollo local sin errores de conexión.
+
+
 ### 📱 Responsividad Total (Administración)
 - Se ha rediseñado TODO el panel administrativo para ser usable en móviles.
 - **Layout**: Menú lateral colapsable con "hamburguesa".

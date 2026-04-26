@@ -6,6 +6,9 @@ LOGROS RECIENTES:
 3. Fix en Fechas de Órdenes (Fecha mínima hoy).
 4. PrintableOrden.tsx mejorado (Fotos por técnico + especialidad).
 5. Despliegue automático GitHub -> Netlify funcionando.
+6. [APP MÓVIL] Firma bloqueada por defecto + Selector de estado de trabajo.
+7. [SYNC] Sincronización automática de asignaciones (check verde ✅) desde el móvil.
+8. [UI] Favicons personalizados (🛠️/⚡) para distinguir apps.
 
 PENDIENTE:
 - Ajuste fino tabla Trabajadores.tsx (en móviles).
