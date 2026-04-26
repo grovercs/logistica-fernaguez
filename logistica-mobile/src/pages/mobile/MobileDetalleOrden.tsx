@@ -87,25 +87,30 @@ const MobileDetalleOrden = () => {
         let currentOrden = null;
         let fetchError = null;
 
+        const cleanId = (id || '').trim();
         // Check if ID looks like a UUID
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '');
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
 
         if (isUUID) {
-            const { data, error } = await supabase.from('ordenes').select('*').eq('id', id).maybeSingle();
+            const { data, error } = await supabase.from('ordenes').select('*').eq('id', cleanId).maybeSingle();
             currentOrden = data;
             fetchError = error;
         }
 
-        // If not found or not UUID, try by id_legible
+        // If not found or not UUID, try by id_legible (case insensitive search for better reliability)
         if (!currentOrden) {
-            const { data, error } = await supabase.from('ordenes').select('*').eq('id_legible', id).maybeSingle();
+            const { data, error } = await supabase
+                .from('ordenes')
+                .select('*')
+                .ilike('id_legible', cleanId)
+                .maybeSingle();
             currentOrden = data;
             if (error) fetchError = error;
         }
 
         if (!currentOrden) {
-            console.error('Orden no encontrada:', id, fetchError);
-            alert('No se pudo encontrar la orden especificada.');
+            console.error('Orden no encontrada:', cleanId, fetchError);
+            setOrden(null);
             setLoading(false);
             return;
         }
@@ -558,7 +563,7 @@ const MobileDetalleOrden = () => {
                          <h2 className="text-lg font-bold text-slate-800 leading-tight mt-1">{orden?.cliente}</h2>
                      </div>
                      <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-1 rounded-lg uppercase">
-                         {orden?.aseguradora || 'Sin empresa'}
+                         {orden?.aseguradora || orden?.cliente || 'Particular'}
                      </span>
                  </div>
 
