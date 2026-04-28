@@ -5,7 +5,6 @@ import EditarOrdenModal from '../components/modals/EditarOrdenModal';
 import EditarReporteModal from '../components/modals/EditarReporteModal';
 import AsignacionesSection from '../components/AsignacionesSection';
 import { PrintableOrden } from '../components/PrintableOrden';
-import { useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 export default function OrdenDetalle() {
