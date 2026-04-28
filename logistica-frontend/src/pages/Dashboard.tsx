@@ -196,7 +196,10 @@ export default function Dashboard() {
       <div className="p-4 sm:p-8 space-y-6 sm:space-y-8 max-w-7xl mx-auto w-full flex-1">
         {/* Summary Cards */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+          <div 
+            onClick={() => navigate('/ordenes')}
+            className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-all hover:shadow-md cursor-pointer hover:border-primary/30"
+          >
             <div className="size-12 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
               <span className="material-symbols-outlined">pending_actions</span>
             </div>
@@ -205,7 +208,10 @@ export default function Dashboard() {
               <p className="text-2xl font-black text-slate-800 dark:text-white">{loading ? '...' : counts.pendientes}</p>
             </div>
           </div>
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+          <div 
+            onClick={() => navigate('/ordenes')}
+            className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-all hover:shadow-md cursor-pointer hover:border-primary/30"
+          >
             <div className="size-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
               <span className="material-symbols-outlined">sync</span>
             </div>
@@ -214,7 +220,10 @@ export default function Dashboard() {
               <p className="text-2xl font-black text-slate-800 dark:text-white">{loading ? '...' : counts.enCurso}</p>
             </div>
           </div>
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-all hover:shadow-md sm:col-span-2 lg:col-span-1">
+          <div 
+            onClick={() => navigate('/ordenes')}
+            className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-all hover:shadow-md sm:col-span-2 lg:col-span-1 cursor-pointer hover:border-primary/30"
+          >
             <div className="size-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600">
               <span className="material-symbols-outlined">check_circle</span>
             </div>
@@ -282,7 +291,11 @@ export default function Dashboard() {
                     {loading ? (
                       <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 animate-pulse">Cargando...</td></tr>
                     ) : ordenes.map((orden: any) => (
-                      <tr key={orden.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                      <tr 
+                        key={orden.id} 
+                        onClick={() => navigate(`/ordenes/${orden.id}`)}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer group"
+                      >
                         <td className="px-4 sm:px-6 py-4 font-black text-slate-900 dark:text-white whitespace-nowrap">{orden.id_legible}</td>
                         <td className="px-4 sm:px-6 py-4 font-semibold text-slate-700 dark:text-slate-300">
                           <div className="max-w-[120px] sm:max-w-none truncate">{orden.cliente}</div>

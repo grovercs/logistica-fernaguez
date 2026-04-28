@@ -57,6 +57,7 @@ export const PrintableOrden = React.forwardRef<HTMLDivElement, Props>(({ orden, 
         }
         .page-break {
           page-break-before: always;
+          break-before: page;
           padding-top: 20mm;
         }
         .avoid-break {
@@ -93,27 +94,27 @@ export const PrintableOrden = React.forwardRef<HTMLDivElement, Props>(({ orden, 
         <div className="grid grid-cols-2 gap-x-12 mb-8">
           <div className="space-y-4">
             <div className="border-l-4 border-blue-600 pl-3">
-               <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Titular del Servicio</h3>
-               <p className="text-sm font-bold mt-0.5">{orden.cliente}</p>
-               <p className="text-[10px] text-slate-600 mt-1">{orden.aseguradora ? 'Empresa' : 'Cliente Particular'} | Ref: {orden.poliza || 'S/N'}</p>
+              <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Titular del Servicio</h3>
+              <p className="text-sm font-bold mt-0.5">{orden.cliente}</p>
+              <p className="text-[10px] text-slate-600 mt-1">{orden.aseguradora ? 'Empresa' : 'Cliente Particular'} | Ref: {orden.poliza || 'S/N'}</p>
             </div>
           </div>
           <div className="space-y-4">
             <div className="border-l-4 border-slate-300 pl-3">
-               <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Ubicación</h3>
-               <p className="text-xs font-medium text-slate-700 leading-tight mt-1">{orden.direccion || 'No especificada'}</p>
+              <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Ubicación</h3>
+              <p className="text-xs font-medium text-slate-700 leading-tight mt-1">{orden.direccion || 'No especificada'}</p>
             </div>
             <div className="border-l-4 border-slate-300 pl-3">
-               <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Contacto</h3>
-               <p className="text-xs font-medium text-slate-700 mt-1">{orden.asegurado || '---'} {orden.telefono_asegurado ? `(${orden.telefono_asegurado})` : ''}</p>
+              <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Contacto</h3>
+              <p className="text-xs font-medium text-slate-700 mt-1">{orden.asegurado || '---'} {orden.telefono_asegurado ? `(${orden.telefono_asegurado})` : ''}</p>
             </div>
           </div>
         </div>
 
         {/* Encargo / Descripción */}
         <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-8">
-            <h3 className="text-[9px] font-bold text-blue-600 uppercase tracking-wider mb-1">Descripción del Encargo</h3>
-            <p className="text-xs leading-relaxed text-slate-700 italic">"{orden.descripcion || 'Sin descripción detallada.'}"</p>
+          <h3 className="text-[9px] font-bold text-blue-600 uppercase tracking-wider mb-1">Descripción del Encargo</h3>
+          <p className="text-xs leading-relaxed text-slate-700 italic">"{orden.descripcion || 'Sin descripción detallada.'}"</p>
         </div>
 
         {/* Interventions Detail */}
@@ -121,25 +122,25 @@ export const PrintableOrden = React.forwardRef<HTMLDivElement, Props>(({ orden, 
           <h3 className="text-[11px] font-black text-slate-900 border-b border-slate-200 pb-1 mb-4 uppercase">Detalle de Trabajos Realizados</h3>
           <div className="space-y-4">
             {reportes.length > 0 ? reportes.map((rep, i) => {
-               const worker = trabajadores.find(t => t.auth_user_id === rep.tecnico_id);
-               return (
-                 <div key={i} className="pb-4 border-b border-slate-100 last:border-0">
-                    <div className="flex justify-between items-baseline mb-1">
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-800 uppercase">
-                          {worker ? `${worker.nombre} ${worker.apellidos}` : 'Servicio Técnico'}
-                          {worker?.especialidad && <span className="ml-2 text-blue-600 font-medium">({worker.especialidad})</span>}
-                        </p>
-                      </div>
-                      <p className="text-[9px] font-bold text-slate-400">{rep.fecha_trabajo || new Date(rep.creado_en).toLocaleDateString('es-ES')} | {rep.horas_trabajadas} hrs</p>
+              const worker = trabajadores.find(t => t.auth_user_id === rep.tecnico_id);
+              return (
+                <div key={i} className="pb-4 border-b border-slate-100 last:border-0">
+                  <div className="flex justify-between items-baseline mb-1">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-800 uppercase">
+                        {worker ? `${worker.nombre} ${worker.apellidos}` : 'Servicio Técnico'}
+                        {worker?.especialidad && <span className="ml-2 text-blue-600 font-medium">({worker.especialidad})</span>}
+                      </p>
                     </div>
-                    <div className="text-[10px] text-slate-600 leading-normal whitespace-pre-wrap">
-                      {rep.notas}
-                    </div>
-                 </div>
-               )
+                    <p className="text-[9px] font-bold text-slate-400">{rep.fecha_trabajo || new Date(rep.creado_en).toLocaleDateString('es-ES')} | {rep.horas_trabajadas} hrs</p>
+                  </div>
+                  <div className="text-[10px] text-slate-600 leading-normal whitespace-pre-wrap">
+                    {rep.notas}
+                  </div>
+                </div>
+              )
             }) : (
-               <p className="text-[10px] italic text-slate-300 py-4 text-center border border-dashed rounded uppercase">No hay reportes de trabajo registrados todavía.</p>
+              <p className="text-[10px] italic text-slate-300 py-4 text-center border border-dashed rounded uppercase">No hay reportes de trabajo registrados todavía.</p>
             )}
           </div>
         </div>
@@ -147,34 +148,34 @@ export const PrintableOrden = React.forwardRef<HTMLDivElement, Props>(({ orden, 
         {/* SUMMARY & SIGNATURE */}
         <div className="avoid-break mt-10">
           <div className="bg-blue-600 text-white p-4 rounded-lg flex justify-end gap-12 mb-10 shadow-sm">
-              <div className="text-right">
-                 <p className="text-[9px] font-bold opacity-80 uppercase">Total Horas</p>
-                 <p className="text-2xl font-black">{totalHoras} H</p>
-              </div>
-              <div className="text-right">
-                 <p className="text-[9px] font-bold opacity-80 uppercase">Estado Final</p>
-                 <p className="text-2xl font-black uppercase">{orden.estado === 'Finalizada' ? 'CERTIFICADA' : 'EN CURSO'}</p>
-              </div>
+            <div className="text-right">
+              <p className="text-[9px] font-bold opacity-80 uppercase">Total Horas</p>
+              <p className="text-2xl font-black">{totalHoras} H</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[9px] font-bold opacity-80 uppercase">Estado Final</p>
+              <p className="text-2xl font-black uppercase">{orden.estado === 'Finalizada' ? 'CERTIFICADA' : 'EN CURSO'}</p>
+            </div>
           </div>
 
           <div className="pt-8 border-t-2 border-slate-100">
             <div className="grid grid-cols-2 gap-20">
               <div className="text-center">
-                 <div className="h-24 border-b border-slate-200 flex items-end justify-center pb-2">
-                    <p className="text-[9px] text-slate-400 italic">Validado por Operativo</p>
-                 </div>
-                 <p className="text-[10px] font-bold text-slate-700 mt-2 uppercase tracking-widest">Firma Técnico</p>
+                <div className="h-24 border-b border-slate-200 flex items-end justify-center pb-2">
+                  <p className="text-[9px] text-slate-400 italic">Validado por Operativo</p>
+                </div>
+                <p className="text-[10px] font-bold text-slate-700 mt-2 uppercase tracking-widest">Firma Técnico</p>
               </div>
               <div className="text-center">
-                 <div className="h-24 border-b border-slate-200 flex items-center justify-center">
-                    {firmReporte?.firma_url ? (
-                       <img src={firmReporte.firma_url} alt="Firma cliente" className="max-h-20 mix-blend-multiply" />
-                    ) : (
-                       <p className="text-[9px] text-slate-300 italic">Pendiente de firma del cliente</p>
-                    )}
-                 </div>
-                 <p className="text-[10px] font-bold text-slate-700 mt-2 uppercase tracking-widest">Conformidad Cliente</p>
-                 <p className="text-[8px] text-slate-400 mt-1 uppercase font-medium">{orden.cliente}</p>
+                <div className="h-24 border-b border-slate-200 flex items-center justify-center">
+                  {firmReporte?.firma_url ? (
+                    <img src={firmReporte.firma_url} alt="Firma cliente" className="max-h-20 mix-blend-multiply" />
+                  ) : (
+                    <p className="text-[9px] text-slate-300 italic">Pendiente de firma del cliente</p>
+                  )}
+                </div>
+                <p className="text-[10px] font-bold text-slate-700 mt-2 uppercase tracking-widest">Conformidad Cliente</p>
+                <p className="text-[8px] text-slate-400 mt-1 uppercase font-medium">{orden.cliente}</p>
               </div>
             </div>
           </div>

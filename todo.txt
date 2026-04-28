@@ -1,18 +1,17 @@
-ESTADO ACTUAL LOGISTICA FERNAGUEZ - 26/04/2026
+ESTADO ACTUAL LOGISTICA FERNAGUEZ - 28/04/2026
 
 LOGROS RECIENTES:
 1. Panel de Administración 100% Responsivo (Menú, Tablas, Calendario, Liquidaciones).
 2. Notificaciones WhatsApp (UltraMsg) integradas y funcionales.
-3. Fix en Fechas de Órdenes (Fecha mínima hoy).
-4. PrintableOrden.tsx mejorado (Fotos por técnico + especialidad).
-5. Despliegue automático GitHub -> Netlify funcionando.
-6. [APP MÓVIL] Firma bloqueada por defecto + Selector de estado de trabajo.
-7. [SYNC] Sincronización automática de asignaciones (check verde ✅) desde el móvil.
-8. [UI] Favicons personalizados (🛠️/⚡) para distinguir apps.
+3. [IMPRESIÓN] Solucionados los problemas de impresión nativa (window.print() con createPortal) en PrintableOrden.tsx para generar correctamente el reporte PDF con fotografías aisladas de la UI del dashboard.
+4. [ASIGNACIONES] Permitida la asignación múltiple de técnicos a una misma orden, sin sobreescribir al trabajador anterior.
+5. [ASIGNACIONES] Se añadió obligatoriedad de añadir "Notas" al asignar un trabajador y se incorporó un botón manual para re-enviar la notificación de WhatsApp directamente desde el panel de asignaciones en el detalle de la orden.
+6. [APP MÓVIL] En el detalle de intervención (MobileDetalleOrden.tsx), ahora se muestran claramente las instrucciones específicas de asignación enviadas al trabajador desde el panel central.
+7. [UI] Dashboard mejorado para permitir hacer clic en las filas de órdenes recientes y tarjetas resumen, navegando directamente a las órdenes.
 
 PENDIENTE:
 - Ajuste fino tabla Trabajadores.tsx (en móviles).
 - Backup multimedia pesado en Bd.tsx (verificar Drive).
 
 PARA CONTINUAR:
-"Continuar Logística Fernaguez: Responsividad y WhatsApp"
+"Continuar Logística Fernaguez: Optimización y Refactorización"

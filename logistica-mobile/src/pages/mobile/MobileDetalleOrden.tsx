@@ -12,6 +12,7 @@ const MobileDetalleOrden = () => {
     const [orden, setOrden] = useState<any>(null);
     const [reportes, setReportes] = useState<any[]>([]); // List of all reports
     const [reporte, setReporte] = useState<any>(null); // Current report being edited
+    const [misAsignaciones, setMisAsignaciones] = useState<any[]>([]); // Assignments specific to the current worker
     const [loading, setLoading] = useState(true);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [currentUserName, setCurrentUserName] = useState<string>('');
@@ -127,13 +128,15 @@ const MobileDetalleOrden = () => {
         const realId = currentOrden.id; // The real UUID
 
         // 2. Fetch reports and workers using the REAL ID
-        const [reportesReq, trabajadoresReq] = await Promise.all([
+        const [reportesReq, trabajadoresReq, asignacionesReq] = await Promise.all([
             supabase.from('reportes').select('*').eq('orden_id', realId).order('creado_en', { ascending: false }),
-            supabase.from('trabajadores').select('auth_user_id, nombre, apellidos, especialidad')
+            supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, especialidad'),
+            supabase.from('orden_asignaciones').select('*').eq('orden_id', realId)
         ]);
 
         if (reportesReq.error) console.error('Error fetching reportes:', reportesReq.error);
         if (trabajadoresReq.error) console.error('Error fetching trabajadores:', trabajadoresReq.error);
+        if (asignacionesReq.error) console.error('Error fetching asignaciones:', asignacionesReq.error);
 
         // Create map of technician IDs to names and specialties
         if (!trabajadoresReq.error && trabajadoresReq.data) {
@@ -148,6 +151,15 @@ const MobileDetalleOrden = () => {
                 if (t.auth_user_id) map.set(t.auth_user_id, info);
             });
             setTrabajadoresMap(map);
+        }
+
+        if (asignacionesReq.data && userId) {
+            // Find current worker's DB ID to match both possible references
+            const currentWorker = trabajadoresReq.data?.find(t => t.auth_user_id === userId || t.id === userId);
+            const myAssigs = asignacionesReq.data.filter(a => 
+                a.trabajador_id === userId || (currentWorker && a.trabajador_id === currentWorker.id)
+            );
+            setMisAsignaciones(myAssigs);
         }
 
         setOrden(currentOrden);
@@ -617,9 +629,32 @@ const MobileDetalleOrden = () => {
                      <div className="pt-3 border-t border-slate-100 bg-blue-50/50 -mx-4 px-4 py-3">
                          <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest leading-tight flex items-center gap-1">
                              <span className="material-symbols-outlined text-[14px]">assignment</span>
-                             Trabajo a Realizar
+                             Trabajo a Realizar (General)
                          </p>
                          <p className="text-sm font-medium text-slate-800 mt-1 whitespace-pre-wrap">{orden.descripcion}</p>
+                     </div>
+                 )}
+
+                 {/* Notas de Asignación Específicas */}
+                 {misAsignaciones.length > 0 && (
+                     <div className="pt-3 border-t border-slate-100 bg-green-50/50 -mx-4 px-4 py-3 border-b border-green-100">
+                         <p className="text-[10px] font-bold text-green-700 uppercase tracking-widest leading-tight flex items-center gap-1 mb-2">
+                             <span className="material-symbols-outlined text-[14px]">person_check</span>
+                             Tus Instrucciones Específicas
+                         </p>
+                         {misAsignaciones.map(asig => (
+                             <div key={asig.id} className="mt-2 bg-white/80 p-3 rounded-xl border border-green-200/60 shadow-sm">
+                                 <div className="flex items-center gap-2 mb-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 animate-pulse"></span>
+                                    <p className="text-[10px] text-green-600 font-bold uppercase">
+                                        Asignado el {new Date(asig.fecha_asignacion || asig.creado_en).toLocaleDateString('es-ES')} {asig.hora_programada && `a las ${asig.hora_programada}`}
+                                    </p>
+                                 </div>
+                                 <p className="text-sm font-bold text-slate-800 whitespace-pre-wrap pl-4 border-l-2 border-green-200">
+                                    {asig.notas || 'Sin notas adicionales.'}
+                                 </p>
+                             </div>
+                         ))}
                      </div>
                  )}
 
@@ -783,14 +818,16 @@ const MobileDetalleOrden = () => {
                                 </div>
                             )}
 
-                            {/* Motivo de la orden (para referencia) */}
+                            {/* Instrucciones de la orden (para referencia) */}
                             <div className="pt-2">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight flex justify-between items-center mb-2">
-                                    Motivo de la Orden
+                                    {misAsignaciones.length > 0 ? 'Tus Instrucciones' : 'Motivo de la Orden'}
                                     <span className="text-[9px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded font-black">REF: {orden?.poliza || '-'}</span>
                                 </p>
-                                <p className="text-xs text-slate-600 leading-relaxed bg-white/50 p-4 rounded-2xl border border-white shadow-inner italic">
-                                    {orden?.descripcion || 'Sin descripción detallada'}
+                                <p className="text-xs text-slate-600 leading-relaxed bg-white/50 p-4 rounded-2xl border border-white shadow-inner italic whitespace-pre-wrap">
+                                    {misAsignaciones.length > 0 
+                                        ? misAsignaciones.map(a => a.notas).filter(Boolean).join('\n\n---\n\n') 
+                                        : (orden?.descripcion || 'Sin descripción detallada')}
                                 </p>
                             </div>
                 <div className="space-y-4 pt-4">

@@ -96,16 +96,15 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       return;
     }
 
+    if (!formNotas.trim()) {
+      alert('Por favor, escribe una nota o instrucción para el trabajador.');
+      return;
+    }
+
     setSaving(true);
     
     try {
-      // 1. Limpiamos cualquier asignación previa para esta orden (evita 409)
-      await supabase
-        .from('orden_asignaciones')
-        .delete()
-        .eq('orden_id', ordenId);
-
-      // 2. Insertamos la nueva asignación
+      // 1. Insertamos la nueva asignación
       const { error: assignError } = await supabase
         .from('orden_asignaciones')
         .insert({
@@ -130,10 +129,10 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       console.log("✅ Asignación completada con éxito");
 
       // NOTIFICACIÓN WHATSAPP
-      const selectedWorker = trabajadores.find(t => t.id === formTrabajador);
+      const selectedWorker = trabajadores.find(t => t.auth_user_id === formTrabajador || t.id === formTrabajador);
       if (selectedWorker && selectedWorker.telefono && orden) {
         try {
-           console.log("Enviando notificación WhatsApp...");
+           console.log("Enviando notificación WhatsApp al teléfono:", selectedWorker.telefono);
            await notifyNewOrder(selectedWorker.telefono, {
              id: ordenId, // Usamos el UUID de la orden para el deep link
              id_legible: orden.id_legible,
@@ -186,6 +185,34 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       fetchAsignaciones();
       onUpdate?.();
     }
+  };
+
+  const handleManualWhatsApp = async (asig: Asignacion) => {
+    if (!asig.trabajador?.telefono) {
+      alert("El técnico asignado no tiene un teléfono configurado.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await notifyNewOrder(asig.trabajador.telefono, {
+        id: ordenId,
+        id_legible: orden?.id_legible || '',
+        cliente: orden?.cliente || '',
+        direccion: orden?.direccion || '',
+        descripcion: `${orden?.descripcion || ''}\n\n*Notas de asignación:* ${asig.notas || ''}`
+      });
+
+      if (result.sent === "true" || result.success) {
+        alert("✅ Notificación reenviada a " + asig.trabajador.nombre);
+      } else {
+        alert("⚠️ Revisa el panel de UltraMsg, el mensaje no se pudo confirmar.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("❌ Error al conectar con WhatsApp.");
+    }
+    setSaving(false);
   };
 
   const getEstadoBadge = (estado: string) => {
@@ -271,13 +298,14 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
             </div>
           </div>
           <div className="mt-3">
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Notas</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Notas *</label>
             <input
               type="text"
               value={formNotas}
               onChange={(e) => setFormNotas(e.target.value)}
               placeholder="Instrucciones para el trabajador..."
               className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+              required
             />
           </div>
         </form>
@@ -320,6 +348,14 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
                   <option value="completado">✅ Completado</option>
                   <option value="cancelado">❌ Cancelado</option>
                 </select>
+                <button
+                  onClick={() => handleManualWhatsApp(asig)}
+                  disabled={saving}
+                  className="p-1.5 text-slate-400 hover:text-green-500 hover:bg-green-50 rounded-full transition-colors disabled:opacity-50"
+                  title="Reenviar WhatsApp al técnico"
+                >
+                  <span className="material-symbols-outlined text-[18px]">chat</span>
+                </button>
                 <button
                   onClick={() => handleDeleteAsignacion(asig.id)}
                   className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
