@@ -49,7 +49,7 @@ export const notifyNewOrder = async (trabajador: any, orden: any) => {
     `👤 *Cliente:* ${orden.cliente}\n` +
     `🏠 *Dirección:* ${orden.direccion}\n` +
     `📝 *Trabajo:* ${orden.descripcion}\n\n` +
-    `Por favor, revisa la app para más detalles.`;
+    `🔗 [Abrir orden en la app](https://app.appvielha.com/m/ordenes/${orden.id})`;
 
   return sendTelegramMessage(trabajador.telegram_chat_id, msg);
 };
