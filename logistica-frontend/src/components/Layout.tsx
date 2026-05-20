@@ -235,6 +235,18 @@ const Layout = () => {
               Gestión BD
             </NavLink>
 
+            <NavLink
+              to="/configuracion"
+              className={({ isActive }) =>
+                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 hover:bg-slate-50'
+                }`
+              }
+            >
+              <Settings className="w-5 h-5 mr-3" />
+              Configuración
+            </NavLink>
+
           </nav>
           
           <div className="p-4 border-t border-gray-200">

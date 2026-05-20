@@ -155,15 +155,16 @@ export default function Trabajadores() {
                    <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Trabajador</th>
                    <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Especialidad</th>
                    <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center hidden sm:table-cell">Estado</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center hidden lg:table-cell">Telegram</th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center hidden md:table-cell">Rendimiento</th>
                    <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {loading ? (
-                     <tr><td colSpan={5} className="text-center py-8">Cargando trabajadores...</td></tr>
+                     <tr><td colSpan={6} className="text-center py-8">Cargando trabajadores...</td></tr>
                   ) : trabajadores.length === 0 ? (
-                     <tr><td colSpan={5} className="text-center py-8">No hay trabajadores registrados.</td></tr>
+                     <tr><td colSpan={6} className="text-center py-8">No hay trabajadores registrados.</td></tr>
                   ) : (
                      trabajadores.map(trabajador => (
                         <tr key={trabajador.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
@@ -181,6 +182,13 @@ export default function Trabajadores() {
                                  <span className={`w-2 h-2 rounded-full ${trabajador.estado === 'Disponible' ? 'bg-emerald-500' : (trabajador.estado === 'En Obra' ? 'bg-amber-500' : 'bg-rose-500')}`}></span>
                                  <span className="text-sm font-medium">{trabajador.estado}</span>
                               </div>
+                           </td>
+                           <td className="px-6 py-4 text-center hidden lg:table-cell">
+                              {trabajador.telegram_chat_id ? (
+                                <span className="px-2 py-1 bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 text-xs font-bold rounded-full border border-sky-200">✅ Activo</span>
+                              ) : (
+                                <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-400 text-xs font-bold rounded-full border border-slate-200">❌ Sin ID</span>
+                              )}
                            </td>
                            <td className="px-6 py-4 text-center">
                               <span className="text-amber-500 font-bold text-sm">5.0 ⭐</span>

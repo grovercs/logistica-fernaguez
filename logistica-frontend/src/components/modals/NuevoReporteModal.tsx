@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { notifyNewOrder } from '../../lib/whatsapp';
+import { notifyNewOrder } from '../../lib/notifications';
 
 interface Props {
   isOpen: boolean;
@@ -57,7 +57,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
     // Cargar todos los técnicos activos para poder asignarles órdenes futuras incluso si están ocupados ahora
     const { data } = await supabase
       .from('trabajadores')
-      .select('id, auth_user_id, nombre, apellidos, telefono')
+      .select('id, auth_user_id, nombre, apellidos, telefono, telegram_chat_id')
       .neq('estado', 'Baja');
     if (data) setTecnicos(data);
   };
@@ -187,17 +187,17 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
          });
        }
 
-       // Notificación WhatsApp al técnico con el ID interno para el link
+       // Notificación Telegram al técnico con el ID interno para el link
        if (formData.tecnico) {
          const selectedTecnico = tecnicos.find(t => t.id === formData.tecnico);
-         if (selectedTecnico && selectedTecnico.telefono) {
-             await notifyNewOrder(selectedTecnico.telefono, {
-              id: newOrder.id, // Enviamos el UUID para que el link de la app funcione
+         if (selectedTecnico && selectedTecnico.telegram_chat_id) {
+             await notifyNewOrder(selectedTecnico, {
+              id: newOrder.id,
               id_legible: newOrder.id_legible,
               cliente: formData.cliente,
               direccion: formData.direccion,
               descripcion: formData.observaciones
-            }).catch(err => console.error("Error enviando WhatsApp automático:", err));
+            }).catch(err => console.error("Error enviando Telegram automático:", err));
          }
        }
 

@@ -17,6 +17,7 @@ export default function EditarTrabajadorModal({ isOpen, onClose, onUpdated, trab
       especialidad: '',
       nuevaEspecialidad: '',
       telefono: '',
+      telegram_chat_id: '',
       email: '',
       fecha_incorporacion: '',
       estado: '',
@@ -32,6 +33,7 @@ export default function EditarTrabajadorModal({ isOpen, onClose, onUpdated, trab
              especialidad: trabajadorData.especialidad || '',
              nuevaEspecialidad: '',
              telefono: trabajadorData.telefono || '',
+             telegram_chat_id: trabajadorData.telegram_chat_id || '',
              email: trabajadorData.email || '',
              fecha_incorporacion: trabajadorData.fecha_incorporacion || '',
              estado: trabajadorData.estado || 'Disponible',
@@ -61,6 +63,7 @@ export default function EditarTrabajadorModal({ isOpen, onClose, onUpdated, trab
               dni: formData.dni,
               especialidad: specToSave.toLowerCase(),
               telefono: formData.telefono,
+              telegram_chat_id: formData.telegram_chat_id || null,
               email: formData.email,
               fecha_incorporacion: formData.fecha_incorporacion || null,
               estado: formData.estado
@@ -212,15 +215,27 @@ export default function EditarTrabajadorModal({ isOpen, onClose, onUpdated, trab
             
             <div className="flex flex-col gap-1.5 pt-[22px]">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Teléfono de contacto</label>
-              <input 
-                 className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-400" 
-                 placeholder="+34 600 000 000" 
+              <input
+                 className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-400"
+                 placeholder="+34 600 000 000"
                  type="tel"
                  value={formData.telefono}
                  onChange={(e) => setFormData({...formData, telefono: e.target.value})}
               />
             </div>
-            
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Chat ID de Telegram</label>
+              <input
+                 className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-400"
+                 placeholder="Ej: 8751170701"
+                 type="text"
+                 value={formData.telegram_chat_id}
+                 onChange={(e) => setFormData({...formData, telegram_chat_id: e.target.value})}
+              />
+              <p className="text-[11px] text-slate-400">Pídele al trabajador que abra el bot de Telegram y le dé /start para obtener su ID.</p>
+            </div>
+
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Correo Electrónico</label>
               <input 

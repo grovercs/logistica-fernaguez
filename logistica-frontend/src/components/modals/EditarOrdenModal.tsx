@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { notifyNewOrder } from '../../lib/whatsapp';
+import { notifyNewOrder } from '../../lib/notifications';
 
 interface Props {
   isOpen: boolean;
@@ -69,7 +69,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
     // Traer todos los técnicos que no estén de baja para poder asignarles órdenes incluso si están "En Obra"
     const { data } = await supabase
       .from('trabajadores')
-      .select('id, auth_user_id, nombre, apellidos, telefono, estado')
+      .select('id, auth_user_id, nombre, apellidos, telefono, telegram_chat_id, estado')
       .neq('estado', 'Baja');
     if (data) setTecnicos(data);
   };
@@ -144,18 +144,18 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
 
        if (onUpdated) onUpdated();
         
-        // Notificación WhatsApp al técnico si se asignó uno nuevo o cambió
+        // Notificación Telegram al técnico si se asignó uno nuevo o cambió
         if (formData.tecnico && formData.tecnico !== ordenData.tecnico_id) {
           const selectedTecnico = tecnicos.find(t => t.id === formData.tecnico);
-          if (selectedTecnico && selectedTecnico.telefono) {
-             console.log("WhatsApp: Detectado cambio de técnico, enviando notificación...");
-              await notifyNewOrder(selectedTecnico.telefono, {
-               id: ordenData.id, // ID interno real
+          if (selectedTecnico && selectedTecnico.telegram_chat_id) {
+             console.log("Telegram: Detectado cambio de técnico, enviando notificación...");
+              await notifyNewOrder(selectedTecnico, {
+               id: ordenData.id,
                id_legible: ordenData.id_legible,
                cliente: formData.cliente,
                direccion: formData.direccion,
                descripcion: formData.observaciones
-             }).catch(err => console.error("Error enviando WhatsApp automático:", err));
+             }).catch(err => console.error("Error enviando Telegram automático:", err));
           }
         }
 
@@ -167,21 +167,21 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
     setLoading(false);
   };
 
-  const handleManualWhatsApp = async () => {
+  const handleManualTelegram = async () => {
     if (!formData.tecnico) {
       alert("Asigna un técnico primero para enviar la notificación.");
       return;
     }
 
     const selectedTecnico = tecnicos.find(t => t.id === formData.tecnico || t.auth_user_id === formData.tecnico);
-    if (!selectedTecnico || !selectedTecnico.telefono) {
-      alert("El técnico seleccionado no tiene un teléfono configurado.");
+    if (!selectedTecnico || !selectedTecnico.telegram_chat_id) {
+      alert("El técnico seleccionado no tiene un Chat ID de Telegram configurado. Añádeselo desde el panel de Trabajadores.");
       return;
     }
 
     setLoading(true);
     try {
-      const result = await notifyNewOrder(selectedTecnico.telefono, {
+      const result = await notifyNewOrder(selectedTecnico, {
         id: ordenData.id,
         id_legible: ordenData.id_legible,
         cliente: formData.cliente,
@@ -189,14 +189,14 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
         descripcion: formData.observaciones
       });
 
-      if (result.sent === "true" || result.success) {
-        alert("✅ Notificación de WhatsApp enviada correctamente.");
+      if (result.success) {
+        alert("✅ Notificación de Telegram enviada correctamente.");
       } else {
-        alert("⚠️ El mensaje se registró pero UltraMsg devolvió un estado inesperado. Revisa el panel de UltraMsg.");
+        alert("⚠️ No se pudo enviar la notificación. Revisa que el token del bot esté configurado en Configuración.");
       }
     } catch (err) {
       console.error(err);
-      alert("❌ Error al conectar con el servicio de WhatsApp.");
+      alert("❌ Error al conectar con el servicio de Telegram.");
     }
     setLoading(false);
   };
@@ -420,9 +420,9 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
             Cancelar
           </button>
 
-          <button 
+          <button
             type="button"
-            onClick={handleManualWhatsApp}
+            onClick={handleManualTelegram}
             disabled={loading}
             className="px-5 py-2.5 bg-green-500 text-white rounded-xl font-bold shadow-lg shadow-green-500/30 hover:bg-green-600 hover:shadow-green-500/40 focus:ring-4 focus:ring-green-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
           >

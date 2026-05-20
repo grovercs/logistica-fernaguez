@@ -15,6 +15,7 @@ import Usuarios from './pages/Usuarios';
 import Bd from './pages/Bd';
 import Login from './pages/Login';
 import TareasFrecuentes from './pages/TareasFrecuentes';
+import Configuracion from './pages/Configuracion';
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
           <Route path="rbac" element={<RbacDashboard />} />
           <Route path="roles" element={<Roles />} />
           <Route path="permisos" element={<Permisos />} />
+          <Route path="configuracion" element={<Configuracion />} />
           {/* Add more routes here later */}
         </Route>
       </Routes>
