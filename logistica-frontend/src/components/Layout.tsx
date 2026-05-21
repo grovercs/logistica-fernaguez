@@ -56,7 +56,7 @@ const Layout = () => {
   }, [location]);
 
   if (loading) {
-    return <div className="h-screen w-screen flex items-center justify-center bg-gray-50 text-blue-600 font-bold">Cargando sistema...</div>;
+    return <div className="h-screen w-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 text-blue-600 font-bold">Cargando sistema...</div>;
   }
 
   if (!session) {
@@ -68,7 +68,7 @@ const Layout = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-gray-50 dark:bg-slate-950 overflow-hidden">
       {/* Mobile Backdrop */}
       {isSidebarOpen && (
         <div 
@@ -79,11 +79,11 @@ const Layout = () => {
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
+        fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="flex flex-col h-full">
-          <div className="flex items-center justify-center p-4 border-b border-gray-200">
+          <div className="flex items-center justify-center p-4 border-b border-gray-200 dark:border-slate-800">
             <img
               src="/logo_fernaguez_blk.png"
               alt="Logística Fernaguez"
@@ -91,34 +91,34 @@ const Layout = () => {
             />
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400"
             >
               <X className="w-6 h-6" />
             </button>
           </div>
 
           {/* User Profile */}
-          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/50">
+          <div className="px-5 py-3 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-bold text-slate-900 truncate min-w-0">
+              <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate min-w-0">
                 {userProfile?.nombre_completo || session?.user?.email || 'Usuario'}
               </p>
               <button
                 onClick={toggleTheme}
-                className="p-1.5 rounded-md text-slate-400 hover:text-amber-500 hover:bg-amber-50 transition-colors shrink-0"
+                className="p-1.5 rounded-md text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors shrink-0"
                 title={isDark ? 'Modo claro' : 'Modo oscuro'}
               >
                 {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
               <button
                 onClick={handleLogout}
-                className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
                 title="Cerrar Sesión"
               >
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-[11px] text-slate-500 uppercase tracking-wider truncate mt-0.5">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate mt-0.5">
               {userProfile?.rol || 'Cargando...'}
             </p>
           </div>
@@ -128,7 +128,7 @@ const Layout = () => {
               to="/"
               className={({ isActive }) =>
                 `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 hover:bg-slate-50'
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -137,7 +137,7 @@ const Layout = () => {
             </NavLink>
 
             <div className="pt-6 pb-2">
-              <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+              <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
                 Operaciones
               </p>
             </div>
@@ -146,7 +146,7 @@ const Layout = () => {
               to="/calendario"
               className={({ isActive }) =>
                 `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 hover:bg-slate-50'
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -158,7 +158,7 @@ const Layout = () => {
               to="/ordenes"
               className={({ isActive }) =>
                 `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 hover:bg-slate-50'
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -170,7 +170,7 @@ const Layout = () => {
               to="/liquidaciones"
               className={({ isActive }) =>
                 `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 hover:bg-slate-50'
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -179,7 +179,7 @@ const Layout = () => {
             </NavLink>
 
             <div className="pt-6 pb-2">
-              <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+              <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
                 Administración
               </p>
             </div>
@@ -188,7 +188,7 @@ const Layout = () => {
               to="/usuarios"
               className={({ isActive }) =>
                 `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 hover:bg-slate-50'
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -200,7 +200,7 @@ const Layout = () => {
               to="/trabajadores"
               className={({ isActive }) =>
                 `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 hover:bg-slate-50'
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -212,7 +212,7 @@ const Layout = () => {
               to="/aseguradoras"
               className={({ isActive }) =>
                 `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 hover:bg-slate-50'
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -224,7 +224,7 @@ const Layout = () => {
               to="/tareas-frecuentes"
               className={({ isActive }) =>
                 `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 hover:bg-slate-50'
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -233,7 +233,7 @@ const Layout = () => {
             </NavLink>
 
             <div className="pt-6 pb-2">
-              <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+              <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
                 Sistema
               </p>
             </div>
@@ -242,7 +242,7 @@ const Layout = () => {
               to="/roles"
               className={({ isActive }) =>
                 `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 hover:bg-slate-50'
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -254,7 +254,7 @@ const Layout = () => {
               to="/permisos"
               className={({ isActive }) =>
                 `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 hover:bg-slate-50'
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -266,7 +266,7 @@ const Layout = () => {
               to="/rbac"
               className={({ isActive }) =>
                 `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 hover:bg-slate-50'
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -278,7 +278,7 @@ const Layout = () => {
               to="/bd"
               className={({ isActive }) =>
                 `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 hover:bg-slate-50'
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -290,7 +290,7 @@ const Layout = () => {
               to="/configuracion"
               className={({ isActive }) =>
                 `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 hover:bg-slate-50'
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -301,7 +301,7 @@ const Layout = () => {
           </nav>
 
           {/* Footer */}
-          <div className="p-3 border-t border-gray-100 bg-gray-50/50">
+          <div className="p-3 border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50">
             <a
               href="https://vielhacomputer.com"
               target="_blank"
@@ -313,7 +313,7 @@ const Layout = () => {
                 alt="Vielha Computer"
                 className="h-10 w-auto object-contain opacity-60 group-hover:opacity-100 transition-opacity"
               />
-              <span className="text-[10px] text-slate-400 group-hover:text-slate-600 transition-colors leading-tight">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors leading-tight">
                 Desarrollado por<br />Vielha Computer
               </span>
             </a>
@@ -324,10 +324,10 @@ const Layout = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Mobile Top Bar */}
-        <header className="lg:hidden h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0">
+        <header className="lg:hidden h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-4 shrink-0">
           <button 
             onClick={() => setIsSidebarOpen(true)}
-            className="p-2 rounded-lg hover:bg-gray-100 text-slate-600"
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
           >
             <Menu className="w-6 h-6" />
           </button>
@@ -358,8 +358,14 @@ const Layout = () => {
           background: #e2e8f0;
           border-radius: 10px;
         }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #334155;
+        }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: #cbd5e1;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #475569;
         }
       `}</style>
     </div>
