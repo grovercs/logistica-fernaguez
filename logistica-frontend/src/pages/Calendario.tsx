@@ -41,6 +41,16 @@ export default function Calendario() {
     fetchTecnicos();
   }, []);
 
+  // Auto-navegar al mes de la fecha "Desde" cuando se aplica un rango
+  useEffect(() => {
+    if (fechaDesde) {
+      const [y, m] = fechaDesde.split('-').map(Number);
+      if (y && m) {
+        setCurrentDate(new Date(y, m - 1, 1));
+      }
+    }
+  }, [fechaDesde]);
+
   const fetchData = async () => {
     // Fetch all orders
     const { data: ordenesData } = await supabase
@@ -456,7 +466,22 @@ export default function Calendario() {
       </header>
 
       {/* Presets rápidos de fechas */}
-      <div className="px-4 sm:px-6 py-2 flex flex-wrap gap-1.5 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-200 dark:border-slate-800">
+      <div className="px-4 sm:px-6 py-2 flex flex-wrap items-center gap-1.5 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-200 dark:border-slate-800">
+        {/* Indicador de filtro activo */}
+        {(fechaDesde || fechaHasta) && (
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 dark:bg-primary/20 border border-primary/20 rounded-lg">
+            <span className="material-symbols-outlined text-primary text-[12px]">date_range</span>
+            <span className="text-[9px] font-bold text-primary">
+              {fechaDesde ? new Date(fechaDesde + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : 'Inicio'} → {fechaHasta ? new Date(fechaHasta + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : 'Hoy'}
+            </span>
+            <button
+              onClick={() => { setFechaDesde(''); setFechaHasta(''); }}
+              className="text-primary hover:text-red-500 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[12px]">close</span>
+            </button>
+          </div>
+        )}
         {[
           { key: 'hoy', label: 'Hoy' },
           { key: 'ayer', label: 'Ayer' },
