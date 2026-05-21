@@ -263,9 +263,9 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
             </select>
           </div>
 
-          {/* Línea 2: Fecha | Hora | Notas | Botones */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-            <div className="sm:col-span-6 lg:col-span-2">
+          {/* Línea 2: Fecha | Hora */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Fecha</label>
               <input
                 type="date"
@@ -274,7 +274,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
                 className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
               />
             </div>
-            <div className="sm:col-span-6 lg:col-span-2">
+            <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Hora</label>
               <input
                 type="time"
@@ -283,8 +283,12 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
                 className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
               />
             </div>
-            <div className="sm:col-span-12 lg:col-span-5">
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Notas *</label>
+          </div>
+
+          {/* Línea 3: Instrucciones + Botones */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-8">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Instrucciones *</label>
               <input
                 type="text"
                 value={formNotas}
@@ -294,7 +298,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
                 required
               />
             </div>
-            <div className="sm:col-span-12 lg:col-span-3 flex items-end gap-2">
+            <div className="lg:col-span-4 flex items-end gap-2">
               <button
                 type="submit"
                 disabled={saving}
