@@ -92,29 +92,22 @@ const Layout = () => {
           </div>
 
           {/* User Profile */}
-          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold shrink-0">
-                  <UserCircle className="w-6 h-6" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-slate-900 truncate">
-                    {userProfile?.nombre_completo || session?.user?.email || 'Usuario'}
-                  </p>
-                  <p className="text-[11px] text-slate-500 uppercase tracking-wider truncate">
-                    {userProfile?.rol || 'Cargando...'}
-                  </p>
-                </div>
-              </div>
+          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/50">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-bold text-slate-900 truncate min-w-0">
+                {userProfile?.nombre_completo || session?.user?.email || 'Usuario'}
+              </p>
               <button
                 onClick={handleLogout}
-                className="p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
                 title="Cerrar Sesión"
               >
-                <LogOut className="w-5 h-5" />
+                <LogOut className="w-4 h-4" />
               </button>
             </div>
+            <p className="text-[11px] text-slate-500 uppercase tracking-wider truncate mt-0.5">
+              {userProfile?.rol || 'Cargando...'}
+            </p>
           </div>
 
           <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto custom-scrollbar">
