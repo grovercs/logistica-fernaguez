@@ -15,7 +15,8 @@ export default function Ordenes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
   const [filterTecnico, setFilterTecnico] = useState('');
-  const [filterFecha, setFilterFecha] = useState('');
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [activeTab, setActiveTab] = useState<'activas' | 'archivadas'>('activas');
 
@@ -84,8 +85,18 @@ export default function Ordenes() {
       
     const matchesEstado = filterEstado === '' || o.estado === filterEstado;
     const matchesTecnico = filterTecnico === '' || o.tecnico_id === filterTecnico || tecnicos.find(t => t.id === filterTecnico)?.auth_user_id === o.tecnico_id;
-    const matchesFecha = filterFecha === '' || (o.fecha_programada && o.fecha_programada.startsWith(filterFecha));
-    
+    let matchesFecha = true;
+    if (fechaDesde || fechaHasta) {
+      const ordenDate = o.fecha_programada || o.creado_en;
+      if (!ordenDate) { matchesFecha = false; }
+      else {
+        const d = new Date(ordenDate);
+        const dStr = d.toISOString().split('T')[0];
+        if (fechaDesde && dStr < fechaDesde) matchesFecha = false;
+        if (fechaHasta && dStr > fechaHasta) matchesFecha = false;
+      }
+    }
+
     return matchesSearch && matchesEstado && matchesTecnico && matchesFecha;
   });
 
@@ -93,7 +104,70 @@ export default function Ordenes() {
     setSearchTerm('');
     setFilterEstado('');
     setFilterTecnico('');
-    setFilterFecha('');
+    setFechaDesde('');
+    setFechaHasta('');
+  };
+
+  const applyDatePreset = (preset: string) => {
+    const hoy = new Date();
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dd = String(hoy.getDate()).padStart(2, '0');
+    const toISO = (d: Date) => d.toISOString().split('T')[0];
+
+    switch (preset) {
+      case 'hoy':
+        setFechaDesde(`${yyyy}-${mm}-${dd}`);
+        setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      case 'ayer': {
+        const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
+        const a = toISO(ayer);
+        setFechaDesde(a); setFechaHasta(a);
+        break;
+      }
+      case 'semana': {
+        const inicio = new Date(hoy);
+        const dow = inicio.getDay();
+        const diff = dow === 0 ? -6 : 1 - dow;
+        inicio.setDate(hoy.getDate() + diff);
+        setFechaDesde(toISO(inicio));
+        setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      }
+      case 'semana_pasada': {
+        const fin = new Date(hoy);
+        const dow2 = fin.getDay();
+        const diff2 = dow2 === 0 ? 0 : 7 - dow2;
+        fin.setDate(hoy.getDate() - diff2 - 1);
+        const ini = new Date(fin); ini.setDate(fin.getDate() - 6);
+        setFechaDesde(toISO(ini)); setFechaHasta(toISO(fin));
+        break;
+      }
+      case 'mes': {
+        setFechaDesde(`${yyyy}-${mm}-01`);
+        setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      }
+      case 'mes_pasado': {
+        const mp = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+        const mpEnd = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+        setFechaDesde(toISO(mp)); setFechaHasta(toISO(mpEnd));
+        break;
+      }
+      case '7dias': {
+        const d7 = new Date(hoy); d7.setDate(hoy.getDate() - 6);
+        setFechaDesde(toISO(d7)); setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      }
+      case '30dias': {
+        const d30 = new Date(hoy); d30.setDate(hoy.getDate() - 29);
+        setFechaDesde(toISO(d30)); setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      }
+      default:
+        setFechaDesde(''); setFechaHasta('');
+    }
   };
 
   const handleManualWhatsApp = async (orden: any) => {
@@ -222,26 +296,73 @@ export default function Ordenes() {
                     <option value="Cancelada">Cancelada</option>
                 </select>
 
-                <select 
+                <select
                     className="w-full lg:w-48 pl-4 pr-8 py-3 bg-slate-50 dark:bg-slate-800 border-none rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 focus:ring-2 focus:ring-primary/20 outline-none appearance-none cursor-pointer"
                     value={filterTecnico}
                     onChange={e => setFilterTecnico(e.target.value)}
                 >
                     <option value="">Técnico</option>
                     {tecnicos.map((t: any) => (
-                        <option key={t.id} value={t.id}>{t.nombre}</option>
+                        <option key={t.id} value={t.id}>{t.nombre} {t.apellidos}</option>
                     ))}
                 </select>
 
-                <input 
-                    type="date" 
-                    className="w-full lg:w-40 px-4 py-3 bg-slate-50 dark:bg-slate-800 border-none rounded-xl text-xs font-black text-slate-600 dark:text-slate-300 focus:ring-2 focus:ring-primary/20 outline-none"
-                    value={filterFecha}
-                    onChange={e => setFilterFecha(e.target.value)}
-                />
+                {/* Rango de Fechas Profesional */}
+                <div className="w-full lg:w-auto flex flex-col gap-2">
+                  <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 rounded-xl p-1.5">
+                    <div className="flex items-center gap-1.5 px-2">
+                      <span className="material-symbols-outlined text-slate-400 text-[16px]">calendar_today</span>
+                      <input
+                        type="date"
+                        className="bg-transparent text-xs font-bold text-slate-700 dark:text-slate-200 outline-none w-28"
+                        value={fechaDesde}
+                        onChange={e => setFechaDesde(e.target.value)}
+                        placeholder="Desde"
+                      />
+                    </div>
+                    <span className="text-slate-300 text-[10px]">→</span>
+                    <div className="flex items-center gap-1.5 px-2">
+                      <input
+                        type="date"
+                        className="bg-transparent text-xs font-bold text-slate-700 dark:text-slate-200 outline-none w-28"
+                        value={fechaHasta}
+                        onChange={e => setFechaHasta(e.target.value)}
+                        placeholder="Hasta"
+                      />
+                      <span className="material-symbols-outlined text-slate-400 text-[16px]">calendar_today</span>
+                    </div>
+                  </div>
+                  {/* Presets rápidos */}
+                  <div className="flex flex-wrap gap-1">
+                    {[
+                      { key: 'hoy', label: 'Hoy' },
+                      { key: 'ayer', label: 'Ayer' },
+                      { key: '7dias', label: '7 días' },
+                      { key: 'semana', label: 'Esta semana' },
+                      { key: 'semana_pasada', label: 'Sem. pasada' },
+                      { key: 'mes', label: 'Este mes' },
+                      { key: 'mes_pasado', label: 'Mes pasado' },
+                      { key: '30dias', label: '30 días' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.key}
+                        type="button"
+                        onClick={() => applyDatePreset(preset.key)}
+                        className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider transition-colors ${
+                          (preset.key === 'hoy' && fechaDesde === fechaHasta && fechaDesde === new Date().toISOString().split('T')[0]) ||
+                          (preset.key !== 'hoy' && false) // Simplified active state
+                            ? 'bg-primary text-white'
+                            : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-                {(searchTerm || filterEstado || filterTecnico || filterFecha) && (
-                    <button 
+                {(searchTerm || filterEstado || filterTecnico || fechaDesde || fechaHasta) && (
+                    <button
                         onClick={clearFilters}
                         className="w-full lg:w-auto p-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-all flex items-center justify-center"
                         title="Limpiar filtros"
