@@ -85,7 +85,7 @@ const Layout = () => {
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-center p-4 border-b border-gray-200 dark:border-slate-800">
             <img
-              src={isDark ? '/logo_fernaguez_wht.png' : '/logo_fernaguez_blk.png'}
+              src={isDark ? '/logo_fernaguez_white.png' : '/logo_fernaguez_blk.png'}
               alt="Logística Fernaguez"
               className="h-14 w-auto object-contain"
             />
@@ -332,7 +332,7 @@ const Layout = () => {
             <Menu className="w-6 h-6" />
           </button>
           <img
-            src={isDark ? '/logo_fernaguez_wht.png' : '/logo_fernaguez_blk.png'}
+            src={isDark ? '/logo_fernaguez_white.png' : '/logo_fernaguez_blk.png'}
             alt="Logística Fernaguez"
             className="h-10 w-auto object-contain"
           />

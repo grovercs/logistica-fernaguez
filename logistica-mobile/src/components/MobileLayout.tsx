@@ -45,9 +45,9 @@ const MobileLayout = () => {
                 <header className="bg-primary dark:bg-primary-dark text-white shadow-md sticky top-0 z-20">
                     <div className="px-4 py-2.5 flex items-center justify-between">
                         <img
-                            src="/logo_fernaguez_blk.png"
+                            src={isDark ? '/logo_fernaguez_white.png' : '/logo_fernaguez_blk.png'}
                             alt="Logística Fernaguez"
-                            className="h-12 w-auto object-contain brightness-0 invert"
+                            className="h-12 w-auto object-contain"
                         />
                         <button
                             onClick={toggleTheme}
