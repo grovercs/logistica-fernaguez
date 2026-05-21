@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ClipboardList, Plus, Search, Filter, X } from 'lucide-react';
 import NuevoReporteModal from '../components/modals/NuevoReporteModal';
-import { notifyNewOrder } from '../lib/whatsapp';
+import { notifyNewOrder } from '../lib/notifications';
 
 export default function Ordenes() {
   const [ordenes, setOrdenes] = useState<any[]>([]);
@@ -35,7 +35,7 @@ export default function Ordenes() {
     // 2. Cargamos los técnicos para poder cruzar los datos
     const { data: rawTecnicos } = await supabase
       .from('trabajadores')
-      .select('id, auth_user_id, nombre, apellidos, telefono');
+      .select('id, auth_user_id, nombre, apellidos, telefono, telegram_chat_id');
 
     if (!error && rawOrdenes) {
       // 3. Cruzamos los datos manualmente (más fiable si no hay FKs en BD)
@@ -61,7 +61,7 @@ export default function Ordenes() {
   };
 
   const fetchTecnicos = async () => {
-    const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, telefono');
+    const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, telefono, telegram_chat_id');
     setTecnicos(data || []);
   };
 
@@ -96,14 +96,14 @@ export default function Ordenes() {
 
     // Buscamos el técnico por cualquiera de sus IDs (interno o auth)
     const selectedTecnico = tecnicos.find(t => t.id === orden.tecnico_id || t.auth_user_id === orden.tecnico_id);
-    if (!selectedTecnico || !selectedTecnico.telefono) {
-      alert("El técnico asignado no tiene un teléfono configurado.");
+    if (!selectedTecnico) {
+      alert("No se encontró el técnico asignado.");
       return;
     }
 
     setLoading(true);
     try {
-      const result = await notifyNewOrder(selectedTecnico.telefono, {
+      const result = await notifyNewOrder(selectedTecnico, {
         id: orden.id,
         id_legible: orden.id_legible,
         cliente: orden.cliente,
@@ -111,14 +111,14 @@ export default function Ordenes() {
         descripcion: orden.descripcion
       });
 
-      if (result.sent === "true" || result.success) {
+      if (result.success) {
         alert("✅ Notificación enviada a " + selectedTecnico.nombre);
       } else {
-        alert("⚠️ Revisa el panel de UltraMsg, el mensaje no se pudo confirmar.");
+        alert("⚠️ No se pudo enviar la notificación: " + (result.error || 'Error desconocido'));
       }
     } catch (err) {
       console.error(err);
-      alert("❌ Error al conectar con WhatsApp.");
+      alert("❌ Error al enviar la notificación.");
     }
     setLoading(false);
   };
@@ -302,7 +302,7 @@ export default function Ordenes() {
                                     handleManualWhatsApp(orden);
                                 }}
                                 className="size-9 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-all inline-flex items-center justify-center"
-                                title="Re-notificar WhatsApp"
+                                title="Re-notificar al técnico"
                             >
                                 <span className="material-symbols-outlined text-[18px]">chat</span>
                             </button>

@@ -15,6 +15,7 @@ export default function AltaUsuarioModal({ isOpen, onClose, onCreated }: AltaUsu
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [activo, setActivo] = useState(true);
+  const [telegramChatId, setTelegramChatId] = useState('');
   const [roles, setRoles] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -28,6 +29,7 @@ export default function AltaUsuarioModal({ isOpen, onClose, onCreated }: AltaUsu
         setPassword('');
         setConfirmPassword('');
         setActivo(true);
+        setTelegramChatId('');
     }
   }, [isOpen]);
 
@@ -64,7 +66,8 @@ export default function AltaUsuarioModal({ isOpen, onClose, onCreated }: AltaUsu
             id: userId,
             nombre_completo: nombre,
             rol_id: rolId,
-            activo: activo
+            activo: activo,
+            telegram_chat_id: telegramChatId || null
         }, { onConflict: 'id' });
 
         if (profileError) throw profileError;
@@ -148,9 +151,9 @@ export default function AltaUsuarioModal({ isOpen, onClose, onCreated }: AltaUsu
 
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Repetir Contraseña *</label>
-              <input 
-                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none transition-all focus:ring-2 focus:ring-primary/20 focus:border-primary" 
-                 placeholder="Repita la contraseña" 
+              <input
+                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none transition-all focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                 placeholder="Repita la contraseña"
                  type="password"
                  value={confirmPassword}
                  onChange={(e) => setConfirmPassword(e.target.value)}
@@ -158,7 +161,19 @@ export default function AltaUsuarioModal({ isOpen, onClose, onCreated }: AltaUsu
                  minLength={6}
               />
             </div>
-            
+
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Chat ID de Telegram</label>
+              <input
+                 className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none transition-all focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                 placeholder="Ej: 8751170701"
+                 type="text"
+                 value={telegramChatId}
+                 onChange={(e) => setTelegramChatId(e.target.value)}
+              />
+              <p className="text-xs text-slate-400 mt-1">Pídele al usuario que abra el bot de Telegram y le dé /start para obtener su ID.</p>
+            </div>
+
             <div className="col-span-2 pt-2">
               <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
                   <div>

@@ -213,7 +213,7 @@ export default function Configuracion() {
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Token del Bot de Telegram</label>
                 <input
-                  type="text"
+                  type="password"
                   value={botToken}
                   onChange={(e) => setBotToken(e.target.value)}
                   placeholder="Pega aquí el token de BotFather..."

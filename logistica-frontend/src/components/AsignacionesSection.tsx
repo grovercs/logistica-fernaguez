@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { notifyNewOrder } from '../lib/whatsapp';
+import { notifyNewOrder } from '../lib/notifications';
 
 interface Asignacion {
   id: string;
@@ -63,7 +63,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       // 2. Cargamos todos los trabajadores para poder cruzar los datos
       const { data: rawTrab } = await supabase
         .from('trabajadores')
-        .select('id, auth_user_id, nombre, apellidos');
+        .select('id, auth_user_id, nombre, apellidos, telegram_chat_id, telefono');
 
       // 3. Cruzamos los datos manualmente (mucho más fiable)
       const mergedAsignaciones = (data || []).map(asig => {
@@ -84,7 +84,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
   const fetchTrabajadores = async () => {
     const { data } = await supabase
       .from('trabajadores')
-      .select('id, auth_user_id, nombre, apellidos, telefono')
+      .select('id, auth_user_id, nombre, apellidos, telefono, telegram_chat_id')
       .eq('estado', 'Disponible');
     if (data) setTrabajadores(data);
   };
@@ -188,14 +188,14 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
   };
 
   const handleManualWhatsApp = async (asig: Asignacion) => {
-    if (!asig.trabajador?.telefono) {
-      alert("El técnico asignado no tiene un teléfono configurado.");
+    if (!asig.trabajador) {
+      alert("No se encontró el técnico asignado.");
       return;
     }
 
     setSaving(true);
     try {
-      const result = await notifyNewOrder(asig.trabajador.telefono, {
+      const result = await notifyNewOrder(asig.trabajador, {
         id: ordenId,
         id_legible: orden?.id_legible || '',
         cliente: orden?.cliente || '',
@@ -203,14 +203,14 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
         descripcion: `${orden?.descripcion || ''}\n\n*Notas de asignación:* ${asig.notas || ''}`
       });
 
-      if (result.sent === "true" || result.success) {
+      if (result.success) {
         alert("✅ Notificación reenviada a " + asig.trabajador.nombre);
       } else {
-        alert("⚠️ Revisa el panel de UltraMsg, el mensaje no se pudo confirmar.");
+        alert("⚠️ No se pudo enviar la notificación: " + (result.error || 'Error desconocido'));
       }
     } catch (err) {
       console.error(err);
-      alert("❌ Error al conectar con WhatsApp.");
+      alert("❌ Error al enviar la notificación.");
     }
     setSaving(false);
   };
@@ -352,7 +352,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
                   onClick={() => handleManualWhatsApp(asig)}
                   disabled={saving}
                   className="p-1.5 text-slate-400 hover:text-green-500 hover:bg-green-50 rounded-full transition-colors disabled:opacity-50"
-                  title="Reenviar WhatsApp al técnico"
+                  title="Reenviar notificación al técnico"
                 >
                   <span className="material-symbols-outlined text-[18px]">chat</span>
                 </button>

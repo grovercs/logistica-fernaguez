@@ -14,6 +14,7 @@ export default function EditarUsuarioModal({ isOpen, onClose, usuario, roles, on
   const [nombre, setNombre] = useState('');
   const [rolId, setRolId] = useState('');
   const [activo, setActivo] = useState(true);
+  const [telegramChatId, setTelegramChatId] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -25,6 +26,7 @@ export default function EditarUsuarioModal({ isOpen, onClose, usuario, roles, on
       setNombre(usuario.nombre_completo || '');
       setRolId(usuario.rol_id || '');
       setActivo(usuario.activo ?? true);
+      setTelegramChatId(usuario.telegram_chat_id || '');
       setNewPassword('');
       setConfirmPassword('');
       setShowReset(false);
@@ -42,7 +44,8 @@ export default function EditarUsuarioModal({ isOpen, onClose, usuario, roles, on
       .update({
         nombre_completo: nombre,
         rol_id: rolId || null,
-        activo: activo
+        activo: activo,
+        telegram_chat_id: telegramChatId || null
       })
       .eq('id', usuario.id);
 
@@ -109,7 +112,7 @@ export default function EditarUsuarioModal({ isOpen, onClose, usuario, roles, on
 
           <div>
             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Rol Asignado</label>
-            <select 
+            <select
               className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
               value={rolId}
               onChange={(e) => setRolId(e.target.value)}
@@ -120,7 +123,19 @@ export default function EditarUsuarioModal({ isOpen, onClose, usuario, roles, on
                 ))}
             </select>
           </div>
-          
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Chat ID de Telegram</label>
+            <input
+               className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+               placeholder="Ej: 8751170701"
+               type="text"
+               value={telegramChatId}
+               onChange={(e) => setTelegramChatId(e.target.value)}
+            />
+            <p className="text-xs text-slate-400 mt-1">Pídele al usuario que abra el bot de Telegram y le dé /start para obtener su ID.</p>
+          </div>
+
           <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
               <div>
                   <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">Estado de la cuenta</h4>
