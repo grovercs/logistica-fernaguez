@@ -45,7 +45,7 @@ const MobileLayout = () => {
                         <img
                             src="/logo_fernaguez_blk.png"
                             alt="Logística Fernaguez"
-                            className="h-8 w-auto object-contain brightness-0 invert"
+                            className="h-7 w-auto object-contain brightness-0 invert"
                         />
                         <button className="p-1 rounded-full hover:bg-white/20 transition-colors">
                             <span className="material-symbols-outlined text-[24px]">menu</span>
@@ -71,9 +71,9 @@ const MobileLayout = () => {
                         <img
                             src="/vielha-computer-logo.png"
                             alt="Vielha Computer"
-                            className="h-4 w-auto object-contain opacity-40 group-hover:opacity-70 transition-opacity"
+                            className="h-5 w-auto object-contain opacity-40 group-hover:opacity-70 transition-opacity"
                         />
-                        <span className="text-[9px] text-slate-400 group-hover:text-slate-500 transition-colors">
+                        <span className="text-[10px] text-slate-400 group-hover:text-slate-500 transition-colors">
                             Desarrollado por Vielha Computer
                         </span>
                     </a>
