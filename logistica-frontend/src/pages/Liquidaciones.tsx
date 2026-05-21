@@ -69,11 +69,13 @@ export default function Liquidaciones() {
         perfilesLookup[p.id] = { nombre_completo: p.nombre_completo, tarifa_hora: p.tarifa_hora || 0 };
       });
 
-      // Merge perfiles into reportes
-      const merged = (reportesData as any[]).map((r: any) => ({
-        ...r,
-        perfiles: perfilesLookup[r.tecnico_id] || null,
-      }));
+      // Merge perfiles into reportes and filter out orphans (no linked order)
+      const merged = (reportesData as any[])
+        .filter((r: any) => r.ordenes !== null && r.ordenes !== undefined)
+        .map((r: any) => ({
+          ...r,
+          perfiles: perfilesLookup[r.tecnico_id] || null,
+        }));
 
       setReportes(merged as Reporte[]);
 
