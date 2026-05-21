@@ -133,7 +133,11 @@ export default function EditarUsuarioModal({ isOpen, onClose, usuario, roles, on
                value={telegramChatId}
                onChange={(e) => setTelegramChatId(e.target.value)}
             />
-            <p className="text-xs text-slate-400 mt-1">Pídele al usuario que abra el bot de Telegram y le dé /start para obtener su ID.</p>
+            <p className="text-xs text-slate-400 mt-1">
+              1. Abre Telegram y busca el bot <strong>@FernaguezBot</strong> (o toca <a href="https://t.me/FernaguezBot" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">este enlace</a>).<br/>
+              2. Pulsa <strong>Iniciar</strong> o envía <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">/start</code>.<br/>
+              3. El bot responderá con tu <strong>Chat ID</strong>; cópialo y pégalo aquí.
+            </p>
           </div>
 
           <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">

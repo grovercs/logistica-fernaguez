@@ -17,20 +17,28 @@ export default function Ordenes() {
   const [filterTecnico, setFilterTecnico] = useState('');
   const [filterFecha, setFilterFecha] = useState('');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState<'activas' | 'archivadas'>('activas');
 
   useEffect(() => {
     fetchOrdenes();
     fetchTecnicos();
-  }, []);
+  }, [activeTab]);
 
   const fetchOrdenes = async () => {
     setLoading(true);
     // 1. Cargamos las órdenes
-    const { data: rawOrdenes, error } = await supabase
+    let query = supabase
       .from('ordenes')
       .select('*')
-      .neq('estado', 'Archivado')
       .order('creado_en', { ascending: false, nullsFirst: false });
+
+    if (activeTab === 'activas') {
+      query = query.neq('estado', 'Archivado');
+    } else {
+      query = query.eq('estado', 'Archivado');
+    }
+
+    const { data: rawOrdenes, error } = await query;
 
     // 2. Cargamos los técnicos para poder cruzar los datos
     const { data: rawTecnicos } = await supabase
@@ -75,7 +83,7 @@ export default function Ordenes() {
       (o.direccion && o.direccion.toLowerCase().includes(searchLower));
       
     const matchesEstado = filterEstado === '' || o.estado === filterEstado;
-    const matchesTecnico = filterTecnico === '' || o.tecnico_id === filterTecnico;
+    const matchesTecnico = filterTecnico === '' || o.tecnico_id === filterTecnico || tecnicos.find(t => t.id === filterTecnico)?.auth_user_id === o.tecnico_id;
     const matchesFecha = filterFecha === '' || (o.fecha_programada && o.fecha_programada.startsWith(filterFecha));
     
     return matchesSearch && matchesEstado && matchesTecnico && matchesFecha;
@@ -148,6 +156,30 @@ export default function Ordenes() {
       </div>
 
       <div className="p-4 sm:p-8 max-w-7xl mx-auto w-full space-y-6">
+        {/* Tabs Activas / Archivadas */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab('activas')}
+            className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
+              activeTab === 'activas'
+                ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+            }`}
+          >
+            Activas
+          </button>
+          <button
+            onClick={() => setActiveTab('archivadas')}
+            className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
+              activeTab === 'archivadas'
+                ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+            }`}
+          >
+            Archivadas
+          </button>
+        </div>
+
         {/* Barra de Filtros Responsiva */}
         <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row items-center gap-4">
             {/* Buscador */}
@@ -187,6 +219,7 @@ export default function Ordenes() {
                     <option value="En revisión">En revisión</option>
                     <option value="Pendiente de firma">Pendiente de firma</option>
                     <option value="Finalizada">Finalizada</option>
+                    <option value="Cancelada">Cancelada</option>
                 </select>
 
                 <select 
@@ -272,7 +305,7 @@ export default function Ordenes() {
                             })()}
                         </td>
                         <td className="px-4 sm:px-6 py-5 text-center">
-                        <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                        <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest inline-flex items-center gap-1 ${
                             orden.estado === 'Urgente' ? 'bg-red-100 text-red-700 dark:bg-red-900/30' :
                             orden.estado === 'En revisión' ? 'bg-purple-100 text-purple-700' :
                             orden.estado === 'Pendiente de firma' ? 'bg-orange-100 text-orange-700' :
@@ -281,6 +314,7 @@ export default function Ordenes() {
                             orden.estado === 'Finalizada' ? 'bg-green-100 text-green-700' :
                             'bg-slate-100 text-slate-600'
                         }`}>
+                            {orden.estado === 'Urgente' && <span className="material-symbols-outlined text-[10px]">warning</span>}
                             {orden.estado}
                         </span>
                         </td>

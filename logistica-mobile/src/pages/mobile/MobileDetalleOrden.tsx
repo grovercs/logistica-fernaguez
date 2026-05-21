@@ -732,7 +732,7 @@ const MobileDetalleOrden = () => {
                                             <div className="mt-2 flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
                                                     {rep.horas_trabajadas > 0 && (
-                                                        <span className="text-[9px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                        <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded flex items-center gap-1">
                                                             <span className="material-symbols-outlined text-[12px]">schedule</span> {rep.horas_trabajadas}h
                                                         </span>
                                                     )}

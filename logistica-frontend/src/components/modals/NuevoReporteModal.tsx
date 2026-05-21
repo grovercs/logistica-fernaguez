@@ -166,7 +166,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
          telefono_contacto: formData.telefono_contacto,
          direccion: formData.direccion,
          descripcion: formData.observaciones,
-         estado: formData.estado || 'Pendiente', 
+         estado: formData.esUrgente ? 'Urgente' : (formData.estado || 'Pendiente'), 
          tecnico_id: formData.tecnico || null,
          fecha_programada: formData.fecha,
          hora_programada: formData.hora,

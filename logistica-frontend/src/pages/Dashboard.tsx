@@ -302,11 +302,12 @@ export default function Dashboard() {
                         </td>
                         <td className="px-4 sm:px-6 py-4 text-slate-500 max-w-[200px] truncate hidden sm:table-cell">{orden.descripcion || '---'}</td>
                         <td className="px-4 sm:px-6 py-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1 ${
                             orden.estado === 'Urgente' ? 'bg-red-100 text-red-700' :
                             orden.estado === 'Finalizada' ? 'bg-green-100 text-green-700' :
                             'bg-blue-100 text-blue-700'
                           }`}>
+                            {orden.estado === 'Urgente' && <span className="material-symbols-outlined text-[10px]">warning</span>}
                             {orden.estado}
                           </span>
                         </td>
@@ -325,6 +326,27 @@ export default function Dashboard() {
 
           {/* Right Column */}
           <div className="space-y-6 sm:space-y-8">
+            {/* Quick Actions Card */}
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 rounded-2xl shadow-xl shadow-blue-600/20 text-white relative overflow-hidden group">
+              <div className="relative z-10">
+                <div className="size-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <span className="material-symbols-outlined text-white text-2xl">add_task</span>
+                </div>
+                <h3 className="text-xl font-black mb-2 tracking-tight">Nueva Orden</h3>
+                <p className="text-white/70 text-sm mb-8 font-medium leading-relaxed">Asigna una nueva orden de trabajo ahora mismo de forma rápida y sencilla.</p>
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="w-full bg-white text-blue-600 px-6 py-4 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-black/10 hover:bg-blue-50 hover:translate-y-[-2px] transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined font-bold">add</span>
+                  Crear Reporte
+                </button>
+              </div>
+              {/* Background Shapes */}
+              <div className="absolute top-[-20%] right-[-10%] size-40 bg-white/10 rounded-full blur-2xl"></div>
+              <div className="absolute bottom-[-10%] left-[-10%] size-40 bg-indigo-400/20 rounded-full blur-2xl"></div>
+            </div>
+
             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
               <h3 className="text-base font-black text-slate-800 dark:text-white mb-6 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">event_available</span>
@@ -368,27 +390,6 @@ export default function Dashboard() {
                 <span className="material-symbols-outlined text-lg">calendar_month</span>
                 Calendario Completo
               </Link>
-            </div>
-
-            {/* Quick Actions Card */}
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 rounded-2xl shadow-xl shadow-blue-600/20 text-white relative overflow-hidden group">
-              <div className="relative z-10">
-                <div className="size-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <span className="material-symbols-outlined text-white text-2xl">add_task</span>
-                </div>
-                <h3 className="text-xl font-black mb-2 tracking-tight">Nueva Orden</h3>
-                <p className="text-white/70 text-sm mb-8 font-medium leading-relaxed">Asigna una nueva orden de trabajo ahora mismo de forma rápida y sencilla.</p>
-                <button 
-                  onClick={() => setIsModalOpen(true)}
-                  className="w-full bg-white text-blue-600 px-6 py-4 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-black/10 hover:bg-blue-50 hover:translate-y-[-2px] transition-all active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined font-bold">add</span>
-                  Crear Reporte
-                </button>
-              </div>
-              {/* Background Shapes */}
-              <div className="absolute top-[-20%] right-[-10%] size-40 bg-white/10 rounded-full blur-2xl"></div>
-              <div className="absolute bottom-[-10%] left-[-10%] size-40 bg-indigo-400/20 rounded-full blur-2xl"></div>
             </div>
           </div>
         </div>

@@ -133,7 +133,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       if (selectedWorker && selectedWorker.telefono && orden) {
         try {
            console.log("Enviando notificación WhatsApp al teléfono:", selectedWorker.telefono);
-           await notifyNewOrder(selectedWorker.telefono, {
+           await notifyNewOrder(selectedWorker, {
              id: ordenId, // Usamos el UUID de la orden para el deep link
              id_legible: orden.id_legible,
              cliente: orden.cliente,
