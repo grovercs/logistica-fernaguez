@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, Users, CalendarClock, Briefcase, UserPlus, 
-  Shield, Key, Database, ClipboardList, Settings, LogOut, 
-  ListChecks, Menu, X 
+import {
+  LayoutDashboard, Users, CalendarClock, Briefcase, UserPlus,
+  Shield, Key, Database, ClipboardList, Settings, LogOut,
+  ListChecks, Menu, X, UserCircle
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -13,6 +13,7 @@ const Layout = () => {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<{ nombre_completo: string; rol: string } | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -28,6 +29,24 @@ const Layout = () => {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      supabase
+        .from('perfiles')
+        .select('nombre_completo, roles(nombre)')
+        .eq('id', session.user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setUserProfile({
+              nombre_completo: data.nombre_completo || 'Usuario',
+              rol: (data.roles as any)?.nombre || 'Sin rol'
+            });
+          }
+        });
+    }
+  }, [session]);
 
   // Close sidebar on navigation (mobile)
   useEffect(() => {
@@ -64,14 +83,40 @@ const Layout = () => {
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <h1 className="text-2xl font-black text-blue-600 italic tracking-tighter">FERNAGUEZ</h1>
-            <button 
+            <button
               onClick={() => setIsSidebarOpen(false)}
               className="lg:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-500"
             >
               <X className="w-6 h-6" />
             </button>
           </div>
-          
+
+          {/* User Profile */}
+          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold shrink-0">
+                  <UserCircle className="w-6 h-6" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-900 truncate">
+                    {userProfile?.nombre_completo || session?.user?.email || 'Usuario'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 uppercase tracking-wider truncate">
+                    {userProfile?.rol || 'Cargando...'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                title="Cerrar Sesión"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
           <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto custom-scrollbar">
             <NavLink
               to="/"
@@ -248,16 +293,6 @@ const Layout = () => {
             </NavLink>
 
           </nav>
-          
-          <div className="p-4 border-t border-gray-200">
-            <button
-              onClick={handleLogout}
-              className="flex items-center w-full px-4 py-3 text-sm font-bold text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-all"
-            >
-              <LogOut className="w-5 h-5 mr-3" />
-              Cerrar Sesión
-            </button>
-          </div>
         </div>
       </aside>
 

@@ -244,67 +244,67 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
 
       {/* Add Form */}
       {showAddForm && (
-        <form onSubmit={handleAddAsignacion} className="p-4 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-200 dark:border-slate-800">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Trabajador *</label>
+        <form onSubmit={handleAddAsignacion} className="p-5 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-200 dark:border-slate-800 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+            <div className="sm:col-span-12 md:col-span-5">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Trabajador *</label>
               <select
                 value={formTrabajador}
                 onChange={(e) => setFormTrabajador(e.target.value)}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+                className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                 required
               >
-                <option value="">Seleccionar...</option>
+                <option value="">Seleccionar trabajador...</option>
                 {trabajadores.map(t => (
                   <option key={t.id} value={t.auth_user_id || t.id}>
-                    {t.nombre} {t.apellidos} {t.telefono ? `(${t.telefono})` : '(Sin tel)'}
+                    {t.nombre} {t.apellidos} {t.telefono ? `(${t.telefono})` : ''}
                   </option>
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fecha</label>
+            <div className="sm:col-span-6 md:col-span-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Fecha</label>
               <input
                 type="date"
                 value={formFecha}
                 onChange={(e) => setFormFecha(e.target.value)}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+                className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Hora</label>
+            <div className="sm:col-span-6 md:col-span-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Hora</label>
               <input
                 type="time"
                 value={formHora}
                 onChange={(e) => setFormHora(e.target.value)}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+                className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
               />
             </div>
-            <div className="flex items-end gap-2">
+            <div className="sm:col-span-12 md:col-span-3 flex items-end gap-2">
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 shadow-sm"
               >
                 {saving ? 'Guardando...' : 'Guardar y Notificar'}
               </button>
               <button
                 type="button"
                 onClick={() => setShowAddForm(false)}
-                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded-lg text-sm font-semibold"
+                className="px-4 py-2.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
               >
                 Cancelar
               </button>
             </div>
           </div>
-          <div className="mt-3">
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Notas *</label>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Notas *</label>
             <input
               type="text"
               value={formNotas}
               onChange={(e) => setFormNotas(e.target.value)}
               placeholder="Instrucciones para el trabajador..."
-              className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+              className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
               required
             />
           </div>
