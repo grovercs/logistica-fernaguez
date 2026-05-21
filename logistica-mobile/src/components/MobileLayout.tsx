@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Outlet, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../hooks/useTheme';
 
 const MobileLayout = () => {
     const location = useLocation();
@@ -8,6 +9,7 @@ const MobileLayout = () => {
     const isLoginPage = location.pathname === '/m/login';
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const { isDark, toggle: toggleTheme } = useTheme();
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -47,8 +49,14 @@ const MobileLayout = () => {
                             alt="Logística Fernaguez"
                             className="h-12 w-auto object-contain brightness-0 invert"
                         />
-                        <button className="p-1 rounded-full hover:bg-white/20 transition-colors">
-                            <span className="material-symbols-outlined text-[24px]">menu</span>
+                        <button
+                            onClick={toggleTheme}
+                            className="p-1 rounded-full hover:bg-white/20 transition-colors"
+                            title={isDark ? 'Modo claro' : 'Modo oscuro'}
+                        >
+                            <span className="material-symbols-outlined text-[24px]">
+                                {isDark ? 'light_mode' : 'dark_mode'}
+                            </span>
                         </button>
                     </div>
                 </header>

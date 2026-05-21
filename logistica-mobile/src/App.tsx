@@ -3,8 +3,10 @@ import MobileLayout from './components/MobileLayout';
 import MobileLogin from './pages/mobile/MobileLogin';
 import MobileOrdenes from './pages/mobile/MobileOrdenes';
 import MobileDetalleOrden from './pages/mobile/MobileDetalleOrden';
+import { useTheme } from './hooks/useTheme';
 
 function App() {
+  useTheme();
   return (
     <BrowserRouter>
       <Routes>
