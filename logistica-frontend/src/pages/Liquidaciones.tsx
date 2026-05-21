@@ -10,7 +10,7 @@ interface Reporte {
   horas_trabajadas: number;
   creado_en: string;
   estado_liquidacion: string;
-  ordenes: { id_legible: string; cliente: string; estado: string } | null;
+  ordenes: { id_legible: string; cliente: string; estado: string; estado_previo?: string } | null;
   perfiles: { nombre_completo: string; tarifa_hora: number } | null;
 }
 
@@ -54,7 +54,7 @@ export default function Liquidaciones() {
 
     const { data: reportesData, error: repErr } = await supabase
       .from('reportes')
-      .select('id, orden_id, tecnico_id, horas_trabajadas, creado_en, estado_liquidacion, ordenes!inner(id_legible, cliente, estado)')
+      .select('id, orden_id, tecnico_id, horas_trabajadas, creado_en, estado_liquidacion, ordenes!inner(id_legible, cliente, estado, estado_previo)')
       .order('creado_en', { ascending: false });
 
     // Fetch all perfiles separately (Supabase doesn't recognize tecnico_id FK to perfiles)
@@ -347,6 +347,11 @@ export default function Liquidaciones() {
                             <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${rs[0]?.ordenes?.estado === 'Completada' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                               {rs[0]?.ordenes?.estado || 'Activa'}
                             </span>
+                            {rs[0]?.ordenes?.estado === 'Archivado' && rs[0]?.ordenes?.estado_previo && rs[0]?.ordenes?.estado_previo !== 'Finalizada' && (
+                              <span className="px-2 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold uppercase tracking-wider border border-red-200" title={`Archivada sin finalizar. Estado previo: ${rs[0]?.ordenes?.estado_previo}`}>
+                                Sin finalizar
+                              </span>
+                            )}
                           </div>
                         </div>
                         {/* Table */}

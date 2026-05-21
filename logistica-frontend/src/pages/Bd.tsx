@@ -9,6 +9,7 @@ interface OrdenEntry {
   aseguradora: string;
   poliza: string;
   estado: string;
+  estado_previo?: string;
   creado_en: string;
   compactado: boolean;
 }
@@ -236,25 +237,44 @@ export default function Bd() {
 
   const handleCompactar = async () => {
       if (selectedIds.size === 0) return alert('Seleccione al menos una obra para archivar.');
-      if (!window.confirm(`¿Confirmar archivado de ${selectedIds.size} obras seleccionadas?`)) return;
-      
+
+      // Verificar si hay obras no finalizadas entre las seleccionadas
+      const seleccionadas = compactables.filter(c => selectedIds.has(c.id));
+      const noFinalizadas = seleccionadas.filter(c => c.estado !== 'Finalizada');
+
+      if (noFinalizadas.length > 0) {
+          const lista = noFinalizadas.map(o => `• ${o.id_legible} — ${o.cliente || 'Sin cliente'} (${o.estado})`).join('\n');
+          const mensaje =
+            `⚠️ ADVERTENCIA\n\n` +
+            `${noFinalizadas.length} de ${seleccionadas.length} obras seleccionadas NO están finalizadas:\n\n` +
+            `${lista}\n\n` +
+            `¿Deseas archivarlas de todos modos? Se guardarán como historial pero quedará marcado que no estaban finalizadas.`;
+          if (!window.confirm(mensaje)) return;
+      } else {
+          if (!window.confirm(`¿Confirmar archivado de ${selectedIds.size} obras seleccionadas?`)) return;
+      }
+
       setCompacting(true);
-      try { 
-          const idsToArchive = Array.from(selectedIds);
-          const { error } = await supabase
-            .from('ordenes')
-            .update({ estado: 'Archivado', compactado: true })
-            .in('id', idsToArchive);
-          
-          if (error) throw error;
-          
+      try {
+          // Archivar una por una para guardar el estado_previo correcto de cada una
+          for (const orden of seleccionadas) {
+              await supabase
+                  .from('ordenes')
+                  .update({
+                      estado: 'Archivado',
+                      compactado: true,
+                      estado_previo: orden.estado
+                  })
+                  .eq('id', orden.id);
+          }
+
           setSelectedIds(new Set());
-          fetchStats(); 
-          alert(`✅ ${idsToArchive.length} obras movidas al historial.`);
+          fetchStats();
+          alert(`✅ ${seleccionadas.length} obras movidas al historial.`);
       } catch(e: any) {
           alert('Error al archivar: ' + e.message);
-      } finally { 
-          setCompacting(false); 
+      } finally {
+          setCompacting(false);
       }
   };
 
@@ -275,18 +295,22 @@ export default function Bd() {
 
   const handleRestaurar = async (id: string) => {
     if (!window.confirm('¿Desea restaurar esta obra al sistema activo? Volverá a aparecer en el Calendario y Listado de Órdenes.')) return;
-    
+
     setLoading(true);
     try {
+        // Recuperar estado previo antes de restaurar
+        const { data: orden } = await supabase.from('ordenes').select('estado_previo').eq('id', id).single();
+        const estadoRestaurado = orden?.estado_previo || 'Finalizada';
+
         const { error } = await supabase
             .from('ordenes')
-            .update({ estado: 'Finalizada', compactado: false })
+            .update({ estado: estadoRestaurado, compactado: false, estado_previo: null })
             .eq('id', id);
-        
+
         if (error) throw error;
-        
+
         alert('✅ Obra restaurada correctamente.');
-        setSelectedDetalle(null); // Close modal if open
+        setSelectedDetalle(null);
         fetchArchivados();
         fetchStats();
     } catch (e: any) {
@@ -640,7 +664,16 @@ export default function Bd() {
                                     ) : archivados.filter(a => (a.id_legible?.includes(searchTerm) || a.cliente?.toLowerCase().includes(searchTerm.toLowerCase()))).map(a => (
                                         <tr key={a.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
                                             <td className="px-6 py-4 text-slate-400 text-xs">{a.creado_en?.split('T')[0]}</td>
-                                            <td className="px-6 py-4 font-bold text-slate-900 dark:text-white uppercase">{a.id_legible}</td>
+                                            <td className="px-6 py-4">
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-bold text-slate-900 dark:text-white uppercase">{a.id_legible}</span>
+                                                {a.estado_previo && a.estado_previo !== 'Finalizada' && (
+                                                  <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-wider border border-amber-200" title={`Archivada sin finalizar (estado previo: ${a.estado_previo})`}>
+                                                    Sin finalizar
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </td>
                                             <td className="px-6 py-4 text-slate-500">{a.cliente || 'Sin Cliente'}</td>
                                             <td className="px-6 py-4 text-right flex items-center justify-end gap-2 text-[10px] font-bold">
                                                 <button onClick={() => handleVerDetalle(a.id)} className="text-primary bg-primary/5 dark:bg-primary/20 hover:bg-primary/10 px-2 py-1 rounded-lg border border-primary/10 transition-all uppercase flex items-center gap-1">
