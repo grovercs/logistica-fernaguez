@@ -3,9 +3,10 @@ import { NavLink, Outlet, Navigate, useNavigate, useLocation } from 'react-route
 import {
   LayoutDashboard, Users, CalendarClock, Briefcase, UserPlus,
   Shield, Key, Database, ClipboardList, Settings, LogOut,
-  ListChecks, Menu, X
+  ListChecks, Menu, X, Moon, Sun
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../hooks/useTheme';
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ const Layout = () => {
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<{ nombre_completo: string; rol: string } | null>(null);
+  const { isDark, toggle: toggleTheme } = useTheme();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -101,6 +103,13 @@ const Layout = () => {
               <p className="text-sm font-bold text-slate-900 truncate min-w-0">
                 {userProfile?.nombre_completo || session?.user?.email || 'Usuario'}
               </p>
+              <button
+                onClick={toggleTheme}
+                className="p-1.5 rounded-md text-slate-400 hover:text-amber-500 hover:bg-amber-50 transition-colors shrink-0"
+                title={isDark ? 'Modo claro' : 'Modo oscuro'}
+              >
+                {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
               <button
                 onClick={handleLogout}
                 className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
