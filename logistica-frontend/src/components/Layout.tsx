@@ -85,7 +85,7 @@ const Layout = () => {
             <img
               src="/logo_fernaguez_blk.png"
               alt="Logística Fernaguez"
-              className="h-10 w-auto object-contain"
+              className="h-14 w-auto object-contain"
             />
             <button
               onClick={() => setIsSidebarOpen(false)}
@@ -302,7 +302,7 @@ const Layout = () => {
               <img
                 src="/vielha-computer-logo.png"
                 alt="Vielha Computer"
-                className="h-5 w-auto object-contain opacity-60 group-hover:opacity-100 transition-opacity"
+                className="h-10 w-auto object-contain opacity-60 group-hover:opacity-100 transition-opacity"
               />
               <span className="text-[10px] text-slate-400 group-hover:text-slate-600 transition-colors leading-tight">
                 Desarrollado por<br />Vielha Computer
@@ -325,7 +325,7 @@ const Layout = () => {
           <img
             src="/logo_fernaguez_blk.png"
             alt="Logística Fernaguez"
-            className="h-7 w-auto object-contain"
+            className="h-10 w-auto object-contain"
           />
           <div className="w-10"></div> {/* Spacer for symmetry */}
         </header>
