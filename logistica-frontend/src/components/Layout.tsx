@@ -81,8 +81,12 @@ const Layout = () => {
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="flex flex-col h-full">
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
-            <h1 className="text-2xl font-black text-blue-600 italic tracking-tighter">FERNAGUEZ</h1>
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <img
+              src="/logo_fernaguez_blk.png"
+              alt="Logística Fernaguez"
+              className="h-10 w-auto object-contain"
+            />
             <button
               onClick={() => setIsSidebarOpen(false)}
               className="lg:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-500"
@@ -286,6 +290,25 @@ const Layout = () => {
             </NavLink>
 
           </nav>
+
+          {/* Footer */}
+          <div className="p-3 border-t border-gray-100 bg-gray-50/50">
+            <a
+              href="https://vielhacomputer.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 group"
+            >
+              <img
+                src="/vielha-computer-logo.png"
+                alt="Vielha Computer"
+                className="h-6 w-auto object-contain opacity-60 group-hover:opacity-100 transition-opacity"
+              />
+              <span className="text-[10px] text-slate-400 group-hover:text-slate-600 transition-colors leading-tight">
+                Desarrollado por<br />Vielha Computer
+              </span>
+            </a>
+          </div>
         </div>
       </aside>
 
@@ -299,7 +322,11 @@ const Layout = () => {
           >
             <Menu className="w-6 h-6" />
           </button>
-          <h1 className="text-xl font-black text-blue-600 italic tracking-tighter">FERNAGUEZ</h1>
+          <img
+            src="/logo_fernaguez_blk.png"
+            alt="Logística Fernaguez"
+            className="h-8 w-auto object-contain"
+          />
           <div className="w-10"></div> {/* Spacer for symmetry */}
         </header>
 
