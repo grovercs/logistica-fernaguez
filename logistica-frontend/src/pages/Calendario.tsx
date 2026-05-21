@@ -15,6 +15,8 @@ export default function Calendario() {
   const [tecnicoFilter, setTecnicoFilter] = useState('');
   const [calendarView, setCalendarView] = useState<'month' | 'week' | '2weeks'>('month');
   const [tecnicos, setTecnicos] = useState<any[]>([]);
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
 
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -73,6 +75,68 @@ export default function Calendario() {
   const fetchTecnicos = async () => {
     const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos');
     if (data) setTecnicos(data);
+  };
+
+  const applyDatePreset = (preset: string) => {
+    const hoy = new Date();
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dd = String(hoy.getDate()).padStart(2, '0');
+    const toISO = (d: Date) => d.toISOString().split('T')[0];
+
+    switch (preset) {
+      case 'hoy':
+        setFechaDesde(`${yyyy}-${mm}-${dd}`);
+        setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      case 'ayer': {
+        const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
+        const a = toISO(ayer);
+        setFechaDesde(a); setFechaHasta(a);
+        break;
+      }
+      case 'semana': {
+        const inicio = new Date(hoy);
+        const dow = inicio.getDay();
+        const diff = dow === 0 ? -6 : 1 - dow;
+        inicio.setDate(hoy.getDate() + diff);
+        setFechaDesde(toISO(inicio));
+        setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      }
+      case 'semana_pasada': {
+        const fin = new Date(hoy);
+        const dow2 = fin.getDay();
+        const diff2 = dow2 === 0 ? 0 : 7 - dow2;
+        fin.setDate(hoy.getDate() - diff2 - 1);
+        const ini = new Date(fin); ini.setDate(fin.getDate() - 6);
+        setFechaDesde(toISO(ini)); setFechaHasta(toISO(fin));
+        break;
+      }
+      case 'mes': {
+        setFechaDesde(`${yyyy}-${mm}-01`);
+        setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      }
+      case 'mes_pasado': {
+        const mp = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+        const mpEnd = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+        setFechaDesde(toISO(mp)); setFechaHasta(toISO(mpEnd));
+        break;
+      }
+      case '7dias': {
+        const d7 = new Date(hoy); d7.setDate(hoy.getDate() - 6);
+        setFechaDesde(toISO(d7)); setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      }
+      case '30dias': {
+        const d30 = new Date(hoy); d30.setDate(hoy.getDate() - 29);
+        setFechaDesde(toISO(d30)); setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      }
+      default:
+        setFechaDesde(''); setFechaHasta('');
+    }
   };
 
   const getCalendarDays = () => {
@@ -174,7 +238,12 @@ export default function Calendario() {
 
       const orden = r.ordenes;
       if (estadoFilter && orden?.estado !== estadoFilter) return false;
-      if (tecnicoFilter && r.tecnico_id !== tecnicoFilter && !tecnicos.find(t => t.id === tecnicoFilter)?.auth_user_id !== r.tecnico_id) return false;
+      if (tecnicoFilter && r.tecnico_id !== tecnicoFilter && tecnicos.find(t => t.id === tecnicoFilter)?.auth_user_id !== r.tecnico_id) return false;
+      if (fechaDesde || fechaHasta) {
+        if (!r.fecha_trabajo) return false;
+        if (fechaDesde && r.fecha_trabajo < fechaDesde) return false;
+        if (fechaHasta && r.fecha_trabajo > fechaHasta) return false;
+      }
       if (searchTerm) {
         const lower = searchTerm.toLowerCase();
         if (
@@ -200,7 +269,14 @@ export default function Calendario() {
         d.getFullYear() !== dayDate.getFullYear()
       ) return false;
       if (estadoFilter && o.estado !== estadoFilter) return false;
-      if (tecnicoFilter && o.tecnico_id !== tecnicoFilter && !tecnicos.find(t => t.id === tecnicoFilter)?.auth_user_id !== o.tecnico_id) return false;
+      if (tecnicoFilter && o.tecnico_id !== tecnicoFilter && tecnicos.find(t => t.id === tecnicoFilter)?.auth_user_id !== o.tecnico_id) return false;
+      if (fechaDesde || fechaHasta) {
+        const ordenDate = o.fecha_programada || o.creado_en;
+        if (!ordenDate) return false;
+        const dStr = new Date(ordenDate).toISOString().split('T')[0];
+        if (fechaDesde && dStr < fechaDesde) return false;
+        if (fechaHasta && dStr > fechaHasta) return false;
+      }
       if (searchTerm) {
         const lower = searchTerm.toLowerCase();
         if (
@@ -319,8 +395,39 @@ export default function Calendario() {
               <span className="material-symbols-outlined text-xl">{document.fullscreenElement ? 'fullscreen_exit' : 'fullscreen'}</span>
             </button>
           </div>
-          <div className="flex items-center gap-2 w-full xs:w-auto">
-             <select
+          <div className="flex flex-col xs:flex-row items-center gap-2 w-full xs:w-auto">
+            {/* Rango de fechas */}
+            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-xl p-1.5 border border-slate-200 dark:border-slate-700 shadow-sm">
+              <div className="flex items-center gap-1 px-2">
+                <span className="material-symbols-outlined text-slate-400 text-[14px]">calendar_today</span>
+                <input
+                  type="date"
+                  className="bg-transparent text-[10px] font-bold text-slate-700 dark:text-slate-200 outline-none w-24"
+                  value={fechaDesde}
+                  onChange={e => setFechaDesde(e.target.value)}
+                />
+              </div>
+              <span className="text-slate-300 text-[8px]">→</span>
+              <div className="flex items-center gap-1 px-2">
+                <input
+                  type="date"
+                  className="bg-transparent text-[10px] font-bold text-slate-700 dark:text-slate-200 outline-none w-24"
+                  value={fechaHasta}
+                  onChange={e => setFechaHasta(e.target.value)}
+                />
+              </div>
+              {(fechaDesde || fechaHasta) && (
+                <button
+                  onClick={() => { setFechaDesde(''); setFechaHasta(''); }}
+                  className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  title="Limpiar fechas"
+                >
+                  <span className="material-symbols-outlined text-[14px]">close</span>
+                </button>
+              )}
+            </div>
+
+            <select
                className="w-full xs:w-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest focus:ring-2 focus:ring-primary/20 px-4 py-2.5 cursor-pointer shadow-sm appearance-none"
                value={estadoFilter}
                onChange={(e) => setEstadoFilter(e.target.value)}
@@ -347,7 +454,30 @@ export default function Calendario() {
           </div>
         </div>
       </header>
-      
+
+      {/* Presets rápidos de fechas */}
+      <div className="px-4 sm:px-6 py-2 flex flex-wrap gap-1.5 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-200 dark:border-slate-800">
+        {[
+          { key: 'hoy', label: 'Hoy' },
+          { key: 'ayer', label: 'Ayer' },
+          { key: '7dias', label: '7 días' },
+          { key: 'semana', label: 'Esta semana' },
+          { key: 'semana_pasada', label: 'Sem. pasada' },
+          { key: 'mes', label: 'Este mes' },
+          { key: 'mes_pasado', label: 'Mes pasado' },
+          { key: '30dias', label: '30 días' },
+        ].map((preset) => (
+          <button
+            key={preset.key}
+            type="button"
+            onClick={() => applyDatePreset(preset.key)}
+            className="px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-colors bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-primary hover:text-white hover:border-primary"
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+
       {/* Calendar Container */}
       <div className="flex-1 overflow-y-auto p-4 w-full">
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-fit min-h-full">
