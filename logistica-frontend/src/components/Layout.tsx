@@ -3,7 +3,7 @@ import { NavLink, Outlet, Navigate, useNavigate, useLocation } from 'react-route
 import {
   LayoutDashboard, Users, CalendarClock, Briefcase, UserPlus,
   Shield, Key, Database, ClipboardList, Settings, LogOut,
-  ListChecks, Menu, X, UserCircle
+  ListChecks, Menu, X
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
