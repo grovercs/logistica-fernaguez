@@ -114,15 +114,15 @@ const MobileOrdenes = () => {
     };
 
     return (
-        <div className="pb-24 font-sans bg-[#f0f2f5] min-h-[100dvh]">
+        <div className="pb-24 font-sans bg-[#f0f2f5] dark:bg-slate-950 min-h-[100dvh]">
             {/* User Header */}
-            <div className="bg-white shadow-sm px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+            <div className="bg-white dark:bg-slate-900 shadow-sm px-4 py-3 flex items-center justify-between sticky top-0 z-10">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white font-black text-sm uppercase shrink-0 shadow-sm">
                         {currentUserName ? currentUserName.charAt(0) : '?'}
                     </div>
                     <div>
-                        <p className="text-sm font-bold text-slate-800 leading-tight">
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-tight">
                             {currentUserName}
                         </p>
                         {currentUserEspecialidad ? (
@@ -131,13 +131,13 @@ const MobileOrdenes = () => {
                                 {currentUserEspecialidad}
                             </p>
                         ) : (
-                            <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">{currentUserRole}</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">{currentUserRole}</p>
                         )}
                     </div>
                 </div>
                 <button
                     onClick={handleLogout}
-                    className="flex items-center gap-1 text-slate-500 hover:text-red-500 transition-colors text-xs font-bold px-2 py-1 rounded-lg hover:bg-red-50"
+                    className="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors text-xs font-bold px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 dark:bg-red-900/20"
                 >
                     <span className="material-symbols-outlined text-[18px]">logout</span>
                     Salir
@@ -145,12 +145,12 @@ const MobileOrdenes = () => {
             </div>
 
             <div className="p-4 space-y-4">
-                <h2 className="text-xl font-bold text-slate-800 mt-2">Órdenes de Trabajo</h2>
+                <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-2">Órdenes de Trabajo</h2>
                 
                 {loading ? (
-                    <div className="text-center text-slate-500 py-8">Cargando órdenes...</div>
+                    <div className="text-center text-slate-500 dark:text-slate-400 py-8">Cargando órdenes...</div>
                 ) : ordenes.length === 0 ? (
-                    <div className="bg-white p-6 rounded-xl text-center text-slate-500 shadow-sm border border-slate-200">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl text-center text-slate-500 dark:text-slate-400 shadow-sm border border-slate-200 dark:border-slate-700">
                         No tienes órdenes asignadas.
                     </div>
                 ) : (
@@ -160,7 +160,7 @@ const MobileOrdenes = () => {
                             <Link 
                                 to={`/m/ordenes/${orden.id}`} 
                                 key={orden.id} 
-                                className={`block bg-white rounded-xl shadow-sm border p-4 active:scale-[0.98] transition-all relative overflow-hidden ${isLastActive ? 'border-primary border-l-[6px] ring-2 ring-primary/5 shadow-md' : 'border-slate-200'}`}
+                                className={`block bg-white dark:bg-slate-900 rounded-xl shadow-sm border p-4 active:scale-[0.98] transition-all relative overflow-hidden ${isLastActive ? 'border-primary border-l-[6px] ring-2 ring-primary/5 shadow-md' : 'border-slate-200 dark:border-slate-700'}`}
                             >
                                 {isLastActive && (
                                     <div className="absolute top-0 right-0 bg-primary text-white text-[8px] font-black px-2 py-0.5 rounded-bl uppercase tracking-tighter">
@@ -170,39 +170,39 @@ const MobileOrdenes = () => {
                                 <div className="flex justify-between items-start mb-2">
                                     <span className="font-bold text-primary">{orden.id_legible}</span>
                                     <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${
-                                        orden.estado === 'Urgente' ? 'bg-red-100 text-red-700' :
-                                        orden.estado === 'En revisión' ? 'bg-purple-100 text-purple-700' :
-                                        orden.estado === 'Pendiente de firma' ? 'bg-orange-100 text-orange-700' :
-                                        orden.estado === 'En Curso' ? 'bg-primary/10 text-primary' : 
-                                        orden.estado === 'Pendiente' ? 'bg-amber-100 text-amber-700' : 
-                                        'bg-green-100 text-green-700'
+                                        orden.estado === 'Urgente' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' :
+                                        orden.estado === 'En revisión' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' :
+                                        orden.estado === 'Pendiente de firma' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400' :
+                                        orden.estado === 'En Curso' ? 'bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary-light' :
+                                        orden.estado === 'Pendiente' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' :
+                                        'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                                     }`}>
                                         {orden.estado}
                                     </span>
                                 </div>
-                                 <h3 className="font-bold text-slate-800 text-lg leading-tight">{orden.cliente}</h3>
+                                 <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg leading-tight">{orden.cliente}</h3>
                                 
                                 {/* Technician Assigned */}
                                 {(() => {
                                     const tecnicoInfo = trabajadoresMap.get(orden.tecnico_id);
                                     if (tecnicoInfo) {
                                         return (
-                                            <div className="mt-2 flex items-center gap-2 bg-primary/5 p-2 rounded-lg border border-primary/10">
+                                            <div className="mt-2 flex items-center gap-2 bg-primary/5 dark:bg-primary/10 p-2 rounded-lg border border-primary/10">
                                                 <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-[10px] font-black shrink-0">
                                                     {tecnicoInfo.nombre.charAt(0)}
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-[11px] font-black text-primary uppercase leading-none">{tecnicoInfo.nombre}</span>
-                                                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter mt-0.5">{tecnicoInfo.especialidad}</span>
+                                                    <span className="text-[9px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-tighter mt-0.5">{tecnicoInfo.especialidad}</span>
                                                 </div>
                                             </div>
                                         );
                                     } else if (orden.tecnico) {
                                         // Fallback to name string if ID mapping fails
                                         return (
-                                            <div className="mt-2 flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                                <span className="material-symbols-outlined text-[16px] text-slate-400">person</span>
-                                                <span className="text-[11px] font-bold text-slate-600 uppercase leading-none">{orden.tecnico}</span>
+                                            <div className="mt-2 flex items-center gap-2 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
+                                                <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500">person</span>
+                                                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase leading-none">{orden.tecnico}</span>
                                             </div>
                                         );
                                     }
@@ -210,14 +210,14 @@ const MobileOrdenes = () => {
                                 })()}
 
                                 {orden.direccion && (
-                                    <p className="text-[12px] font-medium text-slate-600 mt-3 flex items-start gap-1.5 leading-tight">
+                                    <p className="text-[12px] font-medium text-slate-600 dark:text-slate-300 mt-3 flex items-start gap-1.5 leading-tight">
                                         <span className="material-symbols-outlined text-[16px] text-primary shrink-0">location_on</span>
                                         {orden.direccion}
                                     </p>
                                 )}
 
-                                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
-                                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                    <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
                                         <span className="material-symbols-outlined text-[16px]">event</span> 
                                         {(() => {
                                             if (!orden.fecha_programada) return 'S/F';
@@ -225,7 +225,7 @@ const MobileOrdenes = () => {
                                             return isNaN(d.getTime()) ? 'S/F' : d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
                                         })()}
                                     </p>
-                                    <p className="text-[11px] font-black text-primary bg-primary/10 px-2 py-1 rounded-md flex items-center gap-1.5">
+                                    <p className="text-[11px] font-black text-primary bg-primary/10 dark:bg-primary/20 px-2 py-1 rounded-md flex items-center gap-1.5">
                                         <span className="material-symbols-outlined text-[16px]">schedule</span> 
                                         {orden.hora_programada || '--:--'}
                                     </p>

@@ -42,7 +42,7 @@ const MobileLayout = () => {
         <div className="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen flex flex-col">
             {/* Solo mostramos la barra superior móvil si no estamos en el login */}
             {!isLoginPage && (
-                <header className="bg-primary text-white shadow-md sticky top-0 z-20">
+                <header className="bg-primary dark:bg-primary-dark text-white shadow-md sticky top-0 z-20">
                     <div className="px-4 py-2.5 flex items-center justify-between">
                         <img
                             src="/logo_fernaguez_blk.png"
