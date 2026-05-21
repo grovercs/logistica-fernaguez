@@ -298,18 +298,18 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
                 required
               />
             </div>
-            <div className="lg:col-span-4 flex items-end gap-2">
+            <div className="lg:col-span-4 flex flex-col gap-2">
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 shadow-sm"
+                className="w-full px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 shadow-sm"
               >
-                {saving ? 'Guardando...' : 'Guardar y Notificar'}
+                {saving ? 'Guardando...' : 'Notificar'}
               </button>
               <button
                 type="button"
                 onClick={() => setShowAddForm(false)}
-                className="px-4 py-2.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                className="w-full px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
               >
                 Cancelar
               </button>
