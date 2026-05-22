@@ -39,6 +39,12 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '';
 
+    console.log('Netlify env check:', {
+      hasSupabaseUrl: !!supabaseUrl,
+      hasServiceKey: !!supabaseServiceKey,
+      keyLength: supabaseServiceKey ? supabaseServiceKey.length : 0,
+    });
+
     let botToken: string | null = null;
 
     if (supabaseUrl && supabaseServiceKey) {
@@ -58,6 +64,7 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
         if (configRes.ok) {
           const configData = await configRes.json();
           botToken = configData?.[0]?.valor || null;
+          console.log('Bot token fetched from Supabase:', !!botToken);
         } else {
           console.warn('Supabase config fetch failed:', await configRes.text());
         }
