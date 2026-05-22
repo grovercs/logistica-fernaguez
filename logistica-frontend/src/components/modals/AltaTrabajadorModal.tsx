@@ -44,7 +44,8 @@ export default function AltaTrabajadorModal({ isOpen, onClose, onCreated }: Alta
           telegram_chat_id: formData.telegram_chat_id || null,
           email: formData.email,
           fecha_incorporacion: formData.fecha_incorporacion || null,
-          estado: 'Disponible'
+          estado: 'Disponible',
+          tarifa_hora: parseFloat(formData.tarifa_hora) || 0
       });
 
       setLoading(false);

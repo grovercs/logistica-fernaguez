@@ -27,6 +27,17 @@ export default function EditarTrabajadorModal({ isOpen, onClose, onUpdated, trab
 
   useEffect(() => {
      if (isOpen && trabajadorData) {
+         // Cargar tarifa desde perfiles si el trabajador tiene auth_user_id vinculado
+         let tarifa = trabajadorData.tarifa_hora;
+         if (trabajadorData.auth_user_id && (tarifa == null || tarifa === '')) {
+             supabase.from('perfiles').select('tarifa_hora').eq('id', trabajadorData.auth_user_id).maybeSingle()
+                 .then(({ data }) => {
+                     if (data?.tarifa_hora != null) {
+                         setFormData(prev => ({ ...prev, tarifa_hora: data.tarifa_hora.toString() }));
+                     }
+                 });
+         }
+
          setFormData({
              nombreCompleto: `${trabajadorData.nombre || ''} ${trabajadorData.apellidos || ''}`.trim(),
              dni: trabajadorData.dni || '',
@@ -37,7 +48,7 @@ export default function EditarTrabajadorModal({ isOpen, onClose, onUpdated, trab
              email: trabajadorData.email || '',
              fecha_incorporacion: trabajadorData.fecha_incorporacion || '',
              estado: trabajadorData.estado || 'Disponible',
-             tarifa_hora: trabajadorData.tarifa_hora?.toString() || ''
+             tarifa_hora: tarifa?.toString() || ''
          });
          setShowNewSpecInput(false);
      }
@@ -55,6 +66,7 @@ export default function EditarTrabajadorModal({ isOpen, onClose, onUpdated, trab
 
       const specToSave = showNewSpecInput && formData.nuevaEspecialidad ? formData.nuevaEspecialidad : formData.especialidad;
 
+      // Guardar tarifa en trabajadores SIEMPRE (para que persista aunque no haya auth_user_id)
       const { error } = await supabase
           .from('trabajadores')
           .update({
@@ -66,7 +78,8 @@ export default function EditarTrabajadorModal({ isOpen, onClose, onUpdated, trab
               telegram_chat_id: formData.telegram_chat_id || null,
               email: formData.email,
               fecha_incorporacion: formData.fecha_incorporacion || null,
-              estado: formData.estado
+              estado: formData.estado,
+              tarifa_hora: parseFloat(formData.tarifa_hora) || 0
           })
           .eq('id', trabajadorData.id);
 
