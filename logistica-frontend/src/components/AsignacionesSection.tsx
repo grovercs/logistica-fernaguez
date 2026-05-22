@@ -136,17 +136,22 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       }
 
       // 1. Insertamos la nueva asignación (FK apunta a trabajadores.id)
+      const insertPayload = {
+        orden_id: ordenId,
+        trabajador_id: selectedWorker.id,
+        fecha_asignacion: formFecha,
+        hora_programada: formHora,
+        notas: formNotas,
+        estado: 'pendiente'
+      };
+      console.log('[Asignacion] insertPayload:', insertPayload);
+      console.log('[Asignacion] typeof trabajador_id:', typeof insertPayload.trabajador_id, '| value:', JSON.stringify(insertPayload.trabajador_id));
+
       const { error: assignError } = await supabase
         .from('orden_asignaciones')
-        .insert({
-          orden_id: ordenId,
-          trabajador_id: selectedWorker.id,
-          fecha_asignacion: formFecha,
-          hora_programada: formHora,
-          notas: formNotas,
-          estado: 'pendiente'
-        });
+        .insert(insertPayload);
 
+      console.log('[Asignacion] assignError:', assignError);
       if (assignError) throw assignError;
 
       // 2. Sincronizamos la tabla principal de ordenes (tecnico_id suele ser auth_user_id)
