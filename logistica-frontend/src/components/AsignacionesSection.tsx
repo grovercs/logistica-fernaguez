@@ -102,14 +102,21 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
     }
 
     setSaving(true);
-    
+
     try {
-      // 1. Insertamos la nueva asignación
+      const selectedWorker = trabajadores.find(t => t.id === formTrabajador);
+      if (!selectedWorker) {
+        alert('Trabajador no encontrado. Recarga la página e inténtalo de nuevo.');
+        setSaving(false);
+        return;
+      }
+
+      // 1. Insertamos la nueva asignación (FK apunta a trabajadores.id)
       const { error: assignError } = await supabase
         .from('orden_asignaciones')
         .insert({
           orden_id: ordenId,
-          trabajador_id: formTrabajador,
+          trabajador_id: selectedWorker.id,
           fecha_asignacion: formFecha,
           hora_programada: formHora,
           notas: formNotas,
@@ -118,30 +125,44 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
 
       if (assignError) throw assignError;
 
-      // 3. Sincronizamos la tabla principal de ordenes
+      // 2. Sincronizamos la tabla principal de ordenes (tecnico_id suele ser auth_user_id)
       const { error: updateError } = await supabase
         .from('ordenes')
-        .update({ tecnico_id: formTrabajador })
+        .update({ tecnico_id: selectedWorker.auth_user_id || selectedWorker.id })
         .eq('id', ordenId);
 
       if (updateError) throw updateError;
-      
+
       console.log("✅ Asignación completada con éxito");
 
-      // NOTIFICACIÓN WHATSAPP
-      const selectedWorker = trabajadores.find(t => t.auth_user_id === formTrabajador || t.id === formTrabajador);
-      if (selectedWorker && selectedWorker.telefono && orden) {
-        try {
-           console.log("Enviando notificación WhatsApp al teléfono:", selectedWorker.telefono);
-           await notifyNewOrder(selectedWorker, {
-             id: ordenId, // Usamos el UUID de la orden para el deep link
-             id_legible: orden.id_legible,
-             cliente: orden.cliente,
-             direccion: orden.direccion,
-             descripcion: `${orden.descripcion}\n\n*Notas de asignación:* ${formNotas}`
-           });
-        } catch (wsErr) {
-           console.error("Error al enviar WhatsApp:", wsErr);
+      // 3. Notificación al trabajador
+      if (orden) {
+        const hasTelegram = !!selectedWorker.telegram_chat_id;
+        const hasPhone = !!selectedWorker.telefono;
+
+        if (!hasTelegram && !hasPhone) {
+          const continuar = window.confirm(
+            `⚠️ ${selectedWorker.nombre} ${selectedWorker.apellidos} no tiene medio de contacto configurado (ni Chat ID de Telegram ni teléfono).\n\n` +
+            `¿Quieres guardar la asignación igualmente sin notificar?\n\n` +
+            `Pulsa Aceptar para asignar sin notificar, o Cancelar para detenerte y añadir los datos de contacto desde la página de Trabajadores.`
+          );
+          if (!continuar) {
+            setSaving(false);
+            return;
+          }
+        } else {
+          try {
+            console.log("Enviando notificación al trabajador...");
+            await notifyNewOrder(selectedWorker, {
+              id: ordenId,
+              id_legible: orden.id_legible,
+              cliente: orden.cliente,
+              direccion: orden.direccion,
+              descripcion: `${orden.descripcion}\n\n*Notas de asignación:* ${formNotas}`
+            });
+          } catch (wsErr) {
+            console.error("Error al enviar notificación:", wsErr);
+          }
         }
       }
 
@@ -256,7 +277,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
             >
               <option value="">Seleccionar trabajador...</option>
               {trabajadores.map(t => (
-                <option key={t.id} value={t.auth_user_id || t.id}>
+                <option key={t.id} value={t.id}>
                   {t.nombre} {t.apellidos} {t.telefono ? `(${t.telefono})` : ''}
                 </option>
               ))}

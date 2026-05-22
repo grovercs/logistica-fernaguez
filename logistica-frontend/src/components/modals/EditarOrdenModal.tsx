@@ -37,22 +37,25 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
     if (isOpen && ordenData) {
        fetchTecnicos();
        fetchAseguradoras();
-       
+
        // Usar fecha_programada si existe, si no fallback a creado_en
        const dateSource = ordenData.fecha_programada || ordenData.creado_en;
        let fechaObj = new Date(dateSource);
        let fecha = isNaN(fechaObj.getTime()) ? '' : (ordenData.fecha_programada || fechaObj.toISOString().split('T')[0]);
        let hora = ordenData.hora_programada || (isNaN(fechaObj.getTime()) ? '' : fechaObj.toTimeString().split(' ')[0].substring(0, 5));
 
+       // Mapear tecnico_id (puede ser auth_user_id o trabajadores.id) al ID interno del select
+       const matchedTecnico = tecnicos.find(t => t.id === ordenData.tecnico_id || t.auth_user_id === ordenData.tecnico_id);
+
        setFormData({
          referencia: ordenData.poliza || '',
          cliente: ordenData.cliente || '',
          aseguradora: ordenData.aseguradora || '',
-         tecnico: ordenData.tecnico_id || '',
+         tecnico: matchedTecnico?.id || ordenData.tecnico_id || '',
          fecha: fecha,
          hora: hora,
          observaciones: ordenData.descripcion || '',
-         esUrgente: false, 
+         esUrgente: false,
          asegurado: ordenData.asegurado || '',
          telefono_asegurado: ordenData.telefono_asegurado || '',
          email: ordenData.email || '',
@@ -63,7 +66,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
          estado: ordenData.estado || 'Pendiente'
        });
     }
-  }, [isOpen, ordenData]);
+  }, [isOpen, ordenData, tecnicos]);
 
   const fetchTecnicos = async () => {
     // Traer todos los técnicos que no estén de baja para poder asignarles órdenes incluso si están "En Obra"
@@ -85,6 +88,9 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
     e.preventDefault();
     setLoading(true);
 
+    const selectedTecnico = formData.tecnico ? tecnicos.find(t => t.id === formData.tecnico) : null;
+    const originalTecnico = tecnicos.find(t => t.id === ordenData.tecnico_id || t.auth_user_id === ordenData.tecnico_id);
+
     const { error } = await supabase
       .from('ordenes')
       .update({
@@ -100,7 +106,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
          otras_ordenes: formData.otras_ordenes,
          descripcion: formData.observaciones,
          estado: formData.estado,
-         tecnico_id: formData.tecnico || null,
+         tecnico_id: selectedTecnico ? (selectedTecnico.auth_user_id || selectedTecnico.id) : null,
          fecha_programada: formData.fecha,
          hora_programada: formData.hora
       })
@@ -108,18 +114,18 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
 
     if (!error) {
        // Si el técnico ha cambiado o es nuevo, creamos la asignación oficial
-       if (formData.tecnico && formData.tecnico !== ordenData.tecnico_id) {
+       if (selectedTecnico && selectedTecnico.id !== originalTecnico?.id) {
          const { data: existing } = await supabase
            .from('orden_asignaciones')
            .select('id')
            .eq('orden_id', ordenData.id)
-           .eq('trabajador_id', formData.tecnico)
+           .eq('trabajador_id', selectedTecnico.id)
            .maybeSingle();
 
          if (!existing) {
            await supabase.from('orden_asignaciones').insert({
              orden_id: ordenData.id,
-             trabajador_id: formData.tecnico,
+             trabajador_id: selectedTecnico.id,
              fecha_asignacion: formData.fecha,
              hora_programada: formData.hora,
              estado: 'pendiente'
@@ -143,11 +149,10 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
        }
 
        if (onUpdated) onUpdated();
-        
+
         // Notificación Telegram al técnico si se asignó uno nuevo o cambió
-        if (formData.tecnico && formData.tecnico !== ordenData.tecnico_id) {
-          const selectedTecnico = tecnicos.find(t => t.id === formData.tecnico);
-          if (selectedTecnico && selectedTecnico.telegram_chat_id) {
+        if (selectedTecnico && selectedTecnico.id !== originalTecnico?.id) {
+          if (selectedTecnico.telegram_chat_id) {
              console.log("Telegram: Detectado cambio de técnico, enviando notificación...");
               await notifyNewOrder(selectedTecnico, {
                id: ordenData.id,

@@ -149,8 +149,10 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
 
     const year = new Date().getFullYear();
     const id_legible = `OB-${year}-${Math.floor(1000 + Math.random() * 9000)}`;
-    
+
     const now = new Date().toISOString();
+
+    const selectedTecnico = formData.tecnico ? tecnicos.find(t => t.id === formData.tecnico) : null;
 
     const { data: newOrder, error } = await supabase
       .from('ordenes')
@@ -166,8 +168,8 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
          telefono_contacto: formData.telefono_contacto,
          direccion: formData.direccion,
          descripcion: formData.observaciones,
-         estado: formData.esUrgente ? 'Urgente' : (formData.estado || 'Pendiente'), 
-         tecnico_id: formData.tecnico || null,
+         estado: formData.esUrgente ? 'Urgente' : (formData.estado || 'Pendiente'),
+         tecnico_id: selectedTecnico ? (selectedTecnico.auth_user_id || selectedTecnico.id) : null,
          fecha_programada: formData.fecha,
          hora_programada: formData.hora,
          creado_en: now
@@ -177,10 +179,10 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
 
     if (!error && newOrder) {
        // Crear asignación oficial en la tabla de asignaciones
-       if (formData.tecnico) {
+       if (selectedTecnico) {
          await supabase.from('orden_asignaciones').insert({
            orden_id: newOrder.id,
-           trabajador_id: formData.tecnico,
+           trabajador_id: selectedTecnico.id,
            fecha_asignacion: formData.fecha,
            hora_programada: formData.hora,
            estado: 'pendiente'
@@ -188,17 +190,14 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
        }
 
        // Notificación Telegram al técnico con el ID interno para el link
-       if (formData.tecnico) {
-         const selectedTecnico = tecnicos.find(t => t.id === formData.tecnico);
-         if (selectedTecnico && selectedTecnico.telegram_chat_id) {
-             await notifyNewOrder(selectedTecnico, {
-              id: newOrder.id,
-              id_legible: newOrder.id_legible,
-              cliente: formData.cliente,
-              direccion: formData.direccion,
-              descripcion: formData.observaciones
-            }).catch(err => console.error("Error enviando Telegram automático:", err));
-         }
+       if (selectedTecnico && selectedTecnico.telegram_chat_id) {
+         await notifyNewOrder(selectedTecnico, {
+          id: newOrder.id,
+          id_legible: newOrder.id_legible,
+          cliente: formData.cliente,
+          direccion: formData.direccion,
+          descripcion: formData.observaciones
+        }).catch(err => console.error("Error enviando Telegram automático:", err));
        }
 
        // Auto-registro o actualización del Cliente/Empresa
@@ -491,7 +490,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                     >
                       <option value="">No asignar todavía</option>
                       {tecnicos.map((t: any) => (
-                        <option key={t.id} value={t.auth_user_id || t.id}>{t.nombre} {t.apellidos}</option>
+                        <option key={t.id} value={t.id}>{t.nombre} {t.apellidos}</option>
                       ))}
                     </select>
                   </div>
