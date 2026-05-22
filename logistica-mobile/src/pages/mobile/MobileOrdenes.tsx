@@ -11,6 +11,9 @@ const MobileOrdenes = () => {
     const [currentUserEspecialidad, setCurrentUserEspecialidad] = useState<string>('');
     const [lastActiveId, setLastActiveId] = useState<string | null>(null);
     const [trabajadoresMap, setTrabajadoresMap] = useState<Map<string, { nombre: string; especialidad: string }>>(new Map());
+    const [workersList, setWorkersList] = useState<any[]>([]);
+    const [showWorkerMenu, setShowWorkerMenu] = useState(false);
+    const [filterWorkerId, setFilterWorkerId] = useState<string>('');
 
     useEffect(() => {
         const init = async () => {
@@ -51,11 +54,12 @@ const MobileOrdenes = () => {
             // Fetch workers to map them
             const { data: workers } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, especialidad');
             if (workers) {
+                setWorkersList(workers);
                 const map = new Map();
                 workers.forEach(w => {
-                    const info = { 
-                        nombre: `${w.nombre} ${w.apellidos || ''}`.trim(), 
-                        especialidad: w.especialidad || '' 
+                    const info = {
+                        nombre: `${w.nombre} ${w.apellidos || ''}`.trim(),
+                        especialidad: w.especialidad || ''
                     };
                     if (w.id) map.set(w.id, info);
                     if (w.auth_user_id) map.set(w.auth_user_id, info);
@@ -113,6 +117,31 @@ const MobileOrdenes = () => {
         }
     };
 
+    const statusPriority: Record<string, number> = {
+        'Urgente': 1,
+        'En Curso': 2,
+        'Pendiente de firma': 3,
+        'En revisión': 4,
+        'Pendiente': 5,
+        'Finalizada': 6,
+        'Cancelada': 7,
+        'Archivado': 8,
+    };
+
+    const displayOrdenes = ordenes
+        .filter(o => {
+            if (!filterWorkerId) return true;
+            return o.tecnico_id === filterWorkerId || workersList.find(w => w.id === filterWorkerId)?.auth_user_id === o.tecnico_id;
+        })
+        .sort((a, b) => {
+            const prioA = statusPriority[a.estado] || 99;
+            const prioB = statusPriority[b.estado] || 99;
+            if (prioA !== prioB) return prioA - prioB;
+            const timeA = a.creado_en ? new Date(a.creado_en).getTime() : 0;
+            const timeB = b.creado_en ? new Date(b.creado_en).getTime() : 0;
+            return timeB - timeA;
+        });
+
     return (
         <div className="pb-24 font-sans bg-[#f0f2f5] dark:bg-slate-950 min-h-[100dvh]">
             {/* User Header */}
@@ -135,26 +164,74 @@ const MobileOrdenes = () => {
                         )}
                     </div>
                 </div>
-                <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors text-xs font-bold px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 dark:bg-red-900/20"
-                >
-                    <span className="material-symbols-outlined text-[18px]">logout</span>
-                    Salir
-                </button>
+                <div className="flex items-center gap-2">
+                    {/* Menú filtro por trabajador */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowWorkerMenu(!showWorkerMenu)}
+                            className="p-2 text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                            title="Filtrar por técnico"
+                        >
+                            <span className="material-symbols-outlined text-[22px]">{filterWorkerId ? 'filter_alt' : 'filter_list'}</span>
+                        </button>
+                        {showWorkerMenu && (
+                            <>
+                                <div className="fixed inset-0 z-20" onClick={() => setShowWorkerMenu(false)} />
+                                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-30 overflow-hidden">
+                                    <div className="p-3 max-h-80 overflow-y-auto space-y-1">
+                                        <button
+                                            onClick={() => { setFilterWorkerId(''); setShowWorkerMenu(false); }}
+                                            className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${filterWorkerId === '' ? 'bg-primary/10 text-primary' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                        >
+                                            <span className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px] font-black">T</span>
+                                            Todos los técnicos
+                                        </button>
+                                        {workersList.map((w: any) => (
+                                            <button
+                                                key={w.id}
+                                                onClick={() => { setFilterWorkerId(w.id); setShowWorkerMenu(false); }}
+                                                className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${filterWorkerId === w.id ? 'bg-primary/10 text-primary' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                            >
+                                                <span className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-black uppercase">{w.nombre?.charAt(0)}</span>
+                                                {w.nombre} {w.apellidos}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors text-xs font-bold px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 dark:bg-red-900/20"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">logout</span>
+                    </button>
+                </div>
             </div>
 
             <div className="p-4 space-y-4">
-                <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-2">Órdenes de Trabajo</h2>
-                
+                <div className="flex items-center justify-between mt-2">
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Órdenes de Trabajo</h2>
+                    {filterWorkerId && (
+                        <button
+                            onClick={() => setFilterWorkerId('')}
+                            className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-md flex items-center gap-1"
+                        >
+                            {trabajadoresMap.get(filterWorkerId)?.nombre || 'Filtro'}
+                            <span className="material-symbols-outlined text-[14px]">close</span>
+                        </button>
+                    )}
+                </div>
+
                 {loading ? (
                     <div className="text-center text-slate-500 dark:text-slate-400 py-8">Cargando órdenes...</div>
-                ) : ordenes.length === 0 ? (
+                ) : displayOrdenes.length === 0 ? (
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-xl text-center text-slate-500 dark:text-slate-400 shadow-sm border border-slate-200 dark:border-slate-700">
-                        No tienes órdenes asignadas.
+                        {filterWorkerId ? 'Este técnico no tiene órdenes.' : 'No tienes órdenes asignadas.'}
                     </div>
                 ) : (
-                    ordenes.map(orden => {
+                    displayOrdenes.map(orden => {
                         const isLastActive = orden.id === lastActiveId;
                         return (
                             <Link 

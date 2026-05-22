@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { ClipboardList, Plus, Search, Filter, X } from 'lucide-react';
+import { ClipboardList, Plus, Search, Filter, X, ChevronDown, User } from 'lucide-react';
 import NuevoReporteModal from '../components/modals/NuevoReporteModal';
 import RenotificarModal from '../components/modals/RenotificarModal';
 
@@ -20,6 +20,7 @@ export default function Ordenes() {
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [showWorkerMenu, setShowWorkerMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'activas' | 'archivadas'>('activas');
 
   useEffect(() => {
@@ -76,15 +77,25 @@ export default function Ordenes() {
     setTecnicos(data || []);
   };
 
+  const statusPriority: Record<string, number> = {
+    'Urgente': 1,
+    'En Curso': 2,
+    'Pendiente de firma': 3,
+    'En revisión': 4,
+    'Pendiente': 5,
+    'Finalizada': 6,
+    'Cancelada': 7,
+    'Archivado': 8,
+  };
+
   const filteredOrdenes = ordenes.filter(o => {
     const searchLower = searchTerm.toLowerCase();
-    
-    // Búsqueda más robusta (ID, Cliente, Dirección, etc.)
-    const matchesSearch = searchTerm === '' || 
-      (o.id_legible && o.id_legible.toLowerCase().includes(searchLower)) || 
+
+    const matchesSearch = searchTerm === '' ||
+      (o.id_legible && o.id_legible.toLowerCase().includes(searchLower)) ||
       (o.cliente && o.cliente.toLowerCase().includes(searchLower)) ||
       (o.direccion && o.direccion.toLowerCase().includes(searchLower));
-      
+
     const matchesEstado = filterEstado === '' || o.estado === filterEstado;
     const matchesTecnico = filterTecnico === '' || o.tecnico_id === filterTecnico || tecnicos.find(t => t.id === filterTecnico)?.auth_user_id === o.tecnico_id;
     let matchesFecha = true;
@@ -100,6 +111,13 @@ export default function Ordenes() {
     }
 
     return matchesSearch && matchesEstado && matchesTecnico && matchesFecha;
+  }).sort((a, b) => {
+    const prioA = statusPriority[a.estado] || 99;
+    const prioB = statusPriority[b.estado] || 99;
+    if (prioA !== prioB) return prioA - prioB;
+    const timeA = a.creado_en ? new Date(a.creado_en).getTime() : 0;
+    const timeB = b.creado_en ? new Date(b.creado_en).getTime() : 0;
+    return timeB - timeA;
   });
 
   const clearFilters = () => {
@@ -191,13 +209,55 @@ export default function Ordenes() {
                     <p className="text-xs sm:text-sm font-semibold text-slate-500 uppercase tracking-widest">{filteredOrdenes.length} Intervenciones Registradas</p>
                 </div>
             </div>
-            <button 
+            <div className="flex items-center gap-2">
+              {/* Dropdown filtro por trabajador */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowWorkerMenu(!showWorkerMenu)}
+                  className="w-full sm:w-auto bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-4 py-3.5 rounded-2xl font-bold text-xs shadow-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <User className="size-4" />
+                  <span className="hidden sm:inline">{filterTecnico ? tecnicos.find(t => t.id === filterTecnico)?.nombre || 'Técnico' : 'Filtrar por Técnico'}</span>
+                  <span className="sm:hidden">Técnico</span>
+                  <ChevronDown className={`size-3 transition-transform ${showWorkerMenu ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showWorkerMenu && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setShowWorkerMenu(false)} />
+                    <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-40 overflow-hidden">
+                      <div className="p-2 max-h-72 overflow-y-auto">
+                        <button
+                          onClick={() => { setFilterTecnico(''); setShowWorkerMenu(false); }}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 ${filterTecnico === '' ? 'bg-primary/10 text-primary' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        >
+                          <span className="size-6 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px] font-black">T</span>
+                          Todos los técnicos
+                        </button>
+                        {tecnicos.map((t: any) => (
+                          <button
+                            key={t.id}
+                            onClick={() => { setFilterTecnico(t.id); setShowWorkerMenu(false); }}
+                            className={`w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 ${filterTecnico === t.id ? 'bg-primary/10 text-primary' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                          >
+                            <span className="size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-black uppercase">{t.nombre?.charAt(0)}</span>
+                            {t.nombre} {t.apellidos}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <button
                 onClick={() => setIsModalOpen(true)}
                 className="w-full sm:w-auto bg-primary text-white px-6 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
-            >
+              >
                 <Plus className="size-5" />
                 Nueva Orden
-            </button>
+              </button>
+            </div>
         </div>
       </div>
 
