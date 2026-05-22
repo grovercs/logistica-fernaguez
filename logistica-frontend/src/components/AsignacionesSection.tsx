@@ -105,8 +105,18 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
 
     try {
       const selectedWorker = trabajadores.find(t => t.id === formTrabajador);
+      console.log('[Asignacion] formTrabajador:', formTrabajador);
+      console.log('[Asignacion] selectedWorker:', selectedWorker);
+      console.log('[Asignacion] selectedWorker.id:', selectedWorker?.id);
+
       if (!selectedWorker) {
         alert('Trabajador no encontrado. Recarga la página e inténtalo de nuevo.');
+        setSaving(false);
+        return;
+      }
+
+      if (!selectedWorker.id) {
+        alert('El trabajador seleccionado no tiene un ID válido. Revisa la ficha del trabajador.');
         setSaving(false);
         return;
       }
