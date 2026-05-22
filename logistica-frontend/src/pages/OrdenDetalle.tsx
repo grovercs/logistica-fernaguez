@@ -148,6 +148,7 @@ export default function OrdenDetalle() {
             </button>
             <button
               onClick={handlePrint}
+              title="Consejo: al imprimir, desactiva 'Encabezados y pies de página' en el diálogo para un resultado limpio sin URL"
               className="flex items-center gap-2 bg-primary text-white hover:bg-primary/90 px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-lg shadow-primary/20"
             >
               <span className="material-symbols-outlined text-[18px]">print</span>
@@ -635,7 +636,7 @@ export default function OrdenDetalle() {
               }
             }
           `}</style>
-          <PrintableOrden 
+          <PrintableOrden
             orden={orden}
             reportes={reportes}
             trabajadores={trabajadores}

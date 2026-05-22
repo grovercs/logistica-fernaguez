@@ -246,7 +246,9 @@ export default function EditarTrabajadorModal({ isOpen, onClose, onUpdated, trab
                  value={formData.telegram_chat_id}
                  onChange={(e) => setFormData({...formData, telegram_chat_id: e.target.value})}
               />
-              <p className="text-[11px] text-slate-400">Pídele al trabajador que abra el bot de Telegram y le dé /start para obtener su ID.</p>
+              <p className="text-[11px] text-slate-400">
+                <span className="font-bold text-slate-500">Importante:</span> El trabajador debe buscar el bot <span className="font-mono text-sky-600 dark:text-sky-400">@logisticafernaguez_bot</span> en Telegram, pulsar <span className="font-bold">Iniciar</span> (o enviar <span className="font-mono">/start</span>). Solo después de eso se puede obtener su Chat ID.
+              </p>
             </div>
 
             <div className="flex flex-col gap-1.5">

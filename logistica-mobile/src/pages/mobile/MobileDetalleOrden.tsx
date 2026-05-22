@@ -80,6 +80,18 @@ const MobileDetalleOrden = () => {
             return;
         }
 
+        // Resolve current worker's internal DB id to match orden_asignaciones
+        let currentWorkerDbId: string | null = null;
+        const { data: currentWorkerData } = await supabase
+            .from('trabajadores')
+            .select('id')
+            .eq('auth_user_id', userId)
+            .maybeSingle();
+        if (currentWorkerData) {
+            currentWorkerDbId = currentWorkerData.id;
+        }
+        console.log('[Mobile] Auth ID:', userId, 'Worker DB ID:', currentWorkerDbId);
+
         setLoading(true);
         console.log("Buscando orden con ID:", cleanId);
 
@@ -154,11 +166,10 @@ const MobileDetalleOrden = () => {
         }
 
         if (asignacionesReq.data && userId) {
-            // Find current worker's DB ID to match both possible references
-            const currentWorker = trabajadoresReq.data?.find(t => t.auth_user_id === userId || t.id === userId);
-            const myAssigs = asignacionesReq.data.filter(a => 
-                a.trabajador_id === userId || (currentWorker && a.trabajador_id === currentWorker.id)
+            const myAssigs = asignacionesReq.data.filter(a =>
+                a.trabajador_id === userId || a.trabajador_id === currentWorkerDbId
             );
+            console.log('[Mobile] Total asignaciones:', asignacionesReq.data.length, 'Mis asignaciones:', myAssigs.length);
             setMisAsignaciones(myAssigs);
         }
 
