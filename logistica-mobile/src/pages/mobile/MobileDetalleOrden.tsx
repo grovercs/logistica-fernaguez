@@ -406,7 +406,7 @@ const MobileDetalleOrden = () => {
 
         ctx.lineWidth = 4;
         ctx.lineCap = 'round';
-        ctx.strokeStyle = '#0f172a'; 
+        ctx.strokeStyle = document.documentElement.classList.contains('dark') ? '#ffffff' : '#0f172a';
 
         ctx.lineTo(x, y);
         ctx.stroke();
