@@ -182,13 +182,14 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
         } else {
           try {
             console.log("Enviando notificación al trabajador...");
-            await notifyNewOrder(selectedWorker, {
+            const notifResult = await notifyNewOrder(selectedWorker, {
               id: ordenId,
               id_legible: orden.id_legible,
               cliente: orden.cliente,
               direccion: orden.direccion,
               descripcion: `${orden.descripcion}\n\n*Notas de asignación:* ${formNotas}`
             });
+            console.log("[Notificación] resultado:", notifResult);
           } catch (wsErr) {
             console.error("Error al enviar notificación:", wsErr);
           }
