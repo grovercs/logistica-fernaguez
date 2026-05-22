@@ -511,7 +511,9 @@ const MobileDetalleOrden = () => {
 
         if (errorReporte) {
             console.error(errorReporte);
-            alert("Error al guardar el reporte técnico.");
+            const errorMsg = errorReporte.message || 'Error desconocido';
+            const errorCode = errorReporte.code || '';
+            alert(`Error al guardar el reporte técnico:\n\nCódigo: ${errorCode}\n${errorMsg}\n\nSi el error persiste, contacta con soporte.`);
             setSubmitting(false);
             return;
         }
