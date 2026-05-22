@@ -41,9 +41,13 @@ export default function Trabajadores() {
           // Merge profile info (tarifa_hora) into worker data
           const enriched = workerData.map(w => {
               const profile = profileData?.find(p => p.id === w.auth_user_id);
+              // Usar tarifa de perfiles si existe; si no, usar la de trabajadores
+              const tarifa = (profile?.tarifa_hora != null && profile?.tarifa_hora !== 0)
+                  ? profile.tarifa_hora
+                  : w.tarifa_hora;
               return {
                   ...w,
-                  tarifa_hora: profile?.tarifa_hora || 0
+                  tarifa_hora: tarifa ?? 0
               };
           });
           
