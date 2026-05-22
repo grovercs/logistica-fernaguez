@@ -121,6 +121,20 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
         return;
       }
 
+      // 0. Verificar que el trabajador existe realmente en la base de datos
+      const { data: existsCheck, error: existsErr } = await supabase
+        .from('trabajadores')
+        .select('id')
+        .eq('id', selectedWorker.id)
+        .maybeSingle();
+      console.log('[Asignacion] existsCheck:', existsCheck, 'existsErr:', existsErr);
+
+      if (!existsCheck) {
+        alert(`El trabajador "${selectedWorker.nombre} ${selectedWorker.apellidos}" no se encontró en la base de datos. Es posible que haya sido borrado. Recarga la página.`);
+        setSaving(false);
+        return;
+      }
+
       // 1. Insertamos la nueva asignación (FK apunta a trabajadores.id)
       const { error: assignError } = await supabase
         .from('orden_asignaciones')
