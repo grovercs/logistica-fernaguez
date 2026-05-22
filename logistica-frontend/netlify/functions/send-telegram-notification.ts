@@ -9,10 +9,22 @@ interface TelegramPayload {
   parse_mode?: string;
 }
 
+const FALLBACK_BOT_TOKEN = '8966002039:AAEm3NQZVRYtobSZ5q1c7CWBJaaTbxnJhI4';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
 export const handler: Handler = async (event: HandlerEvent, _context: HandlerContext) => {
+  // Manejar preflight OPTIONS
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: corsHeaders, body: '' };
+  }
+
   // Solo permitir POST
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
+    return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
   try {
@@ -20,41 +32,46 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
     const { chat_id, text, parse_mode = 'Markdown' } = payload;
 
     if (!chat_id || !text) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Missing chat_id or text' }) };
+      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Missing chat_id or text' }) };
     }
 
     // Leer token desde Supabase (variable de entorno del servidor)
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '';
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return { statusCode: 500, body: JSON.stringify({ error: 'Supabase credentials not configured in server' }) };
-    }
+    let botToken: string | null = null;
 
-    // Obtener token del bot desde Supabase vía REST API
-    const configRes = await fetch(
-      `${supabaseUrl}/rest/v1/configuracion_sistema?clave=eq.telegram_bot_token&select=valor`,
-      {
-        method: 'GET',
-        headers: {
-          'apikey': supabaseServiceKey,
-          'Authorization': `Bearer ${supabaseServiceKey}`,
-          'Content-Type': 'application/json',
-        },
+    if (supabaseUrl && supabaseServiceKey) {
+      try {
+        const configRes = await fetch(
+          `${supabaseUrl}/rest/v1/configuracion_sistema?clave=eq.telegram_bot_token&select=valor`,
+          {
+            method: 'GET',
+            headers: {
+              'apikey': supabaseServiceKey,
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (configRes.ok) {
+          const configData = await configRes.json();
+          botToken = configData?.[0]?.valor || null;
+        } else {
+          console.warn('Supabase config fetch failed:', await configRes.text());
+        }
+      } catch (supaErr) {
+        console.warn('Error fetching from Supabase:', supaErr);
       }
-    );
-
-    if (!configRes.ok) {
-      const errText = await configRes.text();
-      console.error('Error fetching config from Supabase:', errText);
-      return { statusCode: 500, body: JSON.stringify({ error: 'Failed to read bot token from database', details: errText }) };
+    } else {
+      console.warn('Supabase credentials not configured in Netlify env vars');
     }
 
-    const configData = await configRes.json();
-    const botToken = configData?.[0]?.valor;
-
+    // Fallback al token hardcodeado si no se pudo leer de Supabase
     if (!botToken) {
-      return { statusCode: 500, body: JSON.stringify({ error: 'Telegram bot token not configured. Go to Configuración panel to set it.' }) };
+      console.log('Using fallback bot token');
+      botToken = FALLBACK_BOT_TOKEN;
     }
 
     // Enviar mensaje vía Telegram Bot API
@@ -74,21 +91,23 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       console.error('Telegram API error:', telegramData);
       return {
         statusCode: 502,
+        headers: corsHeaders,
         body: JSON.stringify({ error: 'Telegram API error', details: telegramData }),
       };
     }
 
     return {
       statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
+      headers: corsHeaders,
       body: JSON.stringify({ success: true, message_id: telegramData.result?.message_id }),
     };
 
   } catch (err: any) {
     console.error('Netlify Function error:', err);
-    return { statusCode: 500, body: JSON.stringify({ error: 'Internal server error', details: err.message }) };
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Internal server error', details: err.message }),
+    };
   }
 };
