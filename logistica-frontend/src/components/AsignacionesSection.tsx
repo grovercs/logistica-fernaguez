@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { supabaseAdmin } from '../lib/supabase-admin';
 import { notifyNewOrder } from '../lib/notifications';
 
 interface Asignacion {
@@ -148,7 +147,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       console.log('[Asignacion] insertPayload:', insertPayload);
       console.log('[Asignacion] typeof trabajador_id:', typeof insertPayload.trabajador_id, '| value:', JSON.stringify(insertPayload.trabajador_id));
 
-      const { error: assignError } = await supabaseAdmin
+      const { error: assignError } = await supabase
         .from('orden_asignaciones')
         .insert(insertPayload);
 
