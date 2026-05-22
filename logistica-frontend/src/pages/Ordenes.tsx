@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ClipboardList, Plus, Search, Filter, X } from 'lucide-react';
 import NuevoReporteModal from '../components/modals/NuevoReporteModal';
-import { notifyNewOrder } from '../lib/notifications';
+import RenotificarModal from '../components/modals/RenotificarModal';
 
 export default function Ordenes() {
   const [ordenes, setOrdenes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRenotificarOpen, setIsRenotificarOpen] = useState(false);
+  const [ordenParaRenotificar, setOrdenParaRenotificar] = useState<any>(null);
   const [tecnicos, setTecnicos] = useState<any[]>([]);
   
   // Filtros
@@ -170,39 +172,9 @@ export default function Ordenes() {
     }
   };
 
-  const handleManualWhatsApp = async (orden: any) => {
-    if (!orden.tecnico_id) {
-      alert("Asigna un técnico primero para enviar la notificación.");
-      return;
-    }
-
-    // Buscamos el técnico por cualquiera de sus IDs (interno o auth)
-    const selectedTecnico = tecnicos.find(t => t.id === orden.tecnico_id || t.auth_user_id === orden.tecnico_id);
-    if (!selectedTecnico) {
-      alert("No se encontró el técnico asignado.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const result = await notifyNewOrder(selectedTecnico, {
-        id: orden.id,
-        id_legible: orden.id_legible,
-        cliente: orden.cliente,
-        direccion: orden.direccion,
-        descripcion: orden.descripcion
-      });
-
-      if (result.success) {
-        alert("✅ Notificación enviada a " + selectedTecnico.nombre);
-      } else {
-        alert("⚠️ No se pudo enviar la notificación: " + (result.error || 'Error desconocido'));
-      }
-    } catch (err) {
-      console.error(err);
-      alert("❌ Error al enviar la notificación.");
-    }
-    setLoading(false);
+  const openRenotificar = (orden: any) => {
+    setOrdenParaRenotificar(orden);
+    setIsRenotificarOpen(true);
   };
 
   return (
@@ -450,18 +422,17 @@ export default function Ordenes() {
                             })()}
                         </td>
                         <td className="px-4 sm:px-6 py-5 text-right">
-                          {orden.tecnico_id && (
-                            <button 
+                          {<button
                                 onClick={(e) => {
                                     e.preventDefault();
-                                    handleManualWhatsApp(orden);
+                                    openRenotificar(orden);
                                 }}
                                 className="size-9 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-all inline-flex items-center justify-center"
                                 title="Re-notificar al técnico"
                             >
                                 <span className="material-symbols-outlined text-[18px]">chat</span>
                             </button>
-                          )}
+                          }
                           <Link to={`/ordenes/${orden.id}`} className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-primary hover:bg-primary/10 transition-all inline-flex items-center justify-center">
                               <Search className="size-4" />
                           </Link>
@@ -475,10 +446,16 @@ export default function Ordenes() {
         </div>
       </div>
 
-      <NuevoReporteModal 
+      <NuevoReporteModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onCreated={fetchOrdenes}
+      />
+
+      <RenotificarModal
+        isOpen={isRenotificarOpen}
+        onClose={() => setIsRenotificarOpen(false)}
+        orden={ordenParaRenotificar}
       />
     </div>
   );
