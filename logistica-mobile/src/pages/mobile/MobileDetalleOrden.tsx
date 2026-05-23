@@ -45,7 +45,7 @@ const MobileDetalleOrden = () => {
     const [hasSignature, setHasSignature] = useState(false);
     const [showForm, setShowForm] = useState(false); // Modal control
     const [canSign, setCanSign] = useState(false); // Enable signature pad
-    const [isFinished, setIsFinished] = useState(true); // Explicit status feedback
+    const [isFinished, setIsFinished] = useState(false); // Explicit status feedback
     const [viewingReport, setViewingReport] = useState<any>(null); // Report being viewed (read-only)
 
     useEffect(() => {
