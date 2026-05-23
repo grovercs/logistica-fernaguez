@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import NuevoReporteModal from '../components/modals/NuevoReporteModal';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { useUserRole } from '../hooks/useUserRole';
 
 export default function Calendario() {
+  const { isEditor } = useUserRole();
   const [isNuevoReporteModalOpen, setIsNuevoReporteModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null); // Fecha preseleccionada para el modal
   // ordenes just for the list panel
@@ -327,13 +329,15 @@ export default function Calendario() {
               />
             </div>
           </div>
-          <button 
-            onClick={() => setIsNuevoReporteModalOpen(true)}
-            className="w-full sm:w-auto bg-primary text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
-          >
-            <span className="material-symbols-outlined text-[18px]">add</span>
-            <span>Nuevo Reporte</span>
-          </button>
+          {isEditor && (
+            <button
+              onClick={() => setIsNuevoReporteModalOpen(true)}
+              className="w-full sm:w-auto bg-primary text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[18px]">add</span>
+              <span>Nuevo Reporte</span>
+            </button>
+          )}
         </div>
         
         {/* Navigation Bar */}

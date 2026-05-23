@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import NuevoReporteModal from '../components/modals/NuevoReporteModal';
+import { useUserRole } from '../hooks/useUserRole';
 
 export default function Dashboard() {
+  const { isEditor } = useUserRole();
   const [ordenes, setOrdenes] = useState<any[]>([]);
   const [counts, setCounts] = useState({ pendientes: 0, enCurso: 0, finalizadas: 0 });
   const [weeklyActivity, setWeeklyActivity] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
@@ -334,13 +336,15 @@ export default function Dashboard() {
                 </div>
                 <h3 className="text-xl font-black mb-2 tracking-tight">Nueva Orden</h3>
                 <p className="text-white/70 text-sm mb-8 font-medium leading-relaxed">Asigna una nueva orden de trabajo ahora mismo de forma rápida y sencilla.</p>
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="w-full bg-white text-blue-600 px-6 py-4 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-black/10 hover:bg-blue-50 hover:translate-y-[-2px] transition-all active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined font-bold">add</span>
-                  Crear Reporte
-                </button>
+                {isEditor && (
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="w-full bg-white text-blue-600 px-6 py-4 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-black/10 hover:bg-blue-50 hover:translate-y-[-2px] transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined font-bold">add</span>
+                    Crear Reporte
+                  </button>
+                )}
               </div>
               {/* Background Shapes */}
               <div className="absolute top-[-20%] right-[-10%] size-40 bg-white/10 rounded-full blur-2xl"></div>
