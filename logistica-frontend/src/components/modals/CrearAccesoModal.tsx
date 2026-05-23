@@ -12,18 +12,26 @@ interface Props {
 export default function CrearAccesoModal({ isOpen, onClose, onCreated, trabajador }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rolSeleccionado, setRolSeleccionado] = useState('Técnico');
+  const [rolesDisponibles, setRolesDisponibles] = useState<{id: string, nombre: string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [paso, setPaso] = useState<'form' | 'exito'>('form');
   const [credentials, setCredentials] = useState({ email: '', password: '' });
 
   useEffect(() => {
     if (isOpen && trabajador) {
-      // Pre-fill email if available
       setEmail(trabajador.email || '');
       setPassword('');
+      setRolSeleccionado('Técnico');
       setPaso('form');
+      fetchRoles();
     }
   }, [isOpen, trabajador]);
+
+  const fetchRoles = async () => {
+    const { data } = await supabase.from('roles').select('id, nombre').order('nombre');
+    if (data) setRolesDisponibles(data);
+  };
 
   if (!isOpen) return null;
 
@@ -59,7 +67,7 @@ export default function CrearAccesoModal({ isOpen, onClose, onCreated, trabajado
           email_confirm: true,
           user_metadata: {
             nombre_completo: `${trabajador.nombre} ${trabajador.apellidos}`,
-            rol: 'tecnico'
+            rol: rolSeleccionado.toLowerCase()
           }
         });
         if (updateErr) throw updateErr;
@@ -71,7 +79,7 @@ export default function CrearAccesoModal({ isOpen, onClose, onCreated, trabajado
           email_confirm: true,
           user_metadata: {
             nombre_completo: `${trabajador.nombre} ${trabajador.apellidos}`,
-            rol: 'tecnico'
+            rol: rolSeleccionado.toLowerCase()
           }
         });
 
@@ -89,11 +97,11 @@ export default function CrearAccesoModal({ isOpen, onClose, onCreated, trabajado
 
       if (trabError) throw trabError;
 
-      // 3. Crear o actualizar perfil en la tabla perfiles con rol Técnico
+      // 3. Crear o actualizar perfil en la tabla perfiles con el rol seleccionado
       const { data: rolData } = await supabase
         .from('roles')
         .select('id')
-        .eq('nombre', 'Técnico')
+        .eq('nombre', rolSeleccionado)
         .single();
 
       await supabase.from('perfiles').upsert({
@@ -167,6 +175,24 @@ export default function CrearAccesoModal({ isOpen, onClose, onCreated, trabajado
                 className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none text-sm"
               />
               <p className="text-xs text-slate-400">Mínimo 6 caracteres. El técnico puede cambiarla después.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Rol en el sistema *</label>
+              <select
+                required
+                value={rolSeleccionado}
+                onChange={e => setRolSeleccionado(e.target.value)}
+                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none text-sm"
+              >
+                {rolesDisponibles.map(r => (
+                  <option key={r.id} value={r.nombre}>{r.nombre}</option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-400">
+                <strong>Técnico:</strong> Puede ver órdenes y rellenar reportes.<br/>
+                <strong>Visualizador:</strong> Solo ve órdenes, no puede editar ni crear reportes.
+              </p>
             </div>
 
             <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl">
