@@ -178,24 +178,6 @@ const Layout = () => {
               Liquidaciones
             </NavLink>
 
-            <div className="pt-6 pb-2">
-              <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
-                Administración
-              </p>
-            </div>
-
-            <NavLink
-              to="/usuarios"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`
-              }
-            >
-              <Users className="w-5 h-5 mr-3" />
-              Usuarios
-            </NavLink>
-
             <NavLink
               to="/trabajadores"
               className={({ isActive }) =>
@@ -209,7 +191,7 @@ const Layout = () => {
             </NavLink>
 
             <NavLink
-              to="/aseguradoras"
+              to="/usuarios"
               className={({ isActive }) =>
                 `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
                   isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
@@ -217,100 +199,120 @@ const Layout = () => {
               }
             >
               <Users className="w-5 h-5 mr-3" />
-              Clientes
+              Usuarios
             </NavLink>
 
-            <NavLink
-              to="/tareas-frecuentes"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`
-              }
-            >
-              <ListChecks className="w-5 h-5 mr-3" />
-              Tareas Frecuentes
-            </NavLink>
+            {userProfile?.rol === 'Administrador' && (
+              <>
+                <div className="pt-6 pb-2">
+                  <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
+                    Administración
+                  </p>
+                </div>
 
-            <NavLink
-              to="/especialidades"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`
-              }
-            >
-              <Wrench className="w-5 h-5 mr-3" />
-              Especialidades
-            </NavLink>
+                <NavLink
+                  to="/aseguradoras"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Users className="w-5 h-5 mr-3" />
+                  Clientes
+                </NavLink>
 
-            <div className="pt-6 pb-2">
-              <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
-                Sistema
-              </p>
-            </div>
+                <NavLink
+                  to="/tareas-frecuentes"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <ListChecks className="w-5 h-5 mr-3" />
+                  Tareas Frecuentes
+                </NavLink>
 
-            <NavLink
-              to="/roles"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`
-              }
-            >
-              <Shield className="w-5 h-5 mr-3" />
-              Gestión de Roles
-            </NavLink>
+                <NavLink
+                  to="/especialidades"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Wrench className="w-5 h-5 mr-3" />
+                  Especialidades
+                </NavLink>
 
-            <NavLink
-              to="/permisos"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`
-              }
-            >
-              <Key className="w-5 h-5 mr-3" />
-              Lista de Permisos
-            </NavLink>
+                <div className="pt-6 pb-2">
+                  <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
+                    Sistema
+                  </p>
+                </div>
 
-            <NavLink
-              to="/rbac"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`
-              }
-            >
-              <Settings className="w-5 h-5 mr-3" />
-              Panel RBAC
-            </NavLink>
+                <NavLink
+                  to="/roles"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Shield className="w-5 h-5 mr-3" />
+                  Gestión de Roles
+                </NavLink>
 
-            <NavLink
-              to="/bd"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`
-              }
-            >
-              <Database className="w-5 h-5 mr-3" />
-              Gestión BD
-            </NavLink>
+                <NavLink
+                  to="/permisos"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Key className="w-5 h-5 mr-3" />
+                  Lista de Permisos
+                </NavLink>
 
-            <NavLink
-              to="/configuracion"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`
-              }
-            >
-              <Settings className="w-5 h-5 mr-3" />
-              Configuración
-            </NavLink>
+                <NavLink
+                  to="/rbac"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Settings className="w-5 h-5 mr-3" />
+                  Panel RBAC
+                </NavLink>
 
-          </nav>
+                <NavLink
+                  to="/bd"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Database className="w-5 h-5 mr-3" />
+                  Gestión BD
+                </NavLink>
+
+                <NavLink
+                  to="/configuracion"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Settings className="w-5 h-5 mr-3" />
+                  Configuración
+                </NavLink>
+              </>
+            )}
 
           {/* Footer */}
           <div className="p-3 border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50">

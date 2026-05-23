@@ -8,9 +8,10 @@ interface Props {
   onClose: () => void;
   onUpdated?: () => void;
   reporteData: any;
+  ordenIdLegible?: string;
 }
 
-export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporteData }: Props) {
+export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporteData, ordenIdLegible }: Props) {
   const [loading, setLoading] = useState(false);
   const [fotos, setFotos] = useState<string[]>([]);
   const [facturas, setFacturas] = useState<string[]>([]);
@@ -53,11 +54,11 @@ export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporte
       // Compress image before upload (1280px max, 70% quality)
       const compressedFile = await smartCompress(file);
 
-      // Generate descriptive filename: OB-2026-1234_2026-04-01_foto_1
-      const ordenId = reporteData?.orden_id || 'unknown';
+      // Generate descriptive filename: OB-2026-0001_2026-04-01_foto_1
+      const orderRef = ordenIdLegible || reporteData?.orden_id || 'unknown';
       const fecha = new Date().toISOString().split('T')[0];
       const count = type === 'foto' ? fotos.length + 1 : facturas.length + 1;
-      const filename = `${ordenId}_${fecha}_${type}_${count}`;
+      const filename = `${orderRef}_${fecha}_${type}_${count}`;
 
       // Upload to Cloudinary with organized folder
       const folder = type === 'foto' ? 'logistica/visitas' : 'logistica/facturas';

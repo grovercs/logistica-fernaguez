@@ -1,6 +1,7 @@
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
+import RequireRole from './components/RequireRole';
 import Dashboard from './pages/Dashboard';
 import Calendario from './pages/Calendario';
 import RbacDashboard from './pages/RbacDashboard';
@@ -29,16 +30,18 @@ function App() {
           <Route path="ordenes" element={<Ordenes />} />
           <Route path="ordenes/:id" element={<OrdenDetalle />} />
           <Route path="liquidaciones" element={<Liquidaciones />} />
-          <Route path="aseguradoras" element={<Aseguradoras />} />
-          <Route path="tareas-frecuentes" element={<TareasFrecuentes />} />
-          <Route path="especialidades" element={<Especialidades />} />
           <Route path="trabajadores" element={<Trabajadores />} />
           <Route path="usuarios" element={<Usuarios />} />
-          <Route path="bd" element={<Bd />} />
-          <Route path="rbac" element={<RbacDashboard />} />
-          <Route path="roles" element={<Roles />} />
-          <Route path="permisos" element={<Permisos />} />
-          <Route path="configuracion" element={<Configuracion />} />
+
+          {/* Rutas protegidas: solo Administrador */}
+          <Route path="aseguradoras" element={<RequireRole><Aseguradoras /></RequireRole>} />
+          <Route path="tareas-frecuentes" element={<RequireRole><TareasFrecuentes /></RequireRole>} />
+          <Route path="especialidades" element={<RequireRole><Especialidades /></RequireRole>} />
+          <Route path="bd" element={<RequireRole><Bd /></RequireRole>} />
+          <Route path="rbac" element={<RequireRole><RbacDashboard /></RequireRole>} />
+          <Route path="roles" element={<RequireRole><Roles /></RequireRole>} />
+          <Route path="permisos" element={<RequireRole><Permisos /></RequireRole>} />
+          <Route path="configuracion" element={<RequireRole><Configuracion /></RequireRole>} />
           {/* Add more routes here later */}
         </Route>
       </Routes>

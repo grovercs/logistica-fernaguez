@@ -636,6 +636,7 @@ export default function OrdenDetalle() {
           onClose={() => setIsEditReporteModalOpen(false)}
           onUpdated={() => fetchOrden(id!)}
           reporteData={selectedReporte}
+          ordenIdLegible={orden?.id_legible}
         />
       )}
 
