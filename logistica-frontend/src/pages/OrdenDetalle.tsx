@@ -99,6 +99,56 @@ export default function OrdenDetalle() {
       }
     }
   };
+
+  const handleDeleteOrden = async () => {
+    if (!window.confirm(
+      '⚠️ ¿BORRAR DEFINITIVAMENTE?\n\n' +
+      'Se eliminarán PERMANENTEMENTE:\n' +
+      '• Todos los reportes de trabajo\n' +
+      '• Todas las fotos y facturas de Cloudinary\n' +
+      '• Todas las asignaciones\n' +
+      '• La orden de trabajo\n\n' +
+      'ESTA ACCIÓN NO SE PUEDE DESHACER.\n\n' +
+      'Pulsa Aceptar solo si estás completamente seguro.'
+    )) return;
+
+    setLoading(true);
+
+    try {
+      // 1. Recolectar TODAS las URLs de imágenes de todos los reportes
+      const allUrls: string[] = [];
+      reportes.forEach((r: any) => {
+        if (r.fotos_urls) allUrls.push(...r.fotos_urls);
+        if (r.facturas_urls) allUrls.push(...r.facturas_urls);
+        if (r.firma_url) allUrls.push(r.firma_url);
+      });
+
+      if (allUrls.length > 0) {
+        const result = await deleteCloudinaryImages(allUrls, supabase);
+        if (!result.success) {
+          console.error('Error borrando imágenes de Cloudinary:', result.error);
+        }
+      }
+
+      // 2. Borrar reportes
+      const { error: repError } = await supabase.from('reportes').delete().eq('orden_id', id);
+      if (repError) throw repError;
+
+      // 3. Borrar asignaciones
+      const { error: asigError } = await supabase.from('orden_asignaciones').delete().eq('orden_id', id);
+      if (asigError) throw asigError;
+
+      // 4. Borrar orden
+      const { error: ordError } = await supabase.from('ordenes').delete().eq('id', id);
+      if (ordError) throw ordError;
+
+      navigate('/ordenes');
+    } catch (err: any) {
+      console.error('Error borrando orden:', err);
+      alert('Error al borrar la orden: ' + (err.message || 'Error desconocido'));
+      setLoading(false);
+    }
+  };
   const handleFinalizarOrden = async () => {
     if (!window.confirm('¿Estás seguro de que deseas finalizar esta orden? Esto marcará el trabajo como completado oficialmente.')) return;
 
@@ -440,9 +490,10 @@ export default function OrdenDetalle() {
                     <label className="text-xs font-bold uppercase tracking-wider">Acción</label>
                   </div>
                   {isEditor && (
-                    <div className="pl-6 flex gap-2">
+                    <div className="pl-6 flex gap-2 flex-wrap">
                       <button onClick={() => setIsEditModalOpen(true)} className="px-3 py-1 bg-sky-500 hover:bg-sky-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Editar</button>
                       <button onClick={handleArchive} className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Archivar</button>
+                      <button onClick={handleDeleteOrden} className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Eliminar</button>
                     </div>
                   )}
                 </div>
