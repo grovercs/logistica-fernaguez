@@ -277,6 +277,10 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
                   {aseguradoras.map(a => (
                      <option key={a.id} value={a.nombre}>{a.nombre}</option>
                   ))}
+                  {/* Fallback si la empresa original ya no existe en aseguradoras */}
+                  {formData.aseguradora && !aseguradoras.some(a => a.nombre === formData.aseguradora) && (
+                    <option value={formData.aseguradora}>{formData.aseguradora} (empresa eliminada)</option>
+                  )}
                 </select>
               </div>
 
