@@ -77,7 +77,8 @@ export default function Calendario() {
       const { data: asignaciones } = await supabase
         .from('orden_asignaciones')
         .select('orden_id')
-        .eq('trabajador_id', workerId);
+        .eq('trabajador_id', workerId)
+        .neq('estado', 'cancelado');
       const assignedIds = (asignaciones || []).map(a => a.orden_id);
       ordenesQuery = ordenesQuery.or(`tecnico_id.eq.${authId},tecnico_id.eq.${workerId},id.in.(${assignedIds.join(',')})`);
     }

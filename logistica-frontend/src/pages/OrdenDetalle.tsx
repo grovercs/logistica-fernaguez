@@ -59,7 +59,8 @@ export default function OrdenDetalle() {
         const { data: asignaciones } = await supabase
           .from('orden_asignaciones')
           .select('trabajador_id')
-          .eq('orden_id', orderId);
+          .eq('orden_id', orderId)
+          .neq('estado', 'cancelado');
         const assignedIds = new Set((asignaciones || []).map(a => a.trabajador_id));
 
         const hasAccess =

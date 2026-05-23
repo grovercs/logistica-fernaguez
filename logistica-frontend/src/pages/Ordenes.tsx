@@ -77,7 +77,8 @@ export default function Ordenes() {
         const { data: asignaciones } = await supabase
           .from('orden_asignaciones')
           .select('orden_id')
-          .eq('trabajador_id', workerDbId || authUserId);
+          .eq('trabajador_id', workerDbId || authUserId)
+          .neq('estado', 'cancelado');
         const assignedIds = new Set((asignaciones || []).map(a => a.orden_id));
 
         visibleOrdenes = rawOrdenes.filter(o =>
