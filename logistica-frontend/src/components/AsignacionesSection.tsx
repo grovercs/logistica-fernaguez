@@ -161,9 +161,9 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       if (assignError) throw assignError;
 
       // 2. Sincronizamos la tabla principal de ordenes (tecnico_id suele ser auth_user_id)
-      // Si la orden estaba en revision o finalizada, la reabrimos a En Curso para el nuevo tecnico
+      // Si la orden estaba cerrada, la reabrimos a En Curso para el nuevo tecnico
       const updates: any = { tecnico_id: selectedWorker.auth_user_id || selectedWorker.id };
-      if (orden?.estado === 'En revision' || orden?.estado === 'Finalizada') {
+      if (orden?.estado === 'En revisión' || orden?.estado === 'Finalizada' || orden?.estado === 'Archivado') {
         updates.estado = 'En Curso';
       }
 
