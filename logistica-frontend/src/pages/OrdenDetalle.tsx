@@ -12,7 +12,7 @@ import { useUserRole } from '../hooks/useUserRole';
 export default function OrdenDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isEditor } = useUserRole();
+  const { isEditor, isWorker } = useUserRole();
   const [orden, setOrden] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -43,7 +43,38 @@ export default function OrdenDetalle() {
     ]);
 
     if (!ordenReq.error && ordenReq.data) {
-      setOrden(ordenReq.data);
+      const ordenData = ordenReq.data;
+
+      // Si es trabajador, verificar que tenga acceso a esta orden
+      if (isWorker) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const authId = sessionData?.session?.user?.id || null;
+        const { data: worker } = await supabase
+          .from('trabajadores')
+          .select('id')
+          .eq('auth_user_id', authId)
+          .maybeSingle();
+        const workerDbId = worker?.id || null;
+
+        const { data: asignaciones } = await supabase
+          .from('orden_asignaciones')
+          .select('trabajador_id')
+          .eq('orden_id', orderId);
+        const assignedIds = new Set((asignaciones || []).map(a => a.trabajador_id));
+
+        const hasAccess =
+          ordenData.tecnico_id === authId ||
+          ordenData.tecnico_id === workerDbId ||
+          assignedIds.has(authId) ||
+          assignedIds.has(workerDbId);
+
+        if (!hasAccess) {
+          navigate('/ordenes');
+          return;
+        }
+      }
+
+      setOrden(ordenData);
     }
     if (!reportesReq.error && reportesReq.data) {
       setReportes(reportesReq.data);
@@ -561,14 +592,16 @@ export default function OrdenDetalle() {
                                                 className="w-full h-20 object-cover rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm"
                                               />
                                             </a>
-                                            <button
-                                              type="button"
-                                              onClick={() => handleDeleteFoto(rep.id, url)}
-                                              className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-md shadow-sm hover:bg-red-600 transition-colors z-10"
-                                              title="Borrar foto"
-                                            >
-                                              <span className="material-symbols-outlined text-[14px]">close</span>
-                                            </button>
+                                            {isEditor && (
+                                              <button
+                                                type="button"
+                                                onClick={() => handleDeleteFoto(rep.id, url)}
+                                                className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-md shadow-sm hover:bg-red-600 transition-colors z-10"
+                                                title="Borrar foto"
+                                              >
+                                                <span className="material-symbols-outlined text-[14px]">close</span>
+                                              </button>
+                                            )}
                                           </div>
                                         ))}
                                       </div>
@@ -592,14 +625,16 @@ export default function OrdenDetalle() {
                                                 className="w-full h-20 object-cover rounded-lg border-2 border-amber-200 dark:border-amber-800 shadow-sm"
                                               />
                                             </a>
-                                            <button
-                                              type="button"
-                                              onClick={() => handleDeleteFactura(rep.id, url)}
-                                              className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-md shadow-sm hover:bg-red-600 transition-colors z-10"
-                                              title="Borrar factura"
-                                            >
-                                              <span className="material-symbols-outlined text-[14px]">close</span>
-                                            </button>
+                                            {isEditor && (
+                                              <button
+                                                type="button"
+                                                onClick={() => handleDeleteFactura(rep.id, url)}
+                                                className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-md shadow-sm hover:bg-red-600 transition-colors z-10"
+                                                title="Borrar factura"
+                                              >
+                                                <span className="material-symbols-outlined text-[14px]">close</span>
+                                              </button>
+                                            )}
                                           </div>
                                         ))}
                                       </div>

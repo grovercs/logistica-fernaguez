@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { notifyNewOrder } from '../lib/notifications';
+import { useUserRole } from '../hooks/useUserRole';
 
 interface Asignacion {
   id: string;
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props) {
+  const { isEditor } = useUserRole();
   const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
   const [trabajadores, setTrabajadores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -307,13 +309,15 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
           <span className="material-symbols-outlined text-primary">group_add</span>
           <h3 className="font-bold text-slate-800 dark:text-white">Asignaciones de Trabajo</h3>
         </div>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors"
-        >
-          <span className="material-symbols-outlined text-[18px]">add</span>
-          Asignar
-        </button>
+        {isEditor && (
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            Asignar
+          </button>
+        )}
       </div>
 
       {/* Add Form */}
@@ -399,7 +403,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
         ) : asignaciones.length === 0 ? (
           <div className="p-6 text-center text-slate-500">
             <span className="material-symbols-outlined text-3xl text-slate-300 block mb-2">person_add_disabled</span>
-            Sin asignaciones. Haz clic en "Asignar" para añadir trabajadores.
+            Sin asignaciones.{isEditor && ' Haz clic en "Asignar" para añadir trabajadores.'}
           </div>
         ) : (
           asignaciones.map(asig => (
@@ -419,31 +423,44 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <select
-                  value={asig.estado}
-                  onChange={(e) => handleUpdateEstado(asig.id, e.target.value)}
-                  className={`px-3 py-1 rounded-full text-xs font-bold border-0 cursor-pointer ${getEstadoBadge(asig.estado)}`}
-                >
-                  <option value="pendiente">⏳ Pendiente</option>
-                  <option value="en_progreso">🔵 En Progreso</option>
-                  <option value="completado">✅ Completado</option>
-                  <option value="cancelado">❌ Cancelado</option>
-                </select>
-                <button
-                  onClick={() => handleManualWhatsApp(asig)}
-                  disabled={saving}
-                  className="p-1.5 text-slate-400 hover:text-green-500 hover:bg-green-50 rounded-full transition-colors disabled:opacity-50"
-                  title="Reenviar notificación al técnico"
-                >
-                  <span className="material-symbols-outlined text-[18px]">chat</span>
-                </button>
-                <button
-                  onClick={() => handleDeleteAsignacion(asig.id)}
-                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                  title="Eliminar asignación"
-                >
-                  <span className="material-symbols-outlined text-[18px]">delete</span>
-                </button>
+                {isEditor ? (
+                  <select
+                    value={asig.estado}
+                    onChange={(e) => handleUpdateEstado(asig.id, e.target.value)}
+                    className={`px-3 py-1 rounded-full text-xs font-bold border-0 cursor-pointer ${getEstadoBadge(asig.estado)}`}
+                  >
+                    <option value="pendiente">⏳ Pendiente</option>
+                    <option value="en_progreso">🔵 En Progreso</option>
+                    <option value="completado">✅ Completado</option>
+                    <option value="cancelado">❌ Cancelado</option>
+                  </select>
+                ) : (
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${getEstadoBadge(asig.estado)}`}>
+                    {asig.estado === 'pendiente' && '⏳ Pendiente'}
+                    {asig.estado === 'en_progreso' && '🔵 En Progreso'}
+                    {asig.estado === 'completado' && '✅ Completado'}
+                    {asig.estado === 'cancelado' && '❌ Cancelado'}
+                  </span>
+                )}
+                {isEditor && (
+                  <>
+                    <button
+                      onClick={() => handleManualWhatsApp(asig)}
+                      disabled={saving}
+                      className="p-1.5 text-slate-400 hover:text-green-500 hover:bg-green-50 rounded-full transition-colors disabled:opacity-50"
+                      title="Reenviar notificación al técnico"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">chat</span>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteAsignacion(asig.id)}
+                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                      title="Eliminar asignación"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))
