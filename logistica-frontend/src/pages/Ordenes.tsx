@@ -4,8 +4,10 @@ import { supabase } from '../lib/supabase';
 import { ClipboardList, Plus, Search, Filter, X, ChevronDown, User } from 'lucide-react';
 import NuevoReporteModal from '../components/modals/NuevoReporteModal';
 import RenotificarModal from '../components/modals/RenotificarModal';
+import { useUserRole } from '../hooks/useUserRole';
 
 export default function Ordenes() {
+  const { isEditor, isWorker } = useUserRole();
   const [ordenes, setOrdenes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -30,6 +32,23 @@ export default function Ordenes() {
 
   const fetchOrdenes = async () => {
     setLoading(true);
+
+    // Si es trabajador, obtenemos su ID para filtrar
+    let workerDbId: string | null = null;
+    let authUserId: string | null = null;
+    if (isWorker) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      authUserId = sessionData?.session?.user?.id || null;
+      if (authUserId) {
+        const { data: worker } = await supabase
+          .from('trabajadores')
+          .select('id')
+          .eq('auth_user_id', authUserId)
+          .single();
+        workerDbId = worker?.id || null;
+      }
+    }
+
     // 1. Cargamos las órdenes
     let query = supabase
       .from('ordenes')
@@ -50,13 +69,31 @@ export default function Ordenes() {
       .select('id, auth_user_id, nombre, apellidos, telefono, telegram_chat_id');
 
     if (!error && rawOrdenes) {
+      let visibleOrdenes = rawOrdenes;
+
+      // Si es trabajador, filtrar solo sus órdenes
+      if (isWorker && (workerDbId || authUserId)) {
+        // Obtener IDs de órdenes asignadas a este trabajador
+        const { data: asignaciones } = await supabase
+          .from('orden_asignaciones')
+          .select('orden_id')
+          .eq('trabajador_id', workerDbId || authUserId);
+        const assignedIds = new Set((asignaciones || []).map(a => a.orden_id));
+
+        visibleOrdenes = rawOrdenes.filter(o =>
+          o.tecnico_id === authUserId ||
+          o.tecnico_id === workerDbId ||
+          assignedIds.has(o.id)
+        );
+      }
+
       // 3. Cruzamos los datos manualmente (más fiable si no hay FKs en BD)
-      const mergedData = rawOrdenes.map(orden => {
+      const mergedData = visibleOrdenes.map(orden => {
         // Buscamos al técnico por su ID o por su AuthID (por si acaso hay mezclas)
         const tecnicoObj = rawTecnicos?.find(t => t.id === orden.tecnico_id || t.auth_user_id === orden.tecnico_id);
         return {
           ...orden,
-          tecnico: tecnicoObj 
+          tecnico: tecnicoObj
         };
       });
 
@@ -255,13 +292,15 @@ export default function Ordenes() {
                 )}
               </div>
 
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="w-full sm:w-auto bg-primary text-white px-6 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
-              >
-                <Plus className="size-5" />
-                Nueva Orden
-              </button>
+              {isEditor && (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="w-full sm:w-auto bg-primary text-white px-6 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus className="size-5" />
+                  Nueva Orden
+                </button>
+              )}
             </div>
         </div>
       </div>

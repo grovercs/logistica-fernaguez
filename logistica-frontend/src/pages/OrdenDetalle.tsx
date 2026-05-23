@@ -7,10 +7,12 @@ import EditarReporteModal from '../components/modals/EditarReporteModal';
 import AsignacionesSection from '../components/AsignacionesSection';
 import { PrintableOrden } from '../components/PrintableOrden';
 import { createPortal } from 'react-dom';
+import { useUserRole } from '../hooks/useUserRole';
 
 export default function OrdenDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isEditor } = useUserRole();
   const [orden, setOrden] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -211,13 +213,15 @@ export default function OrdenDetalle() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsEditModalOpen(true)}
-              className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-            >
-              <span className="material-symbols-outlined text-[18px]">edit</span>
-              Editar
-            </button>
+            {isEditor && (
+              <button
+                onClick={() => setIsEditModalOpen(true)}
+                className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">edit</span>
+                Editar
+              </button>
+            )}
             <button
               onClick={handlePrint}
               title="Consejo: al imprimir, desactiva 'Encabezados y pies de página' en el diálogo para un resultado limpio sin URL"
@@ -226,7 +230,7 @@ export default function OrdenDetalle() {
               <span className="material-symbols-outlined text-[18px]">print</span>
               Imprimir Reporte
             </button>
-            {orden.estado !== 'Finalizada' && (
+            {isEditor && orden.estado !== 'Finalizada' && (
               <button
                 onClick={handleFinalizarOrden}
                 className="flex items-center gap-2 bg-green-600 text-white hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-lg shadow-green-600/20"
@@ -403,10 +407,12 @@ export default function OrdenDetalle() {
                     <span className="material-symbols-outlined text-[16px]">touch_app</span>
                     <label className="text-xs font-bold uppercase tracking-wider">Acción</label>
                   </div>
-                  <div className="pl-6 flex gap-2">
-                    <button onClick={() => setIsEditModalOpen(true)} className="px-3 py-1 bg-sky-500 hover:bg-sky-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Editar</button>
-                    <button onClick={handleArchive} className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Archivar</button>
-                  </div>
+                  {isEditor && (
+                    <div className="pl-6 flex gap-2">
+                      <button onClick={() => setIsEditModalOpen(true)} className="px-3 py-1 bg-sky-500 hover:bg-sky-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Editar</button>
+                      <button onClick={handleArchive} className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Archivar</button>
+                    </div>
+                  )}
                 </div>
 
               </div>
@@ -487,23 +493,27 @@ export default function OrdenDetalle() {
                                       <p className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1">
                                         <span className="material-symbols-outlined text-[16px] text-primary">engineering</span>
                                         {workerName}
-                                        <button
-                                          onClick={() => {
-                                            setSelectedReporte(rep);
-                                            setIsEditReporteModalOpen(true);
-                                          }}
-                                          className="ml-2 text-slate-400 hover:text-primary p-0.5"
-                                          title="Editar registro"
-                                        >
-                                          <span className="material-symbols-outlined text-[14px]">edit</span>
-                                        </button>
-                                        <button
-                                          onClick={() => handleDeleteReporte(rep.id)}
-                                          className="ml-1 text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
-                                          title="Borrar registro"
-                                        >
-                                          <span className="material-symbols-outlined text-[14px]">delete</span>
-                                        </button>
+                                        {isEditor && (
+                                          <>
+                                            <button
+                                              onClick={() => {
+                                                setSelectedReporte(rep);
+                                                setIsEditReporteModalOpen(true);
+                                              }}
+                                              className="ml-2 text-slate-400 hover:text-primary p-0.5"
+                                              title="Editar registro"
+                                            >
+                                              <span className="material-symbols-outlined text-[14px]">edit</span>
+                                            </button>
+                                            <button
+                                              onClick={() => handleDeleteReporte(rep.id)}
+                                              className="ml-1 text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                                              title="Borrar registro"
+                                            >
+                                              <span className="material-symbols-outlined text-[14px]">delete</span>
+                                            </button>
+                                          </>
+                                        )}
                                       </p>
                                       <p className="text-xs text-slate-500 mt-0.5">Tiempo invertido: <span className="font-bold text-slate-700 dark:text-slate-300">{rep.horas_trabajadas} hrs</span></p>
                                     </div>
