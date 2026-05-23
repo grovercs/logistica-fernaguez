@@ -555,17 +555,25 @@ const MobileDetalleOrden = () => {
             .eq('id', id);
 
         // 3. Sync with Assignment status
-        // We find the assignment for this technician in this order and mark it accordingly
+        // Obtenemos el id interno del trabajador (no el auth_user_id) para cruzar con orden_asignaciones
         const { data: userData } = await supabase.auth.getUser();
         if (userData.user) {
-            await supabase
-                .from('orden_asignaciones')
-                .update({ 
-                    estado: isFinished ? 'completado' : 'en_progreso' 
-                })
-                .eq('orden_id', id)
-                .eq('trabajador_id', userData.user.id)
-                .neq('estado', 'completado'); // Only update if not already completed
+            const { data: worker } = await supabase
+                .from('trabajadores')
+                .select('id')
+                .eq('auth_user_id', userData.user.id)
+                .single();
+
+            if (worker?.id) {
+                await supabase
+                    .from('orden_asignaciones')
+                    .update({
+                        estado: isFinished ? 'completado' : 'en_progreso'
+                    })
+                    .eq('orden_id', id)
+                    .eq('trabajador_id', worker.id)
+                    .neq('estado', 'completado'); // Only update if not already completed
+            }
         }
 
         setSubmitting(false);
