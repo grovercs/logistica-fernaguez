@@ -50,15 +50,15 @@ export default function OrdenDetalle() {
     setLoading(false);
   };
 
-  const handleDelete = async () => {
-    if (window.confirm('¿Estás seguro de que deseas borrar esta orden y todos sus reportes asociados? Esta acción no se puede deshacer.')) {
+  const handleArchive = async () => {
+    if (window.confirm('¿Archivar esta orden? Desaparecerá de la lista principal pero seguirá accesible desde la pestaña Archivadas.')) {
       setLoading(true);
-      const { error } = await supabase.from('ordenes').delete().eq('id', id);
+      const { error } = await supabase.from('ordenes').update({ estado: 'Archivado' }).eq('id', id);
       if (!error) {
         navigate('/ordenes');
       } else {
-        console.error('Error deleting:', error);
-        alert('Hubo un error al borrar la orden.');
+        console.error('Error archivando:', error);
+        alert('Hubo un error al archivar la orden.');
         setLoading(false);
       }
     }
@@ -333,7 +333,7 @@ export default function OrdenDetalle() {
                   </div>
                   <div className="pl-6 flex gap-2">
                     <button onClick={() => setIsEditModalOpen(true)} className="px-3 py-1 bg-sky-500 hover:bg-sky-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Editar</button>
-                    <button onClick={handleDelete} className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Borrar</button>
+                    <button onClick={handleArchive} className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Archivar</button>
                   </div>
                 </div>
 

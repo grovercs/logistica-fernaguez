@@ -38,6 +38,7 @@ export default function Trabajadores() {
       const { data: workerData, error: workerErr } = await supabase
         .from('trabajadores')
         .select('*')
+        .neq('estado', 'Baja')
         .order('creado_en', { ascending: false });
       
       // Fetch all perfiles to get tarifa_hora
@@ -100,14 +101,14 @@ export default function Trabajadores() {
       }
   };
 
-  const handleDelete = async (id: string) => {
-      if (window.confirm('¿Estás seguro de que deseas borrar este trabajador? Se desvinculará de sus órdenes.')) {
-          const { error } = await supabase.from('trabajadores').delete().eq('id', id);
+  const handleArchive = async (id: string) => {
+      if (window.confirm('¿Dar de baja este trabajador? Desaparecerá de las listas activas pero se conservará su historial.')) {
+          const { error } = await supabase.from('trabajadores').update({ estado: 'Baja' }).eq('id', id);
           if (!error) {
               fetchTrabajadores();
           } else {
-              console.error('Error deleting:', error);
-              alert('Error al borrar el trabajador.');
+              console.error('Error archivando:', error);
+              alert('Error al dar de baja el trabajador.');
           }
       }
   };
@@ -218,7 +219,7 @@ export default function Trabajadores() {
                               <div className="flex justify-end gap-2">
                                 <button onClick={() => { setTrabajadorAcceso(trabajador); setIsAccesoModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-emerald-500" title="Accesos"><span className="material-symbols-outlined text-[18px]">key</span></button>
                                 <button onClick={() => { setTrabajadorToEdit(trabajador); setIsEditModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-sky-500" title="Editar"><span className="material-symbols-outlined text-[18px]">edit</span></button>
-                                <button onClick={() => handleDelete(trabajador.id)} className="p-1.5 text-slate-400 hover:text-red-500" title="Borrar"><span className="material-symbols-outlined text-[18px]">delete</span></button>
+                                <button onClick={() => handleArchive(trabajador.id)} className="p-1.5 text-slate-400 hover:text-amber-500" title="Dar de baja"><span className="material-symbols-outlined text-[18px]">person_off</span></button>
                               </div>
                            </td>
                         </tr>
