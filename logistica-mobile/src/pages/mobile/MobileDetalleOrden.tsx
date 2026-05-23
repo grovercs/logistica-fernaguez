@@ -551,41 +551,62 @@ const MobileDetalleOrden = () => {
         // 2. Update Order Status - USE orden.id (real UUID) not id (could be id_legible)
         const realOrderId = orden?.id || id;
         const newEstado = isFinished ? 'En revisión' : 'En Curso';
+        console.log('[Mobile Save] realOrderId:', realOrderId, 'newEstado:', newEstado);
 
-        const { error: ordenUpdateError } = await supabase
-            .from('ordenes')
-            .update({
-                estado: newEstado,
-            })
-            .eq('id', realOrderId);
+        try {
+            const { error: ordenUpdateError } = await supabase
+                .from('ordenes')
+                .update({
+                    estado: newEstado,
+                })
+                .eq('id', realOrderId);
 
-        if (ordenUpdateError) {
-            console.error('Error updating order status:', ordenUpdateError);
+            if (ordenUpdateError) {
+                console.error('Error updating order status:', ordenUpdateError);
+                alert('⚠️ Error actualizando estado de orden: ' + ordenUpdateError.message);
+            } else {
+                console.log('[Mobile Save] Orden actualizada a:', newEstado);
+            }
+        } catch (e: any) {
+            console.error('Excepción updating order:', e);
+            alert('⚠️ Excepción actualizando orden: ' + (e.message || 'Error desconocido'));
         }
 
         // 3. Sync with Assignment status - USE realOrderId (UUID)
-        const { data: userData } = await supabase.auth.getUser();
-        if (userData.user) {
-            const { data: worker } = await supabase
-                .from('trabajadores')
-                .select('id')
-                .eq('auth_user_id', userData.user.id)
-                .single();
+        try {
+            const { data: userData } = await supabase.auth.getUser();
+            if (userData.user) {
+                const { data: worker } = await supabase
+                    .from('trabajadores')
+                    .select('id')
+                    .eq('auth_user_id', userData.user.id)
+                    .single();
 
-            if (worker?.id) {
-                const { error: asigUpdateError } = await supabase
-                    .from('orden_asignaciones')
-                    .update({
-                        estado: isFinished ? 'completado' : 'en_progreso'
-                    })
-                    .eq('orden_id', realOrderId)
-                    .eq('trabajador_id', worker.id)
-                    .neq('estado', 'completado'); // Only update if not already completed
+                console.log('[Mobile Save] Worker ID:', worker?.id);
 
-                if (asigUpdateError) {
-                    console.error('Error updating assignment status:', asigUpdateError);
+                if (worker?.id) {
+                    const { error: asigUpdateError } = await supabase
+                        .from('orden_asignaciones')
+                        .update({
+                            estado: isFinished ? 'completado' : 'en_progreso'
+                        })
+                        .eq('orden_id', realOrderId)
+                        .eq('trabajador_id', worker.id)
+                        .neq('estado', 'completado'); // Only update if not already completed
+
+                    if (asigUpdateError) {
+                        console.error('Error updating assignment status:', asigUpdateError);
+                        alert('⚠️ Error actualizando asignación: ' + asigUpdateError.message);
+                    } else {
+                        console.log('[Mobile Save] Asignación actualizada a:', isFinished ? 'completado' : 'en_progreso');
+                    }
+                } else {
+                    alert('⚠️ No se encontró tu perfil de trabajador. La asignación no se actualizó.');
                 }
             }
+        } catch (e: any) {
+            console.error('Excepción updating assignment:', e);
+            alert('⚠️ Excepción actualizando asignación: ' + (e.message || 'Error desconocido'));
         }
 
         setSubmitting(false);
