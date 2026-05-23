@@ -23,7 +23,7 @@ export default function Ordenes() {
   const [fechaHasta, setFechaHasta] = useState('');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [showWorkerMenu, setShowWorkerMenu] = useState(false);
-  const [activeTab, setActiveTab] = useState<'activas' | 'archivadas'>('activas');
+  const [activeTab, setActiveTab] = useState<'activas' | 'archivadas' | 'papelera'>('activas');
 
   useEffect(() => {
     fetchOrdenes();
@@ -56,9 +56,11 @@ export default function Ordenes() {
       .order('id_legible', { ascending: false, nullsFirst: false });
 
     if (activeTab === 'activas') {
-      query = query.neq('estado', 'Archivado');
-    } else {
+      query = query.neq('estado', 'Archivado').neq('estado', 'Papelera');
+    } else if (activeTab === 'archivadas') {
       query = query.eq('estado', 'Archivado');
+    } else {
+      query = query.eq('estado', 'Papelera');
     }
 
     const { data: rawOrdenes, error } = await query;
@@ -328,6 +330,16 @@ export default function Ordenes() {
             }`}
           >
             Archivadas
+          </button>
+          <button
+            onClick={() => setActiveTab('papelera')}
+            className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
+              activeTab === 'papelera'
+                ? 'bg-red-600 text-white shadow-lg shadow-red-600/20'
+                : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+            }`}
+          >
+            Papelera
           </button>
         </div>
 

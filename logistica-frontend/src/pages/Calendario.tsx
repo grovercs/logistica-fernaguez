@@ -71,6 +71,7 @@ export default function Calendario() {
       .from('ordenes')
       .select('*')
       .neq('estado', 'Archivado')
+      .neq('estado', 'Papelera')
       .order('creado_en', { ascending: false });
     if (isCurrentUserWorker) {
       // Solo órdenes asignadas a este trabajador
