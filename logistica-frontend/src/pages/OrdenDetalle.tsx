@@ -114,6 +114,61 @@ export default function OrdenDetalle() {
     }
   };
 
+  const handleDeleteFoto = async (reporteId: string, url: string) => {
+    if (!window.confirm('¿Borrar esta foto de Cloudinary?')) return;
+
+    const result = await deleteCloudinaryImages([url], supabase);
+    if (!result.success) {
+      console.error('Error borrando imagen:', result.error);
+      alert('Error al borrar la imagen de Cloudinary.');
+      return;
+    }
+
+    // Quitar la URL del array fotos_urls del reporte
+    const reporte = reportes.find(r => r.id === reporteId);
+    if (!reporte) return;
+    const nuevasFotos = (reporte.fotos_urls || []).filter((u: string) => u !== url);
+
+    const { error } = await supabase
+      .from('reportes')
+      .update({ fotos_urls: nuevasFotos })
+      .eq('id', reporteId);
+
+    if (error) {
+      console.error('Error actualizando reporte:', error);
+      alert('Error al actualizar el reporte.');
+    } else {
+      fetchOrden(id!);
+    }
+  };
+
+  const handleDeleteFactura = async (reporteId: string, url: string) => {
+    if (!window.confirm('¿Borrar esta factura/albarán de Cloudinary?')) return;
+
+    const result = await deleteCloudinaryImages([url], supabase);
+    if (!result.success) {
+      console.error('Error borrando imagen:', result.error);
+      alert('Error al borrar la imagen de Cloudinary.');
+      return;
+    }
+
+    const reporte = reportes.find(r => r.id === reporteId);
+    if (!reporte) return;
+    const nuevasFacturas = (reporte.facturas_urls || []).filter((u: string) => u !== url);
+
+    const { error } = await supabase
+      .from('reportes')
+      .update({ facturas_urls: nuevasFacturas })
+      .eq('id', reporteId);
+
+    if (error) {
+      console.error('Error actualizando reporte:', error);
+      alert('Error al actualizar el reporte.');
+    } else {
+      fetchOrden(id!);
+    }
+  };
+
   const firmReporte = [...reportes]
     .filter(r => r.firma_url && r.firma_url.length > 5)
     .sort((a, b) => new Date(b.creado_en || 0).getTime() - new Date(a.creado_en || 0).getTime())[0];
@@ -487,13 +542,23 @@ export default function OrdenDetalle() {
                                       </p>
                                       <div className="grid grid-cols-3 gap-2">
                                         {(rep.fotos_urls as string[]).map((url, i) => (
-                                          <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group block">
-                                            <img
-                                              src={url}
-                                              alt={`Foto ${i + 1}`}
-                                              className="w-full h-20 object-cover rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm group-hover:shadow-md group-hover:scale-[1.02] transition-all"
-                                            />
-                                          </a>
+                                          <div key={i} className="relative group">
+                                            <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+                                              <img
+                                                src={url}
+                                                alt={`Foto ${i + 1}`}
+                                                className="w-full h-20 object-cover rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm"
+                                              />
+                                            </a>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteFoto(rep.id, url)}
+                                              className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-md shadow-sm hover:bg-red-600 transition-colors z-10"
+                                              title="Borrar foto"
+                                            >
+                                              <span className="material-symbols-outlined text-[14px]">close</span>
+                                            </button>
+                                          </div>
                                         ))}
                                       </div>
                                     </div>
@@ -508,13 +573,23 @@ export default function OrdenDetalle() {
                                       </p>
                                       <div className="grid grid-cols-3 gap-2">
                                         {(rep.facturas_urls as string[]).map((url, i) => (
-                                          <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group block">
-                                            <img
-                                              src={url}
-                                              alt={`Factura ${i + 1}`}
-                                              className="w-full h-20 object-cover rounded-lg border-2 border-amber-200 dark:border-amber-800 shadow-sm group-hover:shadow-md group-hover:scale-[1.02] transition-all"
-                                            />
-                                          </a>
+                                          <div key={i} className="relative group">
+                                            <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+                                              <img
+                                                src={url}
+                                                alt={`Factura ${i + 1}`}
+                                                className="w-full h-20 object-cover rounded-lg border-2 border-amber-200 dark:border-amber-800 shadow-sm"
+                                              />
+                                            </a>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteFactura(rep.id, url)}
+                                              className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-md shadow-sm hover:bg-red-600 transition-colors z-10"
+                                              title="Borrar factura"
+                                            >
+                                              <span className="material-symbols-outlined text-[14px]">close</span>
+                                            </button>
+                                          </div>
                                         ))}
                                       </div>
                                     </div>
