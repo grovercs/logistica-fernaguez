@@ -61,10 +61,15 @@ export default function Ordenes() {
       });
 
       // Ordenación estricta por número de orden (id_legible) decreciente
+      const getOrderNumber = (idLegible: string | null) => {
+        if (!idLegible) return 0;
+        const match = idLegible.match(/(\d+)$/);
+        return match ? parseInt(match[1], 10) : 0;
+      };
       mergedData.sort((a, b) => {
-        const idA = a.id_legible || '';
-        const idB = b.id_legible || '';
-        return idB.localeCompare(idA);
+        const numA = getOrderNumber(a.id_legible);
+        const numB = getOrderNumber(b.id_legible);
+        return numB - numA;
       });
 
       setOrdenes(mergedData);
