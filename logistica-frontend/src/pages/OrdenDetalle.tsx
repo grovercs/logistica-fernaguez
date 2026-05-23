@@ -28,8 +28,14 @@ export default function OrdenDetalle() {
     return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
   };
 
+  // Polling: refrescar orden cada 15s para ver cambios del técnico en mobile
   useEffect(() => {
-    if (id) fetchOrden(id);
+    if (!id) return;
+    fetchOrden(id);
+    const interval = setInterval(() => {
+      fetchOrden(id);
+    }, 15000);
+    return () => clearInterval(interval);
   }, [id]);
 
   const fetchOrden = async (orderId: string) => {
