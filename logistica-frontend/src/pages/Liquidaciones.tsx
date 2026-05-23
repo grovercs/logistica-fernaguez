@@ -80,7 +80,7 @@ export default function Liquidaciones() {
 
       // Merge perfiles into reportes and filter out orphans (no linked order)
       let merged = (reportesData as any[])
-        .filter((r: any) => r.ordenes !== null && r.ordenes !== undefined)
+        .filter((r: any) => r.ordenes !== null && r.ordenes !== undefined && r.ordenes.estado !== 'Papelera')
         .map((r: any) => ({
           ...r,
           perfiles: perfilesLookup[r.tecnico_id] || null,

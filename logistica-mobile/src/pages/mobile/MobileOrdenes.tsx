@@ -84,6 +84,7 @@ const MobileOrdenes = () => {
 
         const { data, error } = await query
             .neq('estado', 'Finalizada')
+            .neq('estado', 'Papelera')
             .order('creado_en', { ascending: false });
 
         if (!error && data) {
