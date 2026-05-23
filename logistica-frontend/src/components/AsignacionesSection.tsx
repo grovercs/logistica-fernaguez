@@ -84,7 +84,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
 
       setAsignaciones(mergedAsignaciones);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
   const fetchTrabajadores = async () => {

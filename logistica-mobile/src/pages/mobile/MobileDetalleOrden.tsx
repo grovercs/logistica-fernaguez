@@ -229,6 +229,7 @@ const MobileDetalleOrden = () => {
     const resetForm = () => {
         // Clear ALL form state to ensure fresh start
         setReporte(null);
+        setIsFinished(false); // Por defecto, cualquier nueva intervencion sigue en curso
         setTrabajoRealizado('');
         setMaterialUtilizado('');
         setFotos([]);
@@ -253,29 +254,32 @@ const MobileDetalleOrden = () => {
 
     const loadReportData = (rep: any) => {
         setReporte(rep);
-        
+
+        // Al editar un reporte existente, por defecto seguimos en curso (el tecnico debe marcar explicitamente si termino)
+        setIsFinished(false);
+
         // Robust split: handles '\n\nMATERIALES:\n', '\nMATERIALES:\n', ' MATERIALES: ', etc.
         const notes = rep.notas || '';
         const splitter = /[ \t\n]*(?:MATERIALES:?)[ \t\n]*/i;
         const parts = notes.split(splitter);
-        
+
         const descFallback = parts[0] || '';
         const matFallback = parts[1] || '';
-        
+
         setTrabajoRealizado(rep.trabajo_realizado || descFallback.trim());
         setMaterialUtilizado(rep.material_utilizado || matFallback.trim());
-        
+
         // Highly strict check to avoid false positives from 'null' strings or placeholders
-        const isSigned = !!rep.firma_url && 
-                         typeof rep.firma_url === 'string' && 
-                         rep.firma_url.startsWith('http') && 
-                         rep.firma_url.length > 50; 
+        const isSigned = !!rep.firma_url &&
+                         typeof rep.firma_url === 'string' &&
+                         rep.firma_url.startsWith('http') &&
+                         rep.firma_url.length > 50;
         setHasSignature(isSigned);
-        
+
         // Reset canvas before loading (it will show the image if firma_url exists)
         const ctx = canvasRef.current?.getContext('2d');
         ctx?.clearRect(0, 0, canvasRef.current?.width || 0, canvasRef.current?.height || 0);
-        
+
         // Use fecha_trabajo if available, fallback to creado_en
         const reportDate = rep.fecha_trabajo || (rep.creado_en ? new Date(rep.creado_en).toISOString().split('T')[0] : '');
         setFecha(reportDate);
