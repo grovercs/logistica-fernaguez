@@ -166,20 +166,20 @@ const Layout = () => {
               Órdenes de Trabajo
             </NavLink>
             
+            <NavLink
+              to="/liquidaciones"
+              className={({ isActive }) =>
+                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`
+              }
+            >
+              <Briefcase className="w-5 h-5 mr-3" />
+              {userProfile?.rol === 'Técnico' || userProfile?.rol === 'Visualizador' ? 'Mis Liquidaciones' : 'Liquidaciones'}
+            </NavLink>
+
             {(userProfile?.rol === 'Administrador' || userProfile?.rol === 'Editor') && (
               <>
-                <NavLink
-                  to="/liquidaciones"
-                  className={({ isActive }) =>
-                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`
-                  }
-                >
-                  <Briefcase className="w-5 h-5 mr-3" />
-                  Liquidaciones
-                </NavLink>
-
                 <NavLink
                   to="/trabajadores"
                   className={({ isActive }) =>

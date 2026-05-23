@@ -34,6 +34,7 @@ export default function Calendario() {
 
   // Handler para abrir el modal con una fecha específica
   const handleDayClick = (date: Date) => {
+    if (!isEditor) return; // Workers can't create reports from calendar
     setSelectedDate(formatDateToISO(date));
     setIsNuevoReporteModalOpen(true);
   };
@@ -54,16 +55,37 @@ export default function Calendario() {
   }, [fechaDesde]);
 
   const fetchData = async () => {
-    // Fetch all orders
-    const { data: ordenesData } = await supabase
+    // Obtener usuario actual para filtrar si es trabajador
+    const { data: sessionData } = await supabase.auth.getSession();
+    const authId = sessionData?.session?.user?.id;
+    const { data: workerData } = await supabase
+      .from('trabajadores')
+      .select('id, auth_user_id')
+      .eq('auth_user_id', authId)
+      .maybeSingle();
+    const workerId = workerData?.id;
+    const isCurrentUserWorker = !!workerData;
+
+    // Fetch all orders (or worker's orders)
+    let ordenesQuery = supabase
       .from('ordenes')
       .select('*')
       .neq('estado', 'Archivado')
       .order('creado_en', { ascending: false });
+    if (isCurrentUserWorker) {
+      // Solo órdenes asignadas a este trabajador
+      const { data: asignaciones } = await supabase
+        .from('orden_asignaciones')
+        .select('orden_id')
+        .eq('trabajador_id', workerId);
+      const assignedIds = (asignaciones || []).map(a => a.orden_id);
+      ordenesQuery = ordenesQuery.or(`tecnico_id.eq.${authId},tecnico_id.eq.${workerId},id.in.(${assignedIds.join(',')})`);
+    }
+    const { data: ordenesData } = await ordenesQuery;
     if (ordenesData) setOrdenes(ordenesData);
 
     // Fetch all reports joined to orders (for calendar display by work date)
-    const { data: reportesData } = await supabase
+    let reportesQuery = supabase
       .from('reportes')
       .select(`
         id,
@@ -81,6 +103,10 @@ export default function Calendario() {
       `)
       .neq('ordenes.estado', 'Archivado')
       .order('fecha_trabajo', { ascending: false });
+    if (isCurrentUserWorker && authId) {
+      reportesQuery = reportesQuery.eq('tecnico_id', authId);
+    }
+    const { data: reportesData } = await reportesQuery;
     if (reportesData) setReportes(reportesData);
   };
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { useUserRole } from '../hooks/useUserRole';
 import * as XLSX from 'xlsx';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -35,10 +36,12 @@ const avatarColor = (name: string) => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Liquidaciones() {
+  const { isEditor, isWorker } = useUserRole();
   const [tab, setTab] = useState<TabType>('obra');
   const [reportes, setReportes] = useState<Reporte[]>([]);
   const [perfilesMap, setPerfilesMap] = useState<Record<string, { nombre: string; tarifa: number }>>({});
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Filters
   const [desde, setDesde] = useState('');
@@ -51,6 +54,14 @@ export default function Liquidaciones() {
 
   const fetchData = async () => {
     setLoading(true);
+
+    // Si es trabajador, obtener su auth_user_id para filtrar
+    let authId: string | null = null;
+    if (isWorker) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      authId = sessionData?.session?.user?.id || null;
+      setCurrentUserId(authId);
+    }
 
     const { data: reportesData, error: repErr } = await supabase
       .from('reportes')
@@ -70,12 +81,18 @@ export default function Liquidaciones() {
       });
 
       // Merge perfiles into reportes and filter out orphans (no linked order)
-      const merged = (reportesData as any[])
+      let merged = (reportesData as any[])
         .filter((r: any) => r.ordenes !== null && r.ordenes !== undefined)
         .map((r: any) => ({
           ...r,
           perfiles: perfilesLookup[r.tecnico_id] || null,
         }));
+
+      // Si es trabajador, filtrar solo sus reportes
+      if (isWorker && authId) {
+        merged = merged.filter((r: any) => r.tecnico_id === authId);
+        setTrabajadorFilter(authId); // Preseleccionar filtro
+      }
 
       setReportes(merged as Reporte[]);
 
@@ -185,40 +202,57 @@ export default function Liquidaciones() {
   };
 
   // ─── UI ──────────────────────────────────────────────────────────────────
-  const tabs: { key: TabType; label: string; icon: string }[] = [
-    { key: 'obra', label: 'Por Obra', icon: 'construction' },
-    { key: 'trabajador', label: 'Por Trabajador', icon: 'engineering' },
-    { key: 'global', label: 'Global', icon: 'bar_chart' },
-  ];
+  const tabs: { key: TabType; label: string; icon: string }[] = isWorker
+    ? [{ key: 'trabajador', label: 'Resumen', icon: 'engineering' }]
+    : [
+        { key: 'obra', label: 'Por Obra', icon: 'construction' },
+        { key: 'trabajador', label: 'Por Trabajador', icon: 'engineering' },
+        { key: 'global', label: 'Global', icon: 'bar_chart' },
+      ];
 
-  const EstadoBadge = ({ estado, id }: { estado: string; id: string }) => (
-    <button
-      onClick={() => toggleEstado(id, estado)}
-      title="Clic para cambiar estado"
-      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer transition-all hover:scale-105 ${
-        estado === 'Procesada'
-          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-          : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
-      }`}
-    >
-      {estado === 'Procesada' ? '✓ Procesada' : '⏳ Pendiente'}
-    </button>
-  );
+  const EstadoBadge = ({ estado, id }: { estado: string; id: string }) => {
+    if (isWorker) {
+      return (
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+          estado === 'Procesada'
+            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+            : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+        }`}>
+          {estado === 'Procesada' ? '✓ Procesada' : '⏳ Pendiente'}
+        </span>
+      );
+    }
+    return (
+      <button
+        onClick={() => toggleEstado(id, estado)}
+        title="Clic para cambiar estado"
+        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer transition-all hover:scale-105 ${
+          estado === 'Procesada'
+            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+            : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+        }`}
+      >
+        {estado === 'Procesada' ? '✓ Procesada' : '⏳ Pendiente'}
+      </button>
+    );
+  };
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 h-full">
       {/* Header */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 w-full backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between px-4 sm:px-8 py-4 gap-4">
-          <h2 className="text-xl font-black tracking-tight">Liquidaciones</h2>
+          <h2 className="text-xl font-black tracking-tight">{isWorker ? 'Mis Liquidaciones' : 'Liquidaciones'}</h2>
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <button 
-              onClick={exportToExcel} 
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-emerald-600/20"
-            >
-              <span className="material-symbols-outlined text-lg">table_view</span>
-              Exportar Excel
-            </button>
+            {isEditor && (
+              <button
+                onClick={exportToExcel}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-emerald-600/20"
+              >
+                <span className="material-symbols-outlined text-lg">table_view</span>
+                Exportar Excel
+              </button>
+            )}
             <button className="p-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
               <span className="material-symbols-outlined">notifications</span>
             </button>
@@ -239,15 +273,17 @@ export default function Liquidaciones() {
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Hasta</label>
               <input value={hasta} onChange={e => setHasta(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-11 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" type="date" />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Trabajador</label>
-              <select value={trabajadorFilter} onChange={e => setTrabajadorFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-11 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer">
-                <option value="">Todos</option>
-                {Object.entries(perfilesMap).map(([id, { nombre }]) => (
-                  <option key={id} value={id}>{nombre}</option>
-                ))}
-              </select>
-            </div>
+            {!isWorker && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Trabajador</label>
+                <select value={trabajadorFilter} onChange={e => setTrabajadorFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-11 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer">
+                  <option value="">Todos</option>
+                  {Object.entries(perfilesMap).map(([id, { nombre }]) => (
+                    <option key={id} value={id}>{nombre}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Obra / Ref</label>
               <input value={obraFilter} onChange={e => setObraFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm h-11 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="Buscar..." type="text" />

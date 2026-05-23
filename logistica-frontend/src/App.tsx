@@ -29,8 +29,9 @@ function App() {
           <Route path="calendario" element={<Calendario />} />
           <Route path="ordenes" element={<Ordenes />} />
           <Route path="ordenes/:id" element={<OrdenDetalle />} />
+          <Route path="liquidaciones" element={<Liquidaciones />} />
+
           {/* Rutas protegidas: solo Admin y Editor */}
-          <Route path="liquidaciones" element={<RequireRole allowedRoles={['Administrador', 'Editor']}><Liquidaciones /></RequireRole>} />
           <Route path="trabajadores" element={<RequireRole allowedRoles={['Administrador', 'Editor']}><Trabajadores /></RequireRole>} />
           <Route path="usuarios" element={<RequireRole allowedRoles={['Administrador', 'Editor']}><Usuarios /></RequireRole>} />
 

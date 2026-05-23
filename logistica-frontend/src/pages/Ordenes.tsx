@@ -28,7 +28,7 @@ export default function Ordenes() {
   useEffect(() => {
     fetchOrdenes();
     fetchTecnicos();
-  }, [activeTab]);
+  }, [activeTab, isWorker]);
 
   const fetchOrdenes = async () => {
     setLoading(true);
@@ -44,7 +44,7 @@ export default function Ordenes() {
           .from('trabajadores')
           .select('id')
           .eq('auth_user_id', authUserId)
-          .single();
+          .maybeSingle();
         workerDbId = worker?.id || null;
       }
     }
