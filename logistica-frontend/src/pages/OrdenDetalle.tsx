@@ -52,29 +52,8 @@ export default function OrdenDetalle() {
   };
 
   const handleArchive = async () => {
-    if (window.confirm('¿Archivar esta orden? Desaparecerá de la lista principal. Se borrarán las imágenes asociadas de Cloudinary.')) {
+    if (window.confirm('¿Archivar esta orden? Desaparecerá de la lista principal pero seguirá accesible desde la pestaña Archivadas.')) {
       setLoading(true);
-
-      // 1. Borrar fotos de Cloudinary de todos los reportes
-      const allPhotoUrls: string[] = [];
-      reportes.forEach(r => {
-        if (r.fotos_urls && Array.isArray(r.fotos_urls)) {
-          allPhotoUrls.push(...r.fotos_urls);
-        }
-      });
-
-      if (allPhotoUrls.length > 0) {
-        const deleteResult = await deleteCloudinaryImages(allPhotoUrls, supabase);
-        if (!deleteResult.success) {
-          console.error('Error borrando imágenes de Cloudinary:', deleteResult.error);
-          if (!window.confirm('No se pudieron borrar las imágenes de Cloudinary. ¿Archivar la orden igualmente?')) {
-            setLoading(false);
-            return;
-          }
-        }
-      }
-
-      // 2. Archivar la orden
       const { error } = await supabase.from('ordenes').update({ estado: 'Archivado' }).eq('id', id);
       if (!error) {
         navigate('/ordenes');
