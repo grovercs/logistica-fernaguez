@@ -34,7 +34,7 @@ export default function Ordenes() {
     let query = supabase
       .from('ordenes')
       .select('*')
-      .order('creado_en', { ascending: false, nullsFirst: false });
+      .order('id_legible', { ascending: false, nullsFirst: false });
 
     if (activeTab === 'activas') {
       query = query.neq('estado', 'Archivado');
@@ -60,11 +60,11 @@ export default function Ordenes() {
         };
       });
 
-      // Ordenación estricta por fecha
+      // Ordenación estricta por número de orden (id_legible) decreciente
       mergedData.sort((a, b) => {
-        const timeA = a.creado_en ? new Date(a.creado_en).getTime() : 0;
-        const timeB = b.creado_en ? new Date(b.creado_en).getTime() : 0;
-        return timeB - timeA;
+        const idA = a.id_legible || '';
+        const idB = b.id_legible || '';
+        return idB.localeCompare(idA);
       });
 
       setOrdenes(mergedData);
