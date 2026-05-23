@@ -41,7 +41,6 @@ export default function Liquidaciones() {
   const [reportes, setReportes] = useState<Reporte[]>([]);
   const [perfilesMap, setPerfilesMap] = useState<Record<string, { nombre: string; tarifa: number }>>({});
   const [loading, setLoading] = useState(true);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Filters
   const [desde, setDesde] = useState('');
@@ -60,7 +59,6 @@ export default function Liquidaciones() {
     if (isWorker) {
       const { data: sessionData } = await supabase.auth.getSession();
       authId = sessionData?.session?.user?.id || null;
-      setCurrentUserId(authId);
     }
 
     const { data: reportesData, error: repErr } = await supabase
