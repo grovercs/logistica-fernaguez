@@ -45,7 +45,23 @@ export default function Aseguradoras() {
       }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, nombre: string) => {
+      // Verificar si hay órdenes asociadas a este cliente
+      const { data: ordenesAsociadas, error: errCount } = await supabase
+          .from('ordenes')
+          .select('id')
+          .or(`cliente.eq.${nombre},aseguradora.eq.${nombre}`)
+          .limit(1);
+
+      if (errCount) {
+          console.error('Error comprobando órdenes:', errCount);
+      }
+
+      if (ordenesAsociadas && ordenesAsociadas.length > 0) {
+          alert('No se puede borrar este cliente porque tiene órdenes de trabajo asociadas. Desactívalo cambiando su estado a "Inactiva" en su lugar.');
+          return;
+      }
+
       if (window.confirm('¿Estás seguro de que deseas borrar este cliente?')) {
           const { error } = await supabase.from('aseguradoras').delete().eq('id', id);
           if (!error) {
@@ -191,7 +207,7 @@ export default function Aseguradoras() {
                                 <span className="material-symbols-outlined text-[18px]">edit</span>
                               </button>
                               <button
-                                onClick={() => handleDelete(aseguradora.id)}
+                                onClick={() => handleDelete(aseguradora.id, aseguradora.nombre)}
                                 className="size-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
                                 title="Borrar"
                               >

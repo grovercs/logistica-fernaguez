@@ -11,6 +11,8 @@ export default function Trabajadores() {
   const [trabajadorToEdit, setTrabajadorToEdit] = useState<any>(null);
   const [trabajadorAcceso, setTrabajadorAcceso] = useState<any>(null);
   const [trabajadores, setTrabajadores] = useState<any[]>([]);
+  const [especialidadesList, setEspecialidadesList] = useState<string[]>([]);
+  const [filterEspecialidad, setFilterEspecialidad] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({
     enObra: 0,
@@ -21,7 +23,13 @@ export default function Trabajadores() {
 
   useEffect(() => {
      fetchTrabajadores();
+     fetchEspecialidades();
   }, []);
+
+  const fetchEspecialidades = async () => {
+      const { data } = await supabase.from('especialidades').select('nombre').order('nombre');
+      if (data) setEspecialidadesList(data.map(e => e.nombre));
+  };
 
   const fetchTrabajadores = async () => {
       setLoading(true);
@@ -139,8 +147,15 @@ export default function Trabajadores() {
             />
           </div>
           <div className="flex items-center gap-3">
-             <select className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-medium">
-               <option>Todas las Especialidades</option>
+             <select
+               className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-medium"
+               value={filterEspecialidad}
+               onChange={(e) => setFilterEspecialidad(e.target.value)}
+             >
+               <option value="">Todas las Especialidades</option>
+               {especialidadesList.map(esp => (
+                 <option key={esp} value={esp.toLowerCase()}>{esp}</option>
+               ))}
              </select>
              <select className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-medium">
                <option>Todos los Estados</option>
@@ -170,7 +185,9 @@ export default function Trabajadores() {
                   ) : trabajadores.length === 0 ? (
                      <tr><td colSpan={6} className="text-center py-8">No hay trabajadores registrados.</td></tr>
                   ) : (
-                     trabajadores.map(trabajador => (
+                     trabajadores
+                        .filter(t => !filterEspecialidad || t.especialidad?.toLowerCase() === filterEspecialidad)
+                        .map(trabajador => (
                         <tr key={trabajador.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                            <td className="px-6 py-4">
                               <div className="flex items-center gap-3">

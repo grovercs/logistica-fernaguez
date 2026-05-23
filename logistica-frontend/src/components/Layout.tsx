@@ -3,7 +3,7 @@ import { NavLink, Outlet, Navigate, useNavigate, useLocation } from 'react-route
 import {
   LayoutDashboard, Users, CalendarClock, Briefcase, UserPlus,
   Shield, Key, Database, ClipboardList, Settings, LogOut,
-  ListChecks, Menu, X, Moon, Sun
+  ListChecks, Menu, X, Moon, Sun, Wrench
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../hooks/useTheme';
@@ -230,6 +230,18 @@ const Layout = () => {
             >
               <ListChecks className="w-5 h-5 mr-3" />
               Tareas Frecuentes
+            </NavLink>
+
+            <NavLink
+              to="/especialidades"
+              className={({ isActive }) =>
+                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`
+              }
+            >
+              <Wrench className="w-5 h-5 mr-3" />
+              Especialidades
             </NavLink>
 
             <div className="pt-6 pb-2">

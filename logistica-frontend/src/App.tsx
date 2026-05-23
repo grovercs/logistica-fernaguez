@@ -16,6 +16,7 @@ import Bd from './pages/Bd';
 import Login from './pages/Login';
 import TareasFrecuentes from './pages/TareasFrecuentes';
 import Configuracion from './pages/Configuracion';
+import Especialidades from './pages/Especialidades';
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
           <Route path="liquidaciones" element={<Liquidaciones />} />
           <Route path="aseguradoras" element={<Aseguradoras />} />
           <Route path="tareas-frecuentes" element={<TareasFrecuentes />} />
+          <Route path="especialidades" element={<Especialidades />} />
           <Route path="trabajadores" element={<Trabajadores />} />
           <Route path="usuarios" element={<Usuarios />} />
           <Route path="bd" element={<Bd />} />
