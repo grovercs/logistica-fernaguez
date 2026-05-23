@@ -13,7 +13,6 @@ export default function OrdenDetalle() {
   const navigate = useNavigate();
   const [orden, setOrden] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEditReporteModalOpen, setIsEditReporteModalOpen] = useState(false);
   const [selectedReporte, setSelectedReporte] = useState<any>(null);
@@ -29,18 +28,12 @@ export default function OrdenDetalle() {
     return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
   };
 
-  // Polling: refrescar orden cada 5s para ver cambios del técnico en mobile
   useEffect(() => {
     if (!id) return;
-    fetchOrden(id, true);
-    const interval = setInterval(() => {
-      fetchOrden(id, false);
-    }, 5000);
-    return () => clearInterval(interval);
+    fetchOrden(id);
   }, [id]);
 
-  const fetchOrden = async (orderId: string, initial = false) => {
-    if (!initial) setSyncing(true);
+  const fetchOrden = async (orderId: string) => {
     const [ordenReq, reportesReq, trabReq] = await Promise.all([
       supabase.from('ordenes').select('*').eq('id', orderId).single(),
       supabase.from('reportes').select('*').eq('orden_id', orderId),
@@ -56,8 +49,7 @@ export default function OrdenDetalle() {
     if (!trabReq.error && trabReq.data) {
       setTrabajadores(trabReq.data);
     }
-    if (initial) setLoading(false);
-    setSyncing(false);
+    setLoading(false);
   };
 
   const handleArchive = async () => {
@@ -204,7 +196,7 @@ export default function OrdenDetalle() {
                 <h2 className="text-xl font-bold">Detalle de Intervención</h2>
               </div>
               <div className="flex items-center gap-3">
-                <p className="text-slate-500 text-sm font-medium">Reporte: <span className="text-primary font-bold">{orden.id_legible}</span>{syncing && <span className="ml-2 text-[10px] text-slate-400 animate-pulse">(sincronizando...)</span>}</p>
+                <p className="text-slate-500 text-sm font-medium">Reporte: <span className="text-primary font-bold">{orden.id_legible}</span></p>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${orden.estado === 'Urgente' ? 'bg-red-100 text-red-700 dark:bg-red-900/30' :
                     orden.estado === 'En revisión' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30' :
                       orden.estado === 'Pendiente de firma' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30' :
