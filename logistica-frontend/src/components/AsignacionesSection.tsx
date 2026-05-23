@@ -38,18 +38,18 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
   const [formNotas, setFormNotas] = useState('');
 
   useEffect(() => {
-    fetchAsignaciones();
+    fetchAsignaciones(false);
     fetchTrabajadores();
 
-    // Polling: refrescar asignaciones cada 5s para ver cambios del tecnico en mobile
+    // Polling: refrescar asignaciones cada 10s para ver cambios del tecnico en mobile
     const interval = setInterval(() => {
-      fetchAsignaciones();
-    }, 5000);
+      fetchAsignaciones(true);
+    }, 10000);
     return () => clearInterval(interval);
   }, [ordenId]);
 
-  const fetchAsignaciones = async () => {
-    setLoading(true);
+  const fetchAsignaciones = async (silent = false) => {
+    if (!silent) setLoading(true);
     const { data, error } = await supabase
       .from('orden_asignaciones')
       .select(`
@@ -206,7 +206,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       setShowAddForm(false);
       setFormTrabajador('');
       setFormNotas('');
-      fetchAsignaciones();
+      fetchAsignaciones(false);
       onUpdate?.();
 
     } catch (error: any) {
@@ -225,7 +225,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       .eq('id', asignacionId);
 
     if (!error) {
-      fetchAsignaciones();
+      fetchAsignaciones(false);
       onUpdate?.();
     }
   };
@@ -239,7 +239,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       .eq('id', asignacionId);
 
     if (!error) {
-      fetchAsignaciones();
+      fetchAsignaciones(false);
       onUpdate?.();
     }
   };
