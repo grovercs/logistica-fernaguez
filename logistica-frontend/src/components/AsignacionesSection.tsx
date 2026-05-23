@@ -141,6 +141,17 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
         return;
       }
 
+      // 0. Cancelar asignaciones anteriores no completadas para evitar duplicados
+      const { error: cancelError } = await supabase
+        .from('orden_asignaciones')
+        .update({ estado: 'cancelado' })
+        .eq('orden_id', ordenId)
+        .neq('estado', 'completado');
+
+      if (cancelError) {
+        console.error('[Asignacion] Error cancelando asignaciones previas:', cancelError);
+      }
+
       // 1. Insertamos la nueva asignación (FK apunta a trabajadores.id)
       const insertPayload = {
         orden_id: ordenId,

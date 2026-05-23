@@ -548,18 +548,22 @@ const MobileDetalleOrden = () => {
             return;
         }
         
-        // 2. Update Order Status
+        // 2. Update Order Status - USE orden.id (real UUID) not id (could be id_legible)
+        const realOrderId = orden?.id || id;
         const newEstado = isFinished ? 'En revisión' : 'En Curso';
-        
-        await supabase
+
+        const { error: ordenUpdateError } = await supabase
             .from('ordenes')
-            .update({ 
+            .update({
                 estado: newEstado,
             })
-            .eq('id', id);
+            .eq('id', realOrderId);
 
-        // 3. Sync with Assignment status
-        // Obtenemos el id interno del trabajador (no el auth_user_id) para cruzar con orden_asignaciones
+        if (ordenUpdateError) {
+            console.error('Error updating order status:', ordenUpdateError);
+        }
+
+        // 3. Sync with Assignment status - USE realOrderId (UUID)
         const { data: userData } = await supabase.auth.getUser();
         if (userData.user) {
             const { data: worker } = await supabase
@@ -569,14 +573,18 @@ const MobileDetalleOrden = () => {
                 .single();
 
             if (worker?.id) {
-                await supabase
+                const { error: asigUpdateError } = await supabase
                     .from('orden_asignaciones')
                     .update({
                         estado: isFinished ? 'completado' : 'en_progreso'
                     })
-                    .eq('orden_id', id)
+                    .eq('orden_id', realOrderId)
                     .eq('trabajador_id', worker.id)
                     .neq('estado', 'completado'); // Only update if not already completed
+
+                if (asigUpdateError) {
+                    console.error('Error updating assignment status:', asigUpdateError);
+                }
             }
         }
 
