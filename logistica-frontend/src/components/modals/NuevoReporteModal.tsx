@@ -148,7 +148,15 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
     setLoading(true);
 
     const year = new Date().getFullYear();
-    const id_legible = `OB-${year}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const { data: id_legible, error: idError } = await supabase.rpc('generar_id_orden', {
+      prefijo: 'OB',
+      anio: year
+    });
+    if (idError || !id_legible) {
+      alert('Error generando el número de orden. Inténtalo de nuevo.');
+      setLoading(false);
+      return;
+    }
 
     const now = new Date().toISOString();
 
