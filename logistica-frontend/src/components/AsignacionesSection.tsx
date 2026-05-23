@@ -40,6 +40,12 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
   useEffect(() => {
     fetchAsignaciones();
     fetchTrabajadores();
+
+    // Polling: refrescar asignaciones cada 5s para ver cambios del tecnico en mobile
+    const interval = setInterval(() => {
+      fetchAsignaciones();
+    }, 5000);
+    return () => clearInterval(interval);
   }, [ordenId]);
 
   const fetchAsignaciones = async () => {
