@@ -313,6 +313,7 @@ const Layout = () => {
                 </NavLink>
               </>
             )}
+          </nav>
 
           {/* Footer */}
           <div className="p-3 border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50">

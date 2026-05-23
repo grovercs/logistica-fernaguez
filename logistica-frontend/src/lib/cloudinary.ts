@@ -108,7 +108,7 @@ export async function deleteCloudinaryImages(
   }
 
   try {
-    const { data, error } = await supabaseClient.functions.invoke(
+    const { error } = await supabaseClient.functions.invoke(
       'delete-cloudinary-images',
       {
         body: { public_ids: publicIds },
