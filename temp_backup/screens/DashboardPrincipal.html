@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Gestión OT - Dashboard Principal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
+<div class="flex h-screen overflow-hidden">
+<!-- SideNavBar -->
+<aside class="w-64 flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800">
+<div class="p-6 flex items-center gap-3">
+<div class="size-10 bg-primary rounded-lg flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-2xl">construction</span>
+</div>
+<div class="flex flex-col">
+<h1 class="text-slate-900 dark:text-white text-base font-bold leading-none">Gestión OT</h1>
+<p class="text-slate-500 dark:text-slate-400 text-xs font-medium">Panel Admin</p>
+</div>
+</div>
+<nav class="flex-1 px-4 py-2 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary text-white" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+<span class="text-sm font-medium">Calendario</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="text-sm font-medium">Órdenes</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="text-sm font-medium">Clientes</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">engineering</span>
+<span class="text-sm font-medium">Técnicos</span>
+</a>
+</nav>
+<div class="p-4 border-t border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-3 p-2">
+<div class="size-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center overflow-hidden">
+<img alt="Profile" class="size-full object-cover" data-alt="Foto de perfil del administrador" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXUnuOkQ2W1v6C7Qx-Cd07LUpU4VWZrGohPeV0pBpkcZYDtpoCMhQfglaccqOXfiAkVVa4CvnFkpDvo9za-eRjksJ7OHrQJBYVYWEeSfkaothvbvYXiJi6aPiWPfeTWW9IU2WwwwULA1HIbp_gnkv9cFaB1T4SOIv8TlXKR6f36bsfnO2zV_tJ6NSzLhp7WFhlcPzyaFmow0N33pQJ0u4JaZQTCFSImWP67n5M5ThhWpf0E2VrqpR86mw6CuJiECK00NAbW96CfFw"/>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-xs font-bold truncate">Carlos Admin</p>
+<p class="text-[10px] text-slate-500 truncate">carlos@gestionot.com</p>
+</div>
+<span class="material-symbols-outlined text-slate-400 text-sm">logout</span>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col overflow-y-auto">
+<!-- Header -->
+<header class="h-16 flex items-center justify-between px-8 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10">
+<h2 class="text-lg font-bold text-slate-900 dark:text-white">Dashboard Principal</h2>
+<div class="flex items-center gap-6">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+<input class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/50 placeholder:text-slate-500" placeholder="Buscar órdenes, técnicos..." type="text"/>
+</div>
+<div class="flex items-center gap-3">
+<button class="size-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-primary/10 hover:text-primary transition-all relative">
+<span class="material-symbols-outlined text-xl">notifications</span>
+<span class="absolute top-2 right-2 size-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>
+</button>
+</div>
+</div>
+</header>
+<div class="p-8 space-y-8">
+<!-- Summary Cards -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
+<div class="size-12 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
+<span class="material-symbols-outlined">pending_actions</span>
+</div>
+<div>
+<p class="text-sm font-medium text-slate-500 dark:text-slate-400">Pendientes</p>
+<p class="text-2xl font-bold">12</p>
+<p class="text-xs text-green-600 font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">trending_up</span> +5% hoy
+                            </p>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
+<div class="size-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">sync</span>
+</div>
+<div>
+<p class="text-sm font-medium text-slate-500 dark:text-slate-400">En Proceso</p>
+<p class="text-2xl font-bold">8</p>
+<p class="text-xs text-slate-500 font-medium">Sin cambios hoy</p>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
+<div class="size-12 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600">
+<span class="material-symbols-outlined">check_circle</span>
+</div>
+<div>
+<p class="text-sm font-medium text-slate-500 dark:text-slate-400">Finalizadas</p>
+<p class="text-2xl font-bold">25</p>
+<p class="text-xs text-green-600 font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">trending_up</span> +10% hoy
+                            </p>
+</div>
+</div>
+</section>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Left Column: Activity & Table -->
+<div class="lg:col-span-2 space-y-8">
+<!-- Weekly Activity Chart -->
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between mb-8">
+<div>
+<h3 class="text-base font-bold">Actividad Semanal</h3>
+<p class="text-xs text-slate-500">Órdenes completadas los últimos 7 días</p>
+</div>
+<span class="text-sm font-bold text-primary">145 Órdenes</span>
+</div>
+<div class="flex items-end justify-between h-40 gap-2 px-2">
+<div class="flex-1 flex flex-col items-center gap-2 group">
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
+<div class="w-full bg-primary/40 group-hover:bg-primary transition-all" style="height: 40%;"></div>
+</div>
+<span class="text-[10px] font-bold text-slate-500">Lun</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2 group">
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
+<div class="w-full bg-primary/40 group-hover:bg-primary transition-all" style="height: 90%;"></div>
+</div>
+<span class="text-[10px] font-bold text-slate-500">Mar</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2 group">
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
+<div class="w-full bg-primary/40 group-hover:bg-primary transition-all" style="height: 25%;"></div>
+</div>
+<span class="text-[10px] font-bold text-slate-500">Mié</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2 group">
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
+<div class="w-full bg-primary/40 group-hover:bg-primary transition-all" style="height: 80%;"></div>
+</div>
+<span class="text-[10px] font-bold text-slate-500">Jue</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2 group">
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
+<div class="w-full bg-primary/40 group-hover:bg-primary transition-all" style="height: 70%;"></div>
+</div>
+<span class="text-[10px] font-bold text-slate-500">Vie</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2 group">
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
+<div class="w-full bg-primary/40 group-hover:bg-primary transition-all" style="height: 95%;"></div>
+</div>
+<span class="text-[10px] font-bold text-slate-500">Sáb</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2 group">
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative flex items-end overflow-hidden h-full">
+<div class="w-full bg-primary/40 group-hover:bg-primary transition-all" style="height: 60%;"></div>
+</div>
+<span class="text-[10px] font-bold text-slate-500">Dom</span>
+</div>
+</div>
+</div>
+<!-- Recent Orders -->
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+<div class="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+<h3 class="text-base font-bold">Órdenes Recientes</h3>
+<button class="text-sm font-medium text-primary hover:underline">Ver todas</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-sm">
+<thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 font-medium">
+<tr>
+<th class="px-6 py-3">ID OT</th>
+<th class="px-6 py-3">Cliente</th>
+<th class="px-6 py-3">Servicio</th>
+<th class="px-6 py-3">Estado</th>
+<th class="px-6 py-3 text-right">Acción</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4 font-bold">#4582</td>
+<td class="px-6 py-4">Mantenimiento ABC</td>
+<td class="px-6 py-4 text-slate-500">Aire Acondicionado</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-500 uppercase">Pendiente</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4 font-bold">#4581</td>
+<td class="px-6 py-4">Sistemas Global</td>
+<td class="px-6 py-4 text-slate-500">Instalación Red</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-bold bg-primary/10 text-primary uppercase">En Proceso</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4 font-bold">#4579</td>
+<td class="px-6 py-4">Edificio Central</td>
+<td class="px-6 py-4 text-slate-500">Reparación Eléctrica</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-500 uppercase">Finalizada</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Right Column: Quick Access Calendar / Tasks -->
+<div class="space-y-8">
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<h3 class="text-base font-bold mb-6">Calendario de Hoy</h3>
+<div class="space-y-4">
+<!-- Calendar Item -->
+<div class="flex gap-4 group">
+<div class="flex flex-col items-center">
+<span class="text-xs font-bold text-primary">09:00</span>
+<div class="w-px h-full bg-slate-100 dark:bg-slate-800 my-2"></div>
+</div>
+<div class="flex-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border-l-4 border-primary">
+<p class="text-sm font-bold truncate">Revisión Preventiva</p>
+<p class="text-xs text-slate-500">Técnico: Roberto M.</p>
+</div>
+</div>
+<!-- Calendar Item -->
+<div class="flex gap-4 group">
+<div class="flex flex-col items-center">
+<span class="text-xs font-bold text-slate-400">11:30</span>
+<div class="w-px h-full bg-slate-100 dark:bg-slate-800 my-2"></div>
+</div>
+<div class="flex-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border-l-4 border-amber-400">
+<p class="text-sm font-bold truncate">Reparación Urgente</p>
+<p class="text-xs text-slate-500">Técnico: Ana J.</p>
+</div>
+</div>
+<!-- Calendar Item -->
+<div class="flex gap-4 group">
+<div class="flex flex-col items-center">
+<span class="text-xs font-bold text-slate-400">14:00</span>
+<div class="w-px h-full bg-slate-100 dark:bg-slate-800 my-2"></div>
+</div>
+<div class="flex-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border-l-4 border-slate-300">
+<p class="text-sm font-bold truncate">Entrega de Materiales</p>
+<p class="text-xs text-slate-500">Almacén Central</p>
+</div>
+</div>
+</div>
+<button class="w-full mt-6 py-2 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors">
+                                Abrir Calendario Completo
+                            </button>
+</div>
+<!-- Quick Actions -->
+<div class="bg-primary p-6 rounded-xl shadow-lg shadow-primary/20 text-white relative overflow-hidden">
+<div class="relative z-10">
+<h3 class="text-base font-bold mb-2">Nueva Orden</h3>
+<p class="text-white/80 text-sm mb-6">Asigna una nueva orden de trabajo de forma rápida.</p>
+<button class="bg-white text-primary px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-100 transition-all">
+<span class="material-symbols-outlined">add</span>
+                                    Crear Ahora
+                                </button>
+</div>
+<span class="material-symbols-outlined absolute -bottom-4 -right-4 text-9xl text-white/10 select-none">post_add</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

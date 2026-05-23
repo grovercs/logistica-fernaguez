@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Histórico de Compactación - ERP Gestión de Obras</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
+<div class="flex h-screen overflow-hidden">
+<!-- SideNavBar -->
+<aside class="w-72 bg-white dark:bg-slate-900 border-r border-primary/10 flex flex-col shrink-0">
+<div class="p-6 flex items-center gap-3">
+<div class="h-10 w-10 bg-primary rounded-lg flex items-center justify-center text-white">
+<span class="material-symbols-outlined">architecture</span>
+</div>
+<div class="flex flex-col">
+<h1 class="text-sm font-bold uppercase tracking-wider text-primary">ERP Obras</h1>
+<p class="text-xs text-slate-500 dark:text-slate-400">Panel Administrador</p>
+</div>
+</div>
+<nav class="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+<span class="text-sm font-medium">Tablero</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">bar_chart</span>
+<span class="text-sm font-medium">Reportes</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">description</span>
+<span class="text-sm font-medium">Liquidaciones</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">verified_user</span>
+<span class="text-sm font-medium">Aseguradoras</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">groups</span>
+<span class="text-sm font-medium">Trabajadores</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">account_circle</span>
+<span class="text-sm font-medium">Usuarios</span>
+</a>
+<div class="pt-4 pb-2 px-3">
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sistema</p>
+</div>
+<a class="flex items-center gap-3 px-3 py-2 bg-primary/10 text-primary rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px] fill-current">database</span>
+<span class="text-sm font-medium">Compactar BD</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">admin_panel_settings</span>
+<span class="text-sm font-medium">Roles Management</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">key</span>
+<span class="text-sm font-medium">Permissions</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard_customize</span>
+<span class="text-sm font-medium">RBAC Dashboard</span>
+</a>
+</nav>
+<div class="p-4 border-t border-primary/10">
+<div class="flex items-center gap-3 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+<div class="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-sm">person</span>
+</div>
+<div class="flex-1 overflow-hidden">
+<p class="text-xs font-semibold truncate">Admin User</p>
+<p class="text-[10px] text-slate-500 truncate">admin@erpobras.com</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark">
+<header class="h-16 border-b border-primary/10 bg-white dark:bg-slate-900 px-8 flex items-center justify-between sticky top-0 z-10">
+<div class="flex items-center gap-2">
+<span class="text-slate-400">Configuración</span>
+<span class="material-symbols-outlined text-sm text-slate-400">chevron_right</span>
+<span class="font-medium">Compactación de Base de Datos</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-500 hover:bg-primary/5 rounded-full">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-slate-500 hover:bg-primary/5 rounded-full">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</header>
+<div class="p-8 max-w-7xl mx-auto">
+<div class="mb-8">
+<h2 class="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Compactación de Base de Datos</h2>
+<p class="mt-2 text-slate-500 dark:text-slate-400">Gestione la optimización de almacenamiento archivando registros históricos del sistema.</p>
+</div>
+<!-- Tab Navigation -->
+<div class="flex border-b border-primary/10 mb-8">
+<button class="px-6 py-4 text-sm font-semibold text-slate-500 dark:text-slate-400 border-b-2 border-transparent hover:text-primary transition-all">
+                    Ejecutar Compactación
+                </button>
+<button class="px-6 py-4 text-sm font-bold text-primary border-b-2 border-primary">
+                    Histórico
+                </button>
+</div>
+<!-- Stats Overview (Optional but professional) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-primary/10 shadow-sm">
+<p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Archivados</p>
+<p class="text-2xl font-black text-primary">1,245,890</p>
+<p class="text-[11px] text-green-500 mt-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">trending_up</span> +12% vs año anterior
+                    </p>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-primary/10 shadow-sm">
+<p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Última Ejecución</p>
+<p class="text-2xl font-black text-slate-800 dark:text-slate-200">20/01/2024</p>
+<p class="text-[11px] text-slate-500 mt-2">Hace 14 días</p>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-primary/10 shadow-sm">
+<p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Espacio Recuperado</p>
+<p class="text-2xl font-black text-slate-800 dark:text-slate-200">4.2 GB</p>
+<p class="text-[11px] text-slate-500 mt-2">Promedio de 1.05 GB por lote</p>
+</div>
+</div><div class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-primary/10 shadow-sm mb-6 flex flex-wrap items-end gap-4">
+<div class="flex-1 min-w-[240px]">
+<label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1" for="search-obra">Referencia de Obra</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-primary/10 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-200" id="search-obra" placeholder="Buscar por referencia..." type="text"/>
+</div>
+</div>
+<div class="w-full md:w-64">
+<label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1" for="filter-aseguradora">Aseguradora</label>
+<select class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-primary/10 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-200 appearance-none" id="filter-aseguradora">
+<option value="">Todas las aseguradoras</option>
+<option value="1">Seguros Atlas</option>
+<option value="2">Mapfre</option>
+<option value="3">AXA Seguros</option>
+</select>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-6 py-2 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">filter_list</span>
+            Filtrar
+        </button>
+<button class="px-6 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">restart_alt</span>
+            Limpiar
+        </button>
+</div>
+</div>
+<!-- Historical Table -->
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-primary/10 shadow-sm overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50 dark:bg-slate-800/50">
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ID</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Inicio Periodo</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Fin Periodo</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Registros Archivados</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Fecha Ejecución</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Acción</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-primary/5">
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-6 py-4">
+<span class="text-xs font-mono font-bold text-slate-400">#CP-004</span>
+</td>
+<td class="px-6 py-4 text-sm font-medium">01/10/2023</td>
+<td class="px-6 py-4 text-sm font-medium">31/12/2023</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary">
+                                        310,000 recs
+                                    </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">20/01/2024</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:text-primary/80 font-bold text-xs uppercase tracking-widest flex items-center gap-1 ml-auto">
+<span class="material-symbols-outlined text-sm">settings_backup_restore</span> Restaurar
+                                    </button>
+</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-6 py-4">
+<span class="text-xs font-mono font-bold text-slate-400">#CP-003</span>
+</td>
+<td class="px-6 py-4 text-sm font-medium">01/07/2023</td>
+<td class="px-6 py-4 text-sm font-medium">30/09/2023</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary">
+                                        185,000 recs
+                                    </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">12/10/2023</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:text-primary/80 font-bold text-xs uppercase tracking-widest flex items-center gap-1 ml-auto">
+<span class="material-symbols-outlined text-sm">settings_backup_restore</span> Restaurar
+                                    </button>
+</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-6 py-4">
+<span class="text-xs font-mono font-bold text-slate-400">#CP-002</span>
+</td>
+<td class="px-6 py-4 text-sm font-medium">01/04/2023</td>
+<td class="px-6 py-4 text-sm font-medium">30/06/2023</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary">
+                                        220,000 recs
+                                    </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">05/07/2023</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:text-primary/80 font-bold text-xs uppercase tracking-widest flex items-center gap-1 ml-auto">
+<span class="material-symbols-outlined text-sm">settings_backup_restore</span> Restaurar
+                                    </button>
+</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-6 py-4">
+<span class="text-xs font-mono font-bold text-slate-400">#CP-001</span>
+</td>
+<td class="px-6 py-4 text-sm font-medium">01/01/2023</td>
+<td class="px-6 py-4 text-sm font-medium">31/03/2023</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary">
+                                        150,000 recs
+                                    </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">15/04/2023</td>
+<td class="px-6 py-4 text-right">
+<button class="text-primary hover:text-primary/80 font-bold text-xs uppercase tracking-widest flex items-center gap-1 ml-auto">
+<span class="material-symbols-outlined text-sm">settings_backup_restore</span> Restaurar
+                                    </button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="px-6 py-4 border-t border-primary/5 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+<p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Mostrando 1 a 4 de 12 registros</p>
+<div class="flex items-center gap-1">
+<button class="p-1 text-slate-400 hover:bg-primary/10 rounded">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="px-3 py-1 text-xs font-bold bg-primary text-white rounded">1</button>
+<button class="px-3 py-1 text-xs font-bold text-slate-500 hover:bg-primary/10 rounded">2</button>
+<button class="px-3 py-1 text-xs font-bold text-slate-500 hover:bg-primary/10 rounded">3</button>
+<button class="p-1 text-slate-400 hover:bg-primary/10 rounded">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

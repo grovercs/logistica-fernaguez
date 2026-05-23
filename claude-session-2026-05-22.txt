@@ -1,0 +1,94 @@
+RESUMEN DE SESION — 2026-05-22 (Casa Vielha)
+=============================================================
+
+PROYECTO: Logistica Fernaguez (React + Supabase + Netlify)
+SISTEMA: Windows 10 + WAMP64 + PowerShell
+
+-------------------------------------------------------------
+1. REPORTE DE SERVICIO IMPRIMIBLE (PrintableOrden)
+-------------------------------------------------------------
+- Estado: COMPLETADO y desplegado en produccion.
+- Commit: master@b359527 (feat: professional printable service report layout)
+- Cambios:
+  * PrintableOrden.tsx: reescrito como reporte A4 profesional
+  * Secciones estructuradas: header, datos del servicio, descripcion del encargo,
+    detalle de trabajos realizados (cada intervencion en su caja), resumen + firmas
+    (bloque indivisible con page-break-inside: avoid), anexo fotografico en pagina nueva
+  * Footer con position: fixed + @page margin inferior para repetir en todas las paginas
+    sin superponerse al contenido
+  * Logo como imagen en el header (logo_fernaguez_blk.png)
+  * Metodo de impresion: window.print() (html2pdf.js fue probado y descartado por
+    renderizar paginas en blanco)
+  * Tooltip en el boton de imprimir recordando desactivar "Encabezados y pies de pagina"
+    del navegador para un resultado limpio
+
+NOTA: Si aparece la URL del navegador al imprimir, es normal. El usuario debe desmarcar
+"Encabezados y pies de pagina" en el dialogo de impresion (Chrome/Edge).
+
+-------------------------------------------------------------
+2. FILTRO POR TRABAJADOR EN LISTA DE ORDENES
+-------------------------------------------------------------
+- Estado: COMPLETADO y desplegado en produccion (mismo commit)
+- Web (Ordenes.tsx):
+  * Boton desplegable junto a "Nueva Orden" con lista de todos los tecnicos
+  * Al filtrar, las ordenes se ordenan por prioridad de estado (Urgente > En Curso >
+    Pendiente de firma > En revision > Pendiente > Finalizada > Cancelada > Archivado)
+    y luego por mas recientes dentro de cada estado
+- Mobile (MobileOrdenes.tsx):
+  * Icono de filtro en la esquina superior derecha (junto al boton de salir)
+  * Menu desplegable con todos los tecnicos + "Todos los tecnicos"
+  * Etiqueta del filtro activo debajo del titulo con boton para quitarlo rapido
+  * Misma ordenacion por prioridad de estado
+
+-------------------------------------------------------------
+3. SISTEMA DE SINCRONIZACION DE MEMORIAS (casa <-> oficina)
+-------------------------------------------------------------
+- Estado: COMPLETADO y funcionando
+- Repo central: https://github.com/grovercs/claude-memories
+- Ubicacion en casa: C:\wamp64\www\claude-memories
+- Ubicacion en oficina: C:\Proyectos\antigravity\claude-memories
+- Scripts:
+  * push-memory.ps1  -> sube memorias locales a GitHub (ejecutar al terminar)
+  * pull-memory.ps1  -> baja memorias del repo a la PC (ejecutar al empezar)
+- Compatibilidad: PowerShell 5.1 (sin comillas dobles anidadas)
+- Proyectos sincronizados actualmente:
+  * logistica-fernaguez
+  * ribera-estadisticas
+  * lhostalet
+  * landing-tossa
+  * martimpeberat
+  * marketing-claude
+  * N8N
+
+-------------------------------------------------------------
+4. PENDIENTE: SISTEMA DE GESTION DE ESPECIALIDADES
+-------------------------------------------------------------
+- Plan guardado en: C:\Users\Estacion\.claude\plans\quirky-doodling-stallman.md
+- Objetivo: crear un panel igual que "Tareas Frecuentes" pero para especialidades de
+  trabajadores, de forma que se puedan anadir/editar/borrar desde la app sin tocar codigo.
+- Pasos planificados:
+  1. Migracion SQL: crear tabla especialidades + RLS + seed data (las 6 actuales)
+  2. Nueva pagina: Especialidades.tsx (copiar patron de TareasFrecuentes.tsx)
+  3. Ruta + navegacion: App.tsx y Layout.tsx
+  4. Actualizar AltaTrabajadorModal.tsx y EditarTrabajadorModal.tsx para leer
+     especialidades dinamicamente desde Supabase en vez de hardcodeadas
+  5. Actualizar filtro de especialidades en Trabajadores.tsx
+- Estimacion: 7 archivos a modificar + 1 migracion SQL
+- Nota: Se dejo para el dia siguiente (2026-05-23) por ser un cambio grande y preferir
+  trabajarlo con cabeza fresca.
+
+-------------------------------------------------------------
+COMMITS SUBIDOS A GITHUB / DESPLEGADOS EN NETLIFY
+-------------------------------------------------------------
+- f81f88b  feat: professional printable service report layout
+- b359527  feat: add worker filter to orders list on web and mobile
+
+Ultimo push del dia: master@b359527
+
+-------------------------------------------------------------
+NOTAS PARA LA SIGUIENTE SESION
+-------------------------------------------------------------
+- Al empezar: ejecutar .\scripts\pull-memory.ps1 para sincronizar memorias
+- El dev server de Vite esta corriendo en http://localhost:5173
+- El proyecto landing-tossa esta registrado en memoria pero no se ha trabajado en el codigo
+- Recordar: ser decisivo, no cambiar de enfoque sin bloqueo claro (feedback del usuario)

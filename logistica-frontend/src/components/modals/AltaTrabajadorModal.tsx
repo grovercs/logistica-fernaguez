@@ -43,7 +43,7 @@ export default function AltaTrabajadorModal({ isOpen, onClose, onCreated }: Alta
           nombre: nombre,
           apellidos: apellidos,
           dni: formData.dni,
-          especialidad: formData.especialidad.toLowerCase(),
+          especialidad: formData.especialidad,
           telefono: formData.telefono,
           telegram_chat_id: formData.telegram_chat_id || null,
           email: formData.email,
