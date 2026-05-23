@@ -148,21 +148,24 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
     setLoading(true);
 
     const year = new Date().getFullYear();
-    const { data: lastOrden } = await supabase
+    const { data: ordenesExistentes } = await supabase
       .from('ordenes')
       .select('id_legible')
-      .ilike('id_legible', `OB-${year}-%`)
-      .order('id_legible', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .ilike('id_legible', `OB-${year}-____`)
+      .order('creado_en', { ascending: false })
+      .limit(100);
 
-    let nextNum = 1;
-    if (lastOrden?.id_legible) {
-      const parts = lastOrden.id_legible.split('-');
-      const lastNum = parseInt(parts[2], 10);
-      if (!isNaN(lastNum)) nextNum = lastNum + 1;
+    let maxNum = 0;
+    const regex = new RegExp(`^OB-${year}-(\\d{4})$`);
+    for (const o of (ordenesExistentes || [])) {
+      const match = o.id_legible?.match(regex);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
     }
 
+    const nextNum = maxNum + 1;
     const id_legible = `OB-${year}-${String(nextNum).padStart(4, '0')}`;
 
     const now = new Date().toISOString();
