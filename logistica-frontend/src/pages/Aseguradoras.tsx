@@ -45,6 +45,18 @@ export default function Aseguradoras() {
       }
   };
 
+  const handleDeactivate = async (id: string) => {
+      if (window.confirm('¿Desactivar este cliente? Seguirá visible en órdenes antiguas pero no aparecerá al crear órdenes nuevas.')) {
+          const { error } = await supabase.from('aseguradoras').update({ estado: 'Inactiva' }).eq('id', id);
+          if (!error) {
+              fetchAseguradoras();
+          } else {
+              console.error('Error deactivating:', error);
+              alert('Error al desactivar el cliente.');
+          }
+      }
+  };
+
   const handleDelete = async (id: string, nombre: string) => {
       // Verificar si hay órdenes asociadas a este cliente
       const { data: ordenesAsociadas, error: errCount } = await supabase
@@ -58,11 +70,12 @@ export default function Aseguradoras() {
       }
 
       if (ordenesAsociadas && ordenesAsociadas.length > 0) {
-          alert('No se puede borrar este cliente porque tiene órdenes de trabajo asociadas. Desactívalo cambiando su estado a "Inactiva" en su lugar.');
+          alert('No se puede borrar este cliente porque tiene órdenes de trabajo asociadas. Desactívalo en su lugar.');
           return;
       }
 
-      if (window.confirm('¿Estás seguro de que deseas borrar este cliente?')) {
+      const msg = 'ADVERTENCIA: Esta acción es irreversible. ¿Estás completamente seguro de que deseas borrar permanentemente este cliente?';
+      if (window.confirm(msg)) {
           const { error } = await supabase.from('aseguradoras').delete().eq('id', id);
           if (!error) {
               fetchAseguradoras();
@@ -206,10 +219,19 @@ export default function Aseguradoras() {
                               >
                                 <span className="material-symbols-outlined text-[18px]">edit</span>
                               </button>
+                              {aseguradora.estado === 'Activa' && (
+                                <button
+                                  onClick={() => handleDeactivate(aseguradora.id)}
+                                  className="size-8 flex items-center justify-center text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-all"
+                                  title="Desactivar"
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">block</span>
+                                </button>
+                              )}
                               <button
                                 onClick={() => handleDelete(aseguradora.id, aseguradora.nombre)}
                                 className="size-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
-                                title="Borrar"
+                                title="Borrar permanentemente"
                               >
                                 <span className="material-symbols-outlined text-[18px]">delete</span>
                               </button>
