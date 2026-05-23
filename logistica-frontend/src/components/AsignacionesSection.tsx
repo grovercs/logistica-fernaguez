@@ -161,9 +161,15 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       if (assignError) throw assignError;
 
       // 2. Sincronizamos la tabla principal de ordenes (tecnico_id suele ser auth_user_id)
+      // Si la orden estaba en revision o finalizada, la reabrimos a En Curso para el nuevo tecnico
+      const updates: any = { tecnico_id: selectedWorker.auth_user_id || selectedWorker.id };
+      if (orden?.estado === 'En revision' || orden?.estado === 'Finalizada') {
+        updates.estado = 'En Curso';
+      }
+
       const { error: updateError } = await supabase
         .from('ordenes')
-        .update({ tecnico_id: selectedWorker.auth_user_id || selectedWorker.id })
+        .update(updates)
         .eq('id', ordenId);
 
       if (updateError) throw updateError;
