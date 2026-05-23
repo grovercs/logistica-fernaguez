@@ -3,7 +3,7 @@ import { NavLink, Outlet, Navigate, useNavigate, useLocation } from 'react-route
 import {
   LayoutDashboard, Users, CalendarClock, Briefcase, UserPlus,
   Shield, Key, Database, ClipboardList, Settings, LogOut,
-  ListChecks, Menu, X, Moon, Sun, Wrench
+  ListChecks, Menu, X, Moon, Sun, Wrench, BookOpen
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../hooks/useTheme';
@@ -317,6 +317,24 @@ const Layout = () => {
                 </NavLink>
               </>
             )}
+
+            <div className="pt-6 pb-2">
+              <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
+                Soporte
+              </p>
+            </div>
+
+            <NavLink
+              to="/ayuda"
+              className={({ isActive }) =>
+                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`
+              }
+            >
+              <BookOpen className="w-5 h-5 mr-3" />
+              Manual de Usuario
+            </NavLink>
           </nav>
 
           {/* Footer */}

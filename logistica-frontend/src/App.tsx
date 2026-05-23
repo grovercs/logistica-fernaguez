@@ -18,6 +18,7 @@ import Login from './pages/Login';
 import TareasFrecuentes from './pages/TareasFrecuentes';
 import Configuracion from './pages/Configuracion';
 import Especialidades from './pages/Especialidades';
+import Ayuda from './pages/Ayuda';
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
           <Route path="roles" element={<RequireRole><Roles /></RequireRole>} />
           <Route path="permisos" element={<RequireRole><Permisos /></RequireRole>} />
           <Route path="configuracion" element={<RequireRole><Configuracion /></RequireRole>} />
+          <Route path="ayuda" element={<Ayuda />} />
           {/* Add more routes here later */}
         </Route>
       </Routes>
