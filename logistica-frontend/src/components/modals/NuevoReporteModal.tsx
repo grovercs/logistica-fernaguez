@@ -148,15 +148,22 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
     setLoading(true);
 
     const year = new Date().getFullYear();
-    const { data: id_legible, error: idError } = await supabase.rpc('generar_id_orden', {
-      prefijo: 'OB',
-      anio: year
-    });
-    if (idError || !id_legible) {
-      alert('Error generando el número de orden. Inténtalo de nuevo.');
-      setLoading(false);
-      return;
+    const { data: lastOrden } = await supabase
+      .from('ordenes')
+      .select('id_legible')
+      .ilike('id_legible', `OB-${year}-%`)
+      .order('id_legible', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let nextNum = 1;
+    if (lastOrden?.id_legible) {
+      const parts = lastOrden.id_legible.split('-');
+      const lastNum = parseInt(parts[2], 10);
+      if (!isNaN(lastNum)) nextNum = lastNum + 1;
     }
+
+    const id_legible = `OB-${year}-${String(nextNum).padStart(4, '0')}`;
 
     const now = new Date().toISOString();
 
