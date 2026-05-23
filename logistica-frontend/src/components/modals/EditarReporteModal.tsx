@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { smartCompress } from '../../lib/compressImage';
-import { uploadToCloudinary } from '../../lib/cloudinary';
+import { uploadToCloudinary, deleteCloudinaryImages } from '../../lib/cloudinary';
 
 interface Props {
   isOpen: boolean;
@@ -73,7 +73,14 @@ export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporte
     }
   };
 
-  const removeFile = (url: string, type: 'foto' | 'factura') => {
+  const removeFile = async (url: string, type: 'foto' | 'factura') => {
+    // Borrar de Cloudinary
+    const result = await deleteCloudinaryImages([url], supabase);
+    if (!result.success) {
+      console.error('Error borrando imagen de Cloudinary:', result.error);
+      // Continuamos igual: quitamos la referencia de la BD aunque Cloudinary falle
+    }
+
     if (type === 'foto') setFotos(prev => prev.filter(u => u !== url));
     else setFacturas(prev => prev.filter(u => u !== url));
   };

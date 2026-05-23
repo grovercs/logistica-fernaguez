@@ -39,3 +39,6 @@ yarn-error.log*
 Thumbs.db
 
 antigravity_kit_temp/
+
+# Secrets / Cloudinary credentials
+cloudinary-imagenes/

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { compressImage } from '../../lib/compressImage';
-import { uploadToCloudinary } from '../../lib/cloudinary';
+import { uploadToCloudinary, deleteCloudinaryImages } from '../../lib/cloudinary';
 // Cloudinary integration for image uploads
 
 const MobileDetalleOrden = () => {
@@ -197,11 +197,26 @@ const MobileDetalleOrden = () => {
 
     const handleDeleteReport = async (reportId: string) => {
         if (currentUserRole !== 'Administrador') return;
-        if (!window.confirm('¿Estás seguro de que deseas eliminar este reporte técnico? Esta acción no se puede deshacer.')) return;
+        if (!window.confirm('¿Estás seguro de que deseas eliminar este reporte técnico? Se borrarán las imágenes asociadas de Cloudinary. Esta acción no se puede deshacer.')) return;
 
         setLoading(true);
+
+        // 1. Obtener fotos del reporte antes de borrarlo
+        const reporte = reportes.find(r => r.id === reportId);
+        const fotos = reporte?.fotos_urls || [];
+        const facturas = reporte?.facturas_urls || [];
+        const allUrls = [...fotos, ...facturas];
+
+        if (allUrls.length > 0) {
+            const result = await deleteCloudinaryImages(allUrls, supabase);
+            if (!result.success) {
+                console.error('Error borrando imágenes de Cloudinary:', result.error);
+            }
+        }
+
+        // 2. Borrar el reporte
         const { error } = await supabase.from('reportes').delete().eq('id', reportId);
-        
+
         if (error) {
             alert('Error al eliminar el reporte: ' + error.message);
         } else {
