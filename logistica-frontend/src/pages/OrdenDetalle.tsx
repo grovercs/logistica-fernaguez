@@ -436,7 +436,7 @@ export default function OrdenDetalle() {
                                             setSelectedReporte(rep);
                                             setIsEditReporteModalOpen(true);
                                           }}
-                                          className="ml-2 text-slate-400 hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                                          className="ml-2 text-slate-400 hover:text-primary p-0.5"
                                           title="Editar registro"
                                         >
                                           <span className="material-symbols-outlined text-[14px]">edit</span>

@@ -193,10 +193,10 @@ export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporte
                 {fotos.map((url, i) => (
                   <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-100 group">
                     <img src={url} alt="Visita" className="w-full h-full object-cover" />
-                    <button 
+                    <button
                       type="button"
                       onClick={() => removeFile(url, 'foto')}
-                      className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-md shadow-sm hover:bg-red-600 transition-colors"
                     >
                       <span className="material-symbols-outlined text-[14px]">close</span>
                     </button>
@@ -225,10 +225,10 @@ export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporte
                 {facturas.map((url, i) => (
                   <div key={i} className="relative aspect-square rounded-lg overflow-hidden border-2 border-amber-100 group">
                     <img src={url} alt="Factura" className="w-full h-full object-cover" />
-                    <button 
+                    <button
                       type="button"
                       onClick={() => removeFile(url, 'factura')}
-                      className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-md shadow-sm hover:bg-red-600 transition-colors"
                     >
                       <span className="material-symbols-outlined text-[14px]">close</span>
                     </button>
