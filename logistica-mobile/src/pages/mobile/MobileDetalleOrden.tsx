@@ -891,7 +891,13 @@ const MobileDetalleOrden = () => {
                             <div className="pt-2">
                                 <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-tight flex justify-between items-center mb-2">
                                     {misAsignaciones.length > 0 ? 'Tus Instrucciones' : 'Motivo de la Orden'}
-                                    <span className="text-[9px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded font-black">REF: {orden?.poliza || '-'}</span>
+                                    <span className={`text-[9px] px-2 py-0.5 rounded font-black ${
+                                        orden?.estado === 'Urgente' ? 'bg-red-100 text-red-700' :
+                                        orden?.estado === 'En Curso' ? 'bg-blue-100 text-blue-700' :
+                                        orden?.estado === 'Pendiente de firma' ? 'bg-orange-100 text-orange-700' :
+                                        orden?.estado === 'Finalizada' ? 'bg-green-100 text-green-700' :
+                                        'bg-amber-100 text-amber-700'
+                                    }`}>{orden?.estado || 'Pendiente'}</span>
                                 </p>
                                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-white shadow-inner italic whitespace-pre-wrap">
                                     {misAsignaciones.length > 0 
