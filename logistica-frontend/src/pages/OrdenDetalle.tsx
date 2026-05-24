@@ -714,7 +714,7 @@ export default function OrdenDetalle() {
                   {/* Vista previa de la firma */}
                   <div className="w-full md:w-1/2">
                     <p className="text-[11px] font-bold uppercase text-slate-400 tracking-wider mb-2">Firma Digital</p>
-                    <div className="bg-slate-200 border border-dashed border-slate-300 rounded-lg h-32 flex items-center justify-center overflow-hidden">
+                    <div className="bg-slate-500 border border-dashed border-slate-400 rounded-lg h-32 flex items-center justify-center overflow-hidden">
                       {firmReporte?.firma_url ? (
                         <img
                           src={firmReporte.firma_url}
