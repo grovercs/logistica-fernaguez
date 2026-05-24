@@ -436,7 +436,7 @@ const MobileDetalleOrden = () => {
 
         ctx.lineWidth = 4;
         ctx.lineCap = 'round';
-        ctx.strokeStyle = document.documentElement.classList.contains('dark') ? '#ffffff' : '#0f172a';
+        ctx.strokeStyle = '#0f172a'; // Siempre negro para que se vea bien en el admin
 
         ctx.lineTo(x, y);
         ctx.stroke();
@@ -469,7 +469,17 @@ const MobileDetalleOrden = () => {
         // If we have a new signature on canvas, upload it to Storage
         else if (canvasRef.current && (!reporte?.firma_url || canvasRef.current.toDataURL('image/png') !== reporte.firma_url)) {
             try {
-                const blob = await new Promise<Blob>((resolve) => canvasRef.current!.toBlob((b) => resolve(b!), 'image/png'));
+                // Crear canvas temporal con fondo blanco para que la firma se vea bien en cualquier modo
+                const originalCanvas = canvasRef.current;
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = originalCanvas.width;
+                tempCanvas.height = originalCanvas.height;
+                const tempCtx = tempCanvas.getContext('2d')!;
+                tempCtx.fillStyle = '#ffffff';
+                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                tempCtx.drawImage(originalCanvas, 0, 0);
+
+                const blob = await new Promise<Blob>((resolve) => tempCanvas.toBlob((b) => resolve(b!), 'image/png'));
                 const fileName = `firmas/${id}/${Date.now()}-firma.png`;
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('fotos-reportes')
@@ -480,7 +490,7 @@ const MobileDetalleOrden = () => {
                 const { data: { publicUrl } } = supabase.storage
                     .from('fotos-reportes')
                     .getPublicUrl(uploadData.path);
-                
+
                 signatureUrl = publicUrl;
             } catch (err) {
                 console.error('Error uploading signature:', err);

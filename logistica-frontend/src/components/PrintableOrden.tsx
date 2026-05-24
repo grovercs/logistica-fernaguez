@@ -277,7 +277,13 @@ export const PrintableOrden = React.forwardRef<HTMLDivElement, Props>(({ orden, 
               <div className="text-center">
                 <div className="h-20 border-b border-slate-300 flex items-center justify-center">
                   {firmReporte?.firma_url ? (
-                    <img src={firmReporte.firma_url} alt="Firma cliente" className="max-h-16 mix-blend-multiply" />
+                    <img
+                      src={firmReporte.firma_url}
+                      alt="Firma cliente"
+                      className="max-h-16 bg-white"
+                      crossOrigin="anonymous"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
                   ) : (
                     <span className="text-[9px] text-slate-300 italic">Pendiente de firma del cliente</span>
                   )}
