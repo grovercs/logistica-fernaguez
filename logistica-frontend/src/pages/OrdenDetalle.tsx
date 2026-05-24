@@ -714,17 +714,12 @@ export default function OrdenDetalle() {
                   {/* Vista previa de la firma */}
                   <div className="w-full md:w-1/2">
                     <p className="text-[11px] font-bold uppercase text-slate-400 tracking-wider mb-2">Firma Digital</p>
-                    <div className="bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg h-32 flex items-center justify-center overflow-hidden">
+                    <div className="bg-slate-800 border border-dashed border-slate-600 rounded-lg h-32 flex items-center justify-center overflow-hidden">
                       {firmReporte?.firma_url ? (
                         <img
                           src={firmReporte.firma_url}
                           alt="Firma del cliente"
-                          className="h-full object-contain bg-white rounded"
-                          crossOrigin="anonymous"
-                          onError={(e) => {
-                            console.error('Error cargando firma:', firmReporte.firma_url);
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
+                          className="h-full object-contain"
                         />
                       ) : (
                         <div className="flex flex-col items-center gap-1 opacity-40">

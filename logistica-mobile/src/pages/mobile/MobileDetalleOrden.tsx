@@ -436,7 +436,7 @@ const MobileDetalleOrden = () => {
 
         ctx.lineWidth = 4;
         ctx.lineCap = 'round';
-        ctx.strokeStyle = '#0f172a'; // Siempre negro para que se vea bien en el admin
+        ctx.strokeStyle = document.documentElement.classList.contains('dark') ? '#ffffff' : '#0f172a';
 
         ctx.lineTo(x, y);
         ctx.stroke();
@@ -459,27 +459,17 @@ const MobileDetalleOrden = () => {
     // --- Submit Logic ---
     const handleComplete = async () => {
         setSubmitting(true);
-        
+
         let signatureUrl = reporte?.firma_url;
 
         // If the signature pad is empty/cleared, we MUST set signatureUrl to null
         if (!hasSignature) {
             signatureUrl = null;
-        } 
+        }
         // If we have a new signature on canvas, upload it to Storage
         else if (canvasRef.current && (!reporte?.firma_url || canvasRef.current.toDataURL('image/png') !== reporte.firma_url)) {
             try {
-                // Crear canvas temporal con fondo blanco para que la firma se vea bien en cualquier modo
-                const originalCanvas = canvasRef.current;
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = originalCanvas.width;
-                tempCanvas.height = originalCanvas.height;
-                const tempCtx = tempCanvas.getContext('2d')!;
-                tempCtx.fillStyle = '#ffffff';
-                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-                tempCtx.drawImage(originalCanvas, 0, 0);
-
-                const blob = await new Promise<Blob>((resolve) => tempCanvas.toBlob((b) => resolve(b!), 'image/png'));
+                const blob = await new Promise<Blob>((resolve) => canvasRef.current!.toBlob((b) => resolve(b!), 'image/png'));
                 const fileName = `firmas/${id}/${Date.now()}-firma.png`;
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('fotos-reportes')
