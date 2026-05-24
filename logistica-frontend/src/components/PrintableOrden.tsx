@@ -275,7 +275,7 @@ export const PrintableOrden = React.forwardRef<HTMLDivElement, Props>(({ orden, 
                 <p className="text-[10px] font-bold text-slate-700 mt-2 uppercase tracking-widest">Firma Técnico</p>
               </div>
               <div className="text-center">
-                <div className="h-20 border-b border-slate-300 flex items-center justify-center bg-slate-700">
+                <div className="h-20 border-b border-slate-300 flex items-center justify-center bg-slate-200">
                   {firmReporte?.firma_url ? (
                     <img
                       src={firmReporte.firma_url}
