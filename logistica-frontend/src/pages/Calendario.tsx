@@ -295,14 +295,26 @@ export default function Calendario() {
     });
   };
 
-  // Orders always appear on their creation date
+  // Orders always appear on their scheduled/creation date
   const getOrdenesForDay = (dayDate: Date) => {
     return ordenes.filter(o => {
       // Prioridad: 1. fecha_programada, 2. creado_en (fallback para órdenes antiguas)
       const dateStr = o.fecha_programada || o.creado_en;
       if (!dateStr) return false;
 
-      const d = new Date(dateStr);
+      // Para fecha_programada (formato YYYY-MM-DD) parseamos como fecha local
+      // para evitar el desfase UTC que hace que new Date("YYYY-MM-DD") caiga
+      // en el día anterior en zonas horarias positivas (ej. España UTC+2)
+      let d: Date;
+      if (dateStr.length === 10 && dateStr.includes('-')) {
+        // Es una fecha pura YYYY-MM-DD → parsear como local
+        const [year, month, day] = dateStr.split('-').map(Number);
+        d = new Date(year, month - 1, day);
+      } else {
+        // Es un timestamp ISO completo (creado_en) → usar Date normal
+        d = new Date(dateStr);
+      }
+
       if (
         d.getDate() !== dayDate.getDate() ||
         d.getMonth() !== dayDate.getMonth() ||
@@ -311,11 +323,12 @@ export default function Calendario() {
       if (estadoFilter && o.estado !== estadoFilter) return false;
       if (tecnicoFilter && o.tecnico_id !== tecnicoFilter && tecnicos.find(t => t.id === tecnicoFilter)?.auth_user_id !== o.tecnico_id) return false;
       if (fechaDesde || fechaHasta) {
-        const ordenDate = o.fecha_programada || o.creado_en;
-        if (!ordenDate) return false;
-        const dStr = new Date(ordenDate).toISOString().split('T')[0];
-        if (fechaDesde && dStr < fechaDesde) return false;
-        if (fechaHasta && dStr > fechaHasta) return false;
+        // Para el filtro de rango también usamos la cadena directamente
+        const dateStrRange = o.fecha_programada
+          ? o.fecha_programada  // ya es YYYY-MM-DD
+          : new Date(o.creado_en).toLocaleDateString('en-CA'); // timestamp → YYYY-MM-DD local
+        if (fechaDesde && dateStrRange < fechaDesde) return false;
+        if (fechaHasta && dateStrRange > fechaHasta) return false;
       }
       if (searchTerm) {
         const lower = searchTerm.toLowerCase();
