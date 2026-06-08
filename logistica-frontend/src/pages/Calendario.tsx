@@ -55,16 +55,31 @@ export default function Calendario() {
   }, [fechaDesde]);
 
   const fetchData = async () => {
-    // Obtener usuario actual para filtrar si es trabajador
+    // Obtener usuario actual
     const { data: sessionData } = await supabase.auth.getSession();
     const authId = sessionData?.session?.user?.id;
-    const { data: workerData } = await supabase
-      .from('trabajadores')
-      .select('id, auth_user_id')
-      .eq('auth_user_id', authId)
+
+    // Verificar el ROL del perfil primero.
+    // Un admin o editor NUNCA debe tratarse como trabajador aunque exista
+    // en la tabla trabajadores (ej. fue técnico antes de ascender a admin).
+    const { data: perfilData } = await supabase
+      .from('perfiles')
+      .select('roles(nombre)')
+      .eq('id', authId)
       .maybeSingle();
+    const roleName = (perfilData?.roles as any)?.nombre || '';
+    const isRolWorker = roleName === 'Trabajador' || roleName === 'Técnico';
+
+    // Solo buscamos en trabajadores si el rol lo requiere
+    const { data: workerData } = isRolWorker
+      ? await supabase
+          .from('trabajadores')
+          .select('id, auth_user_id')
+          .eq('auth_user_id', authId)
+          .maybeSingle()
+      : { data: null };
     const workerId = workerData?.id;
-    const isCurrentUserWorker = !!workerData;
+    const isCurrentUserWorker = isRolWorker && !!workerData;
 
     // Fetch all orders (or worker's orders)
     let ordenesQuery = supabase
