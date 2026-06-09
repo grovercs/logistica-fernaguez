@@ -39,6 +39,14 @@ const MobileDetalleOrden = () => {
     const [facturas, setFacturas] = useState<string[]>([]);
     const [uploadingFactura, setUploadingFactura] = useState(false);
     const [facturaPreviews, setFacturaPreviews] = useState<string[]>([]);
+
+    // ─── GUARDIA ANTI-CONTAMINACIÓN ──────────────────────────────────────────
+    // Solo contienen URLs subidas en la sesión ACTUAL del formulario.
+    // Se limpian cada vez que se abre el formulario (nuevo o edición).
+    // Al guardar, SOLO estas URLs se añaden al reporte — nunca fotos de otra sesión.
+    const [fotosSubidasEnSesion, setFotosSubidasEnSesion] = useState<string[]>([]);
+    const [facturasSubidasEnSesion, setFacturasSubidasEnSesion] = useState<string[]>([]);
+    // ─────────────────────────────────────────────────────────────────────────
     
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -232,12 +240,13 @@ const MobileDetalleOrden = () => {
         setIsFinished(false);
         setTrabajoRealizado('');
         setMaterialUtilizado('');
-        // ⚠️ Limpiar fotos y facturas siempre — evita que las fotos de un reporte
-        // anterior aparezcan mezcladas en el nuevo reporte
         setFotos([]);
         setFotoPreviews([]);
         setFacturas([]);
         setFacturaPreviews([]);
+        // Guardia: limpiar el registro de fotos de sesión actual
+        setFotosSubidasEnSesion([]);
+        setFacturasSubidasEnSesion([]);
         setHasSignature(false);
         setSelectedHora(0);
         setSelectedMinuto(0);
@@ -257,7 +266,7 @@ const MobileDetalleOrden = () => {
     const loadReportData = (rep: any) => {
         setReporte(rep);
 
-        // Al editar un reporte existente, por defecto seguimos en curso (el tecnico debe marcar explicitamente si termino)
+        // Al editar un reporte existente, por defecto seguimos en curso
         setIsFinished(false);
 
         // Robust split: handles '\n\nMATERIALES:\n', '\nMATERIALES:\n', ' MATERIALES: ', etc.
@@ -271,32 +280,33 @@ const MobileDetalleOrden = () => {
         setTrabajoRealizado(rep.trabajo_realizado || descFallback.trim());
         setMaterialUtilizado(rep.material_utilizado || matFallback.trim());
 
-        // Highly strict check to avoid false positives from 'null' strings or placeholders
         const isSigned = !!rep.firma_url &&
                          typeof rep.firma_url === 'string' &&
                          rep.firma_url.startsWith('http') &&
                          rep.firma_url.length > 50;
         setHasSignature(isSigned);
 
-        // Reset canvas before loading (it will show the image if firma_url exists)
         const ctx = canvasRef.current?.getContext('2d');
         ctx?.clearRect(0, 0, canvasRef.current?.width || 0, canvasRef.current?.height || 0);
 
-        // Use fecha_trabajo if available, fallback to creado_en
         const reportDate = rep.fecha_trabajo || (rep.creado_en ? new Date(rep.creado_en).toISOString().split('T')[0] : '');
         setFecha(reportDate);
-        
-        // Load previously saved hours
+
         const totalHours = rep.horas_trabajadas || 0;
         setSelectedHora(Math.floor(totalHours));
         setSelectedMinuto(Math.round((totalHours % 1) * 60));
 
-        // Restore previously uploaded photos and invoices
+        // Cargar fotos existentes del reporte en el display
         setFotos(rep.fotos_urls || []);
         setFotoPreviews(rep.fotos_urls || []);
         setFacturas(rep.facturas_urls || []);
         setFacturaPreviews(rep.facturas_urls || []);
-        
+
+        // Guardia: al abrir un reporte para editar, limpiar el registro de sesión.
+        // Solo se añadirán a sesión las fotos que se suban a partir de este momento.
+        setFotosSubidasEnSesion([]);
+        setFacturasSubidasEnSesion([]);
+
         // Open Modal
         setShowForm(true);
     };
@@ -338,6 +348,8 @@ const MobileDetalleOrden = () => {
 
         setFotos(prev => [...prev, ...newUrls]);
         setFotoPreviews(prev => [...prev, ...newPreviews]);
+        // Guardia: registrar SOLO las fotos subidas en esta sesión
+        setFotosSubidasEnSesion(prev => [...prev, ...newUrls]);
         setUploadingFoto(false);
 
         // Reset input so the same file can be re-selected if needed
@@ -386,6 +398,8 @@ const MobileDetalleOrden = () => {
         }
         setFacturas(prev => [...prev, ...newUrls]);
         setFacturaPreviews(prev => [...prev, ...newPreviews]);
+        // Guardia: registrar SOLO las facturas subidas en esta sesión
+        setFacturasSubidasEnSesion(prev => [...prev, ...newUrls]);
         setUploadingFactura(false);
         if (facturaInputRef.current) facturaInputRef.current.value = '';
     };
@@ -494,6 +508,16 @@ const MobileDetalleOrden = () => {
 
         const parsedHoras = selectedHora + (selectedMinuto / 60);
 
+        // ─── GUARDIA ANTI-CONTAMINACIÓN ──────────────────────────────────────
+        // Para NUEVO reporte: solo las fotos subidas en esta sesión.
+        // Para EDITAR reporte: fotos originales + fotos nuevas de esta sesión.
+        // Esto garantiza que fotos de otro técnico/sesión NUNCA se cuelen.
+        const fotosOriginales = reporte?.id ? (reporte.fotos_urls || []) : [];
+        const facturasOriginales = reporte?.id ? (reporte.facturas_urls || []) : [];
+        const fotosFinales = [...new Set([...fotosOriginales, ...fotosSubidasEnSesion])];
+        const facturasFinales = [...new Set([...facturasOriginales, ...facturasSubidasEnSesion])];
+        // ─────────────────────────────────────────────────────────────────────
+
         const reportData: any = {
             orden_id: id,
             // Preserve the original technician when editing
@@ -501,12 +525,11 @@ const MobileDetalleOrden = () => {
             notas: `${trabajoRealizado}\n\nMATERIALES:\n${materialUtilizado}`,
             firma_url: signatureUrl,
             horas_trabajadas: parsedHoras,
-            fotos_urls: fotos.length > 0 ? fotos : null,
+            fotos_urls: fotosFinales.length > 0 ? fotosFinales : null,
             creado_en: signatureUrl ? new Date().toISOString() : (reporte?.creado_en || new Date().toISOString()),
-            // The following fields require the database migration
             trabajo_realizado: trabajoRealizado,
             material_utilizado: materialUtilizado,
-            facturas_urls: facturas.length > 0 ? facturas : null,
+            facturas_urls: facturasFinales.length > 0 ? facturasFinales : null,
             fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
         };
 
