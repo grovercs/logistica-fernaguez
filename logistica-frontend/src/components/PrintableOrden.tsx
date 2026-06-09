@@ -223,7 +223,9 @@ export const PrintableOrden = React.forwardRef<HTMLDivElement, Props>(({ orden, 
           {reportes.length > 0 ? (
             <div className="space-y-3">
               {reportes.map((rep, i) => {
-                const worker = trabajadores.find(t => t.auth_user_id === rep.tecnico_id);
+                const worker = trabajadores.find(
+                  t => t.auth_user_id === rep.tecnico_id || t.id === rep.tecnico_id
+                );
                 return (
                   <div key={i} className="intervention-box no-break">
                     <div className="intervention-header">
@@ -303,7 +305,9 @@ export const PrintableOrden = React.forwardRef<HTMLDivElement, Props>(({ orden, 
 
             <div className="space-y-8">
               {reportes.map((rep, rIdx) => {
-                const worker = trabajadores.find(t => t.auth_user_id === rep.tecnico_id);
+                const worker = trabajadores.find(
+                  t => t.auth_user_id === rep.tecnico_id || t.id === rep.tecnico_id
+                );
                 const rFotos = rep.fotos_urls || [];
                 const rFacturas = rep.facturas_urls || [];
                 if (rFotos.length === 0 && rFacturas.length === 0) return null;
