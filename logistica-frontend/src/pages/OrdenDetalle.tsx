@@ -39,7 +39,7 @@ export default function OrdenDetalle() {
     const [ordenReq, reportesReq, trabReq] = await Promise.all([
       supabase.from('ordenes').select('*').eq('id', orderId).single(),
       supabase.from('reportes').select('*').eq('orden_id', orderId),
-      supabase.from('trabajadores').select('auth_user_id, nombre, apellidos, especialidad')
+      supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, especialidad')
     ]);
 
     if (!ordenReq.error && ordenReq.data) {
@@ -556,8 +556,11 @@ export default function OrdenDetalle() {
                         {reportes.length > 0 ? (
                           <div className="space-y-4">
                             {reportes.map((rep, idx) => {
-                              const worker = trabajadores.find(t => t.auth_user_id === rep.tecnico_id);
-                              const workerName = worker ? `${worker.nombre} ${worker.apellidos}` : 'Técnico';
+                              // Buscar por auth_user_id O por id interno para máxima compatibilidad
+                              const worker = trabajadores.find(
+                                t => t.auth_user_id === rep.tecnico_id || t.id === rep.tecnico_id
+                              );
+                              const workerName = worker ? `${worker.nombre} ${worker.apellidos}`.trim() : 'Técnico';
                               return (
                                 <div key={rep.id} className={`pb-4 ${idx !== reportes.length - 1 ? 'border-b border-slate-100 dark:border-slate-700' : ''}`}>
                                   <div className="flex justify-between items-start mb-1.5">

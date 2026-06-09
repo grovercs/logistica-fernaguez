@@ -227,11 +227,13 @@ const MobileDetalleOrden = () => {
     };
 
     const resetForm = () => {
-        // Clear ALL form state to ensure fresh start
+        // Clear ALL form state to ensure fresh start — sin residuos de reportes anteriores
         setReporte(null);
-        setIsFinished(false); // Por defecto, cualquier nueva intervencion sigue en curso
+        setIsFinished(false);
         setTrabajoRealizado('');
         setMaterialUtilizado('');
+        // ⚠️ Limpiar fotos y facturas siempre — evita que las fotos de un reporte
+        // anterior aparezcan mezcladas en el nuevo reporte
         setFotos([]);
         setFotoPreviews([]);
         setFacturas([]);
@@ -247,7 +249,7 @@ const MobileDetalleOrden = () => {
             ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
         }
 
-        // Reset file input
+        // Reset file inputs
         if (fileInputRef.current) fileInputRef.current.value = '';
         if (facturaInputRef.current) facturaInputRef.current.value = '';
     };
