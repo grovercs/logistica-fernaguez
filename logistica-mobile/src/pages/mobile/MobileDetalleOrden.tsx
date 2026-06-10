@@ -331,11 +331,15 @@ const MobileDetalleOrden = () => {
                 const sizeKB = Math.round(compressed.size / 1024);
                 console.log(`Compressed ${file.name}: ${Math.round(file.size/1024)}KB → ${sizeKB}KB`);
 
-                // 3. Generate descriptive filename: OB-2026-1234_2026-04-01_foto_1
+                // 3. Generate UNIQUE filename: OB-2026-1234_2026-04-01_TECNICO_TIMESTAMP_foto_N
+                // Incluye los primeros 6 chars del auth_user_id + ms para garantizar unicidad
+                // aunque dos técnicos suban en el mismo día y misma orden.
                 const ordenId = orden?.id_legible || id || 'unknown';
                 const fecha = new Date().toISOString().split('T')[0];
+                const tecPrefix = (currentUserId || 'anon').slice(0, 6);
+                const tsMs = Date.now();
                 const count = fotos.length + newUrls.length + 1;
-                const filename = `${ordenId}_${fecha}_foto_${count}`;
+                const filename = `${ordenId}_${fecha}_${tecPrefix}_${tsMs}_foto_${count}`;
 
                 // 4. Upload to Cloudinary
                 const result = await uploadToCloudinary(compressed, 'logistica/visitas', filename);
@@ -383,11 +387,13 @@ const MobileDetalleOrden = () => {
                 newPreviews.push(URL.createObjectURL(file));
                 const compressed = await compressImage(file, 1600, 0.75); // Good quality for invoices
 
-                // Generate descriptive filename: OB-2026-1234_2026-04-01_factura_1
+                // Generate UNIQUE filename: OB-2026-1234_2026-04-01_TECNICO_TIMESTAMP_factura_N
                 const ordenId = orden?.id_legible || id || 'unknown';
                 const fecha = new Date().toISOString().split('T')[0];
+                const tecPrefix = (currentUserId || 'anon').slice(0, 6);
+                const tsMs = Date.now();
                 const count = facturas.length + newUrls.length + 1;
-                const filename = `${ordenId}_${fecha}_factura_${count}`;
+                const filename = `${ordenId}_${fecha}_${tecPrefix}_${tsMs}_factura_${count}`;
 
                 const result = await uploadToCloudinary(compressed, 'logistica/facturas', filename);
                 newUrls.push(result.secure_url);
