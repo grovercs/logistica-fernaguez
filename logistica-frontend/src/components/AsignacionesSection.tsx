@@ -32,6 +32,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showCancelled, setShowCancelled] = useState(false);
 
   // Form state
   const [formTrabajador, setFormTrabajador] = useState('');
@@ -405,66 +406,99 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
             <span className="material-symbols-outlined text-3xl text-slate-300 block mb-2">person_add_disabled</span>
             Sin asignaciones.{isEditor && ' Haz clic en "Asignar" para añadir trabajadores.'}
           </div>
-        ) : (
-          asignaciones.map(asig => (
-            <div key={asig.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                  {asig.trabajador?.nombre?.charAt(0) || '?'}
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-800 dark:text-white">
-                    {asig.trabajador?.nombre} {asig.trabajador?.apellidos}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {asig.fecha_asignacion} {asig.hora_programada && `• ${asig.hora_programada}`}
-                  </p>
-                  {asig.notas && <p className="text-xs text-slate-400 italic">{asig.notas}</p>}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {isEditor ? (
-                  <select
-                    value={asig.estado}
-                    onChange={(e) => handleUpdateEstado(asig.id, e.target.value)}
-                    className={`px-3 py-1 rounded-full text-xs font-bold border-0 cursor-pointer ${getEstadoBadge(asig.estado)}`}
+        ) : (() => {
+          const activas   = asignaciones.filter(a => a.estado !== 'cancelado');
+          const canceladas = asignaciones.filter(a => a.estado === 'cancelado');
+          const visibles  = showCancelled ? asignaciones : activas;
+
+          return (
+            <>
+              {visibles.length === 0 && !showCancelled ? (
+                <div className="p-4 text-center text-slate-400 text-sm italic">Sin asignaciones activas.</div>
+              ) : (
+                visibles.map(asig => (
+                  <div
+                    key={asig.id}
+                    className={`p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30 ${
+                      asig.estado === 'cancelado' ? 'opacity-50' : ''
+                    }`}
                   >
-                    <option value="pendiente">⏳ Pendiente</option>
-                    <option value="en_progreso">🔵 En Progreso</option>
-                    <option value="completado">✅ Completado</option>
-                    <option value="cancelado">❌ Cancelado</option>
-                  </select>
-                ) : (
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${getEstadoBadge(asig.estado)}`}>
-                    {asig.estado === 'pendiente' && '⏳ Pendiente'}
-                    {asig.estado === 'en_progreso' && '🔵 En Progreso'}
-                    {asig.estado === 'completado' && '✅ Completado'}
-                    {asig.estado === 'cancelado' && '❌ Cancelado'}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                        {asig.trabajador?.nombre?.charAt(0) || '?'}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-800 dark:text-white">
+                          {asig.trabajador?.nombre} {asig.trabajador?.apellidos}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {asig.fecha_asignacion} {asig.hora_programada && `• ${asig.hora_programada}`}
+                        </p>
+                        {asig.notas && <p className="text-xs text-slate-400 italic">{asig.notas}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isEditor ? (
+                        <select
+                          value={asig.estado}
+                          onChange={(e) => handleUpdateEstado(asig.id, e.target.value)}
+                          className={`px-3 py-1 rounded-full text-xs font-bold border-0 cursor-pointer ${getEstadoBadge(asig.estado)}`}
+                        >
+                          <option value="pendiente">⏳ Pendiente</option>
+                          <option value="en_progreso">🔵 En Progreso</option>
+                          <option value="completado">✅ Completado</option>
+                          <option value="cancelado">❌ Cancelado</option>
+                        </select>
+                      ) : (
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${getEstadoBadge(asig.estado)}`}>
+                          {asig.estado === 'pendiente' && '⏳ Pendiente'}
+                          {asig.estado === 'en_progreso' && '🔵 En Progreso'}
+                          {asig.estado === 'completado' && '✅ Completado'}
+                          {asig.estado === 'cancelado' && '❌ Cancelado'}
+                        </span>
+                      )}
+                      {isEditor && (
+                        <>
+                          <button
+                            onClick={() => handleManualWhatsApp(asig)}
+                            disabled={saving}
+                            className="p-1.5 text-slate-400 hover:text-green-500 hover:bg-green-50 rounded-full transition-colors disabled:opacity-50"
+                            title="Reenviar notificación al técnico"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">chat</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAsignacion(asig.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                            title="Eliminar asignación"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+
+              {/* Toggle de canceladas */}
+              {canceladas.length > 0 && (
+                <button
+                  onClick={() => setShowCancelled(prev => !prev)}
+                  className="w-full py-2.5 px-4 text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[14px]">
+                    {showCancelled ? 'expand_less' : 'expand_more'}
                   </span>
-                )}
-                {isEditor && (
-                  <>
-                    <button
-                      onClick={() => handleManualWhatsApp(asig)}
-                      disabled={saving}
-                      className="p-1.5 text-slate-400 hover:text-green-500 hover:bg-green-50 rounded-full transition-colors disabled:opacity-50"
-                      title="Reenviar notificación al técnico"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">chat</span>
-                    </button>
-                    <button
-                      onClick={() => handleDeleteAsignacion(asig.id)}
-                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                      title="Eliminar asignación"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">delete</span>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          ))
-        )}
+                  {showCancelled
+                    ? 'Ocultar canceladas'
+                    : `Ver ${canceladas.length} asignación${canceladas.length > 1 ? 'es' : ''} cancelada${canceladas.length > 1 ? 's' : ''}`
+                  }
+                </button>
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );
