@@ -132,6 +132,57 @@ export default function OrdenDetalle() {
       setLoading(false);
     }
   };
+
+  const handleDeleteOrdenPermanentemente = async () => {
+    if (!window.confirm(
+      `⚠️ ¿ESTÁS COMPLETAMENTE SEGURO de eliminar permanentemente la orden ${orden.id_legible}?\n\n` +
+      `Esta acción es irreversible y borrará:\n` +
+      `- La orden de trabajo.\n` +
+      `- Todos los partes y registros de los técnicos.\n` +
+      `- Todas las asignaciones.\n` +
+      `- Todas las fotos y albaranes asociados de Cloudinary.`
+    )) return;
+
+    setLoading(true);
+
+    try {
+      // 1. Fotos de todos los reportes de esta orden
+      const allUrls: string[] = [];
+      reportes.forEach(rep => {
+        if (rep.fotos_urls) allUrls.push(...rep.fotos_urls);
+        if (rep.facturas_urls) allUrls.push(...rep.facturas_urls);
+      });
+
+      if (allUrls.length > 0) {
+        const result = await deleteCloudinaryImages(allUrls, supabase);
+        if (!result.success) {
+          console.error('Error borrando imágenes de Cloudinary:', result.error);
+        }
+      }
+
+      // 2. Borrar reportes
+      await supabase.from('reportes').delete().eq('orden_id', id);
+
+      // 3. Borrar asignaciones
+      await supabase.from('orden_asignaciones').delete().eq('orden_id', id);
+
+      // 4. Borrar la orden
+      const { error } = await supabase.from('ordenes').delete().eq('id', id);
+
+      if (error) {
+        console.error('Error al eliminar orden:', error);
+        alert('Hubo un error al eliminar la orden.');
+        setLoading(false);
+      } else {
+        alert('Orden eliminada permanentemente.');
+        navigate('/ordenes');
+      }
+    } catch (err) {
+      console.error('Error durante el borrado:', err);
+      alert('Ocurrió un error inesperado al eliminar la orden.');
+      setLoading(false);
+    }
+  };
   const handleFinalizarOrden = async () => {
     if (!window.confirm('¿Estás seguro de que deseas finalizar esta orden? Esto marcará el trabajo como completado oficialmente.')) return;
 
@@ -475,7 +526,10 @@ export default function OrdenDetalle() {
                   {isEditor && (
                     <div className="pl-6 flex gap-2 flex-wrap">
                       {orden.estado === 'Papelera' ? (
-                        <button onClick={handleRestaurarOrden} className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Restaurar</button>
+                        <>
+                          <button onClick={handleRestaurarOrden} className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Restaurar</button>
+                          <button onClick={handleDeleteOrdenPermanentemente} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold transition-colors shadow-sm">Eliminar Permanentemente</button>
+                        </>
                       ) : (
                         <>
                           <button onClick={() => setIsEditModalOpen(true)} className="px-3 py-1 bg-sky-500 hover:bg-sky-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Editar</button>

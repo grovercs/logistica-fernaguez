@@ -5,6 +5,7 @@ import { ClipboardList, Plus, Search, Filter, X, ChevronDown, User } from 'lucid
 import NuevoReporteModal from '../components/modals/NuevoReporteModal';
 import RenotificarModal from '../components/modals/RenotificarModal';
 import { useUserRole } from '../hooks/useUserRole';
+import { deleteCloudinaryImages } from '../lib/cloudinary';
 
 export default function Ordenes() {
   const { isEditor, isWorker } = useUserRole();
@@ -49,10 +50,10 @@ export default function Ordenes() {
       }
     }
 
-    // 1. Cargamos las órdenes
+    // 1. Cargamos las órdenes con sus asignaciones
     let query = supabase
       .from('ordenes')
-      .select('*')
+      .select('*, orden_asignaciones(*)')
       .order('id_legible', { ascending: false, nullsFirst: false });
 
     if (activeTab === 'activas') {
@@ -142,7 +143,20 @@ export default function Ordenes() {
       (o.direccion && o.direccion.toLowerCase().includes(searchLower));
 
     const matchesEstado = filterEstado === '' || o.estado === filterEstado;
-    const matchesTecnico = filterTecnico === '' || o.tecnico_id === filterTecnico || tecnicos.find(t => t.id === filterTecnico)?.auth_user_id === o.tecnico_id;
+
+    let matchesTecnico = filterTecnico === '';
+    if (filterTecnico) {
+      const selectedTrabajador = tecnicos.find(t => t.id === filterTecnico);
+      const isAssigned = (o.orden_asignaciones || []).some((asig: any) => 
+        asig.estado !== 'cancelado' && 
+        (asig.trabajador_id === filterTecnico || 
+         (selectedTrabajador?.auth_user_id && asig.trabajador_id === selectedTrabajador.auth_user_id))
+      );
+      const isPrimary = o.tecnico_id === filterTecnico || 
+                        (selectedTrabajador?.auth_user_id && o.tecnico_id === selectedTrabajador.auth_user_id);
+      matchesTecnico = isPrimary || isAssigned;
+    }
+
     let matchesFecha = true;
     if (fechaDesde || fechaHasta) {
       const ordenDate = o.fecha_programada || o.creado_en;
@@ -171,6 +185,115 @@ export default function Ordenes() {
     setFilterTecnico('');
     setFechaDesde('');
     setFechaHasta('');
+  };
+
+  const handleDeleteOrdenPermanentemente = async (orderId: string, idLegible: string) => {
+    if (!window.confirm(
+      `⚠️ ¿ESTÁS COMPLETAMENTE SEGURO de eliminar permanentemente la orden ${idLegible}?\n\n` +
+      `Esta acción es irreversible y borrará:\n` +
+      `- La orden de trabajo.\n` +
+      `- Todos los partes y registros de los técnicos.\n` +
+      `- Todas las asignaciones.\n` +
+      `- Todas las fotos y albaranes asociados de Cloudinary.`
+    )) return;
+
+    setLoading(true);
+
+    try {
+      // 1. Obtener todos los reportes de la orden para borrar sus imágenes de Cloudinary
+      const { data: reportesData } = await supabase
+        .from('reportes')
+        .select('fotos_urls, facturas_urls')
+        .eq('orden_id', orderId);
+
+      if (reportesData && reportesData.length > 0) {
+        const allUrls: string[] = [];
+        reportesData.forEach(rep => {
+          if (rep.fotos_urls) allUrls.push(...rep.fotos_urls);
+          if (rep.facturas_urls) allUrls.push(...rep.facturas_urls);
+        });
+
+        if (allUrls.length > 0) {
+          const result = await deleteCloudinaryImages(allUrls, supabase);
+          if (!result.success) {
+            console.error('Error borrando imágenes de Cloudinary:', result.error);
+          }
+        }
+      }
+
+      // 2. Borrar reportes
+      await supabase.from('reportes').delete().eq('orden_id', orderId);
+
+      // 3. Borrar asignaciones
+      await supabase.from('orden_asignaciones').delete().eq('orden_id', orderId);
+
+      // 4. Borrar la orden
+      const { error } = await supabase.from('ordenes').delete().eq('id', orderId);
+
+      if (error) {
+        console.error('Error al eliminar orden de la base de datos:', error);
+        alert('Hubo un error al eliminar la orden de la base de datos.');
+      } else {
+        alert('Orden eliminada permanentemente con éxito.');
+        fetchOrdenes();
+      }
+    } catch (err) {
+      console.error('Error durante el borrado:', err);
+      alert('Ocurrió un error inesperado al eliminar la orden.');
+    }
+    setLoading(false);
+  };
+
+  const handleVaciarPapelera = async () => {
+    if (!window.confirm(
+      `⚠️ ¿ESTÁS ABSOLUTAMENTE SEGURO de vaciar la papelera?\n\n` +
+      `Se eliminarán de forma PERMANENTE e IRREVERSIBLE las ${filteredOrdenes.length} órdenes que se muestran en el listado actual, ` +
+      `con todas sus asignaciones, partes de trabajo y fotos asociadas en Cloudinary.`
+    )) return;
+
+    setLoading(true);
+
+    try {
+      for (const orden of filteredOrdenes) {
+        // 1. Obtener todos los reportes de la orden
+        const { data: reportesData } = await supabase
+          .from('reportes')
+          .select('fotos_urls, facturas_urls')
+          .eq('orden_id', orden.id);
+
+        if (reportesData && reportesData.length > 0) {
+          const allUrls: string[] = [];
+          reportesData.forEach(rep => {
+            if (rep.fotos_urls) allUrls.push(...rep.fotos_urls);
+            if (rep.facturas_urls) allUrls.push(...rep.facturas_urls);
+          });
+
+          if (allUrls.length > 0) {
+            const result = await deleteCloudinaryImages(allUrls, supabase);
+            if (!result.success) {
+              console.error('Error borrando imágenes de Cloudinary:', result.error);
+            }
+          }
+        }
+
+        // 2. Borrar reportes
+        await supabase.from('reportes').delete().eq('orden_id', orden.id);
+
+        // 3. Borrar asignaciones
+        await supabase.from('orden_asignaciones').delete().eq('orden_id', orden.id);
+
+        // 4. Borrar la orden
+        await supabase.from('ordenes').delete().eq('id', orden.id);
+      }
+
+      alert('Papelera vaciada con éxito.');
+      fetchOrdenes();
+    } catch (err) {
+      console.error('Error al vaciar papelera:', err);
+      alert('Ocurrió un error inesperado al vaciar la papelera.');
+    }
+
+    setLoading(false);
   };
 
   const applyDatePreset = (preset: string) => {
@@ -310,37 +433,49 @@ export default function Ordenes() {
 
       <div className="p-4 sm:p-8 max-w-7xl mx-auto w-full space-y-6">
         {/* Tabs Activas / Archivadas */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => setActiveTab('activas')}
-            className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
-              activeTab === 'activas'
-                ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
-            }`}
-          >
-            Activas
-          </button>
-          <button
-            onClick={() => setActiveTab('archivadas')}
-            className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
-              activeTab === 'archivadas'
-                ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
-            }`}
-          >
-            Archivadas
-          </button>
-          <button
-            onClick={() => setActiveTab('papelera')}
-            className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
-              activeTab === 'papelera'
-                ? 'bg-red-600 text-white shadow-lg shadow-red-600/20'
-                : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
-            }`}
-          >
-            Papelera
-          </button>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveTab('activas')}
+              className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
+                activeTab === 'activas'
+                  ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                  : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              Activas
+            </button>
+            <button
+              onClick={() => setActiveTab('archivadas')}
+              className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
+                activeTab === 'archivadas'
+                  ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                  : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              Archivadas
+            </button>
+            <button
+              onClick={() => setActiveTab('papelera')}
+              className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
+                activeTab === 'papelera'
+                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/20'
+                  : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              Papelera
+            </button>
+          </div>
+
+          {activeTab === 'papelera' && filteredOrdenes.length > 0 && isEditor && (
+            <button
+              onClick={handleVaciarPapelera}
+              className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-red-600/20 transition-all active:scale-95 w-full sm:w-auto"
+            >
+              <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+              Vaciar Papelera
+            </button>
+          )}
         </div>
 
         {/* Barra de Filtros Responsiva */}
@@ -538,18 +673,53 @@ export default function Ordenes() {
                                 return `${days}d`;
                             })()}
                         </td>
-                        <td className="px-4 sm:px-6 py-5 text-right">
-                          {<button
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    openRenotificar(orden);
+                        <td className="px-4 sm:px-6 py-5 text-right flex items-center justify-end gap-2">
+                          {activeTab === 'papelera' ? (
+                            <>
+                              <button
+                                onClick={async (e) => {
+                                  e.preventDefault();
+                                  if (window.confirm(`¿Restaurar la orden ${orden.id_legible}? Volverá a estar activa con estado Pendiente.`)) {
+                                    setLoading(true);
+                                    const { error } = await supabase.from('ordenes').update({ estado: 'Pendiente' }).eq('id', orden.id);
+                                    if (!error) {
+                                      fetchOrdenes();
+                                    } else {
+                                      alert('Error al restaurar la orden.');
+                                      setLoading(false);
+                                    }
+                                  }
                                 }}
                                 className="size-9 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-all inline-flex items-center justify-center"
-                                title="Re-notificar al técnico"
+                                title="Restaurar orden"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">restore</span>
+                              </button>
+                              {isEditor && (
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleDeleteOrdenPermanentemente(orden.id, orden.id_legible);
+                                  }}
+                                  className="size-9 rounded-xl bg-red-100 text-red-600 hover:bg-red-200 transition-all inline-flex items-center justify-center"
+                                  title="Eliminar permanentemente"
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">delete</span>
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                  e.preventDefault();
+                                  openRenotificar(orden);
+                              }}
+                              className="size-9 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-all inline-flex items-center justify-center"
+                              title="Re-notificar al técnico"
                             >
                                 <span className="material-symbols-outlined text-[18px]">chat</span>
                             </button>
-                          }
+                          )}
                           <Link to={`/ordenes/${orden.id}`} className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-primary hover:bg-primary/10 transition-all inline-flex items-center justify-center">
                               <Search className="size-4" />
                           </Link>

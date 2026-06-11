@@ -84,12 +84,12 @@ export default function Calendario() {
     // Fetch all orders (or worker's orders)
     let ordenesQuery = supabase
       .from('ordenes')
-      .select('*')
+      .select('*, orden_asignaciones(*)')
       .neq('estado', 'Archivado')
       .neq('estado', 'Papelera')
       .order('creado_en', { ascending: false });
     if (isCurrentUserWorker) {
-      // Solo órdenes asignadas a este trabajador
+      // Solo órdenes asignadas to this worker
       const { data: asignaciones } = await supabase
         .from('orden_asignaciones')
         .select('orden_id')
@@ -119,6 +119,7 @@ export default function Calendario() {
         )
       `)
       .neq('ordenes.estado', 'Archivado')
+      .neq('ordenes.estado', 'Papelera')
       .order('fecha_trabajo', { ascending: false });
     if (isCurrentUserWorker && authId) {
       reportesQuery = reportesQuery.eq('tecnico_id', authId);
@@ -336,7 +337,17 @@ export default function Calendario() {
         d.getFullYear() !== dayDate.getFullYear()
       ) return false;
       if (estadoFilter && o.estado !== estadoFilter) return false;
-      if (tecnicoFilter && o.tecnico_id !== tecnicoFilter && tecnicos.find(t => t.id === tecnicoFilter)?.auth_user_id !== o.tecnico_id) return false;
+      if (tecnicoFilter) {
+        const selectedTrabajador = tecnicos.find(t => t.id === tecnicoFilter);
+        const isAssigned = (o.orden_asignaciones || []).some((asig: any) => 
+          asig.estado !== 'cancelado' && 
+          (asig.trabajador_id === tecnicoFilter || 
+           (selectedTrabajador?.auth_user_id && asig.trabajador_id === selectedTrabajador.auth_user_id))
+        );
+        const isPrimary = o.tecnico_id === tecnicoFilter || 
+                          (selectedTrabajador?.auth_user_id && o.tecnico_id === selectedTrabajador.auth_user_id);
+        if (!isPrimary && !isAssigned) return false;
+      }
       if (fechaDesde || fechaHasta) {
         // Para el filtro de rango también usamos la cadena directamente
         const dateStrRange = o.fecha_programada

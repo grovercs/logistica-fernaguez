@@ -34,10 +34,14 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isOpen && ordenData) {
+    if (isOpen) {
        fetchTecnicos();
        fetchAseguradoras();
+    }
+  }, [isOpen]);
 
+  useEffect(() => {
+    if (isOpen && ordenData) {
        // Usar fecha_programada si existe, si no fallback a creado_en
        const dateSource = ordenData.fecha_programada || ordenData.creado_en;
        let fechaObj = new Date(dateSource);
@@ -66,7 +70,17 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
          estado: ordenData.estado || 'Pendiente'
        });
     }
-  }, [isOpen, ordenData, tecnicos]);
+  }, [isOpen, ordenData]);
+
+  // Mapear el tecnico una vez que se cargan los tecnicos si no se ha mapeado aun
+  useEffect(() => {
+    if (isOpen && ordenData && tecnicos.length > 0 && formData.tecnico === ordenData.tecnico_id) {
+       const matchedTecnico = tecnicos.find(t => t.id === ordenData.tecnico_id || t.auth_user_id === ordenData.tecnico_id);
+       if (matchedTecnico && matchedTecnico.id !== formData.tecnico) {
+         setFormData(prev => ({ ...prev, tecnico: matchedTecnico.id }));
+       }
+    }
+  }, [tecnicos, isOpen, ordenData, formData.tecnico]);
 
   const fetchTecnicos = async () => {
     // Traer todos los técnicos que no estén de baja para poder asignarles órdenes incluso si están "En Obra"
