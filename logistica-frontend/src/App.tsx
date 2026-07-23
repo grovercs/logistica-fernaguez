@@ -3,18 +3,14 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Calendario from './pages/Calendario';
-import RbacDashboard from './pages/RbacDashboard';
-import Roles from './pages/Roles';
-import Permisos from './pages/Permisos';
 import Ordenes from './pages/Ordenes';
 import OrdenDetalle from './pages/OrdenDetalle';
 import Liquidaciones from './pages/Liquidaciones';
 import Aseguradoras from './pages/Aseguradoras';
 import Trabajadores from './pages/Trabajadores';
-import Usuarios from './pages/Usuarios';
-import Bd from './pages/Bd';
 import Login from './pages/Login';
 import TareasFrecuentes from './pages/TareasFrecuentes';
+import AdminMaintenance from './pages/AdminMaintenance';
 
 function App() {
   return (
@@ -30,11 +26,11 @@ function App() {
           <Route path="aseguradoras" element={<Aseguradoras />} />
           <Route path="tareas-frecuentes" element={<TareasFrecuentes />} />
           <Route path="trabajadores" element={<Trabajadores />} />
-          <Route path="usuarios" element={<Usuarios />} />
-          <Route path="bd" element={<Bd />} />
-          <Route path="rbac" element={<RbacDashboard />} />
-          <Route path="roles" element={<Roles />} />
-          <Route path="permisos" element={<Permisos />} />
+          <Route path="usuarios" element={<AdminMaintenance />} />
+          <Route path="bd" element={<AdminMaintenance />} />
+          <Route path="rbac" element={<AdminMaintenance />} />
+          <Route path="roles" element={<AdminMaintenance />} />
+          <Route path="permisos" element={<AdminMaintenance />} />
           {/* Add more routes here later */}
         </Route>
       </Routes>
