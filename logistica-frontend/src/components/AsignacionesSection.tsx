@@ -19,6 +19,15 @@ interface Asignacion {
   creado_en: string;
 }
 
+interface Trabajador {
+    id: string;
+    auth_user_id: string | null;
+    nombre: string;
+    apellidos: string;
+    telefono?: string | null;
+    telegram_chat_id?: string | null;
+}
+
 interface Props {
   ordenId: string;
   orden?: any; // Objeto de la orden para las notificaciones
@@ -28,7 +37,7 @@ interface Props {
 export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props) {
   const { isEditor } = useUserRole();
   const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
-  const [trabajadores, setTrabajadores] = useState<any[]>([]);
+  const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -76,7 +85,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
 
       // 3. Cruzamos los datos manualmente (mucho más fiable)
       const mergedAsignaciones = (data || []).map(asig => {
-        const trabajador = rawTrab?.find(t => 
+        const trabajador = rawTrab?.find(t =>
           t.id === asig.trabajador_id || t.auth_user_id === asig.trabajador_id
         );
         return {

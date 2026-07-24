@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { useUserRole } from '../hooks/useUserRole';
 import * as XLSX from 'xlsx';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -11,8 +10,23 @@ interface Reporte {
   horas_trabajadas: number;
   creado_en: string;
   estado_liquidacion: string;
-  ordenes: { id_legible: string; cliente: string; estado: string; estado_previo?: string } | null;
+  ordenes: { id_legible: string; cliente: string; estado: string } | null;
   perfiles: { nombre_completo: string; tarifa_hora: number } | null;
+}
+
+interface LiquidacionReporteRpcRow {
+  reporte_id: string;
+  orden_id: string;
+  tecnico_id: string;
+  horas_trabajadas: number | null;
+  creado_en: string;
+  fecha_trabajo: string | null;
+  estado_liquidacion: string | null;
+  id_legible: string | null;
+  cliente: string | null;
+  estado_orden: string | null;
+  nombre_completo: string;
+  tarifa_hora: number;
 }
 
 type TabType = 'obra' | 'trabajador' | 'global';
@@ -36,7 +50,6 @@ const avatarColor = (name: string) => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Liquidaciones() {
-  const { isEditor, isWorker } = useUserRole();
   const [tab, setTab] = useState<TabType>('obra');
   const [reportes, setReportes] = useState<Reporte[]>([]);
   const [perfilesMap, setPerfilesMap] = useState<Record<string, { nombre: string; tarifa: number }>>({});
@@ -54,45 +67,31 @@ export default function Liquidaciones() {
   const fetchData = async () => {
     setLoading(true);
 
-    // Si es trabajador, obtener su auth_user_id para filtrar
-    let authId: string | null = null;
-    if (isWorker) {
-      const { data: sessionData } = await supabase.auth.getSession();
-      authId = sessionData?.session?.user?.id || null;
-    }
+    const { data, error } = await supabase
+      .rpc('get_liquidaciones_reportes');
 
-    const { data: reportesData, error: repErr } = await supabase
-      .from('reportes')
-      .select('id, orden_id, tecnico_id, horas_trabajadas, creado_en, estado_liquidacion, ordenes!inner(id_legible, cliente, estado, estado_previo)')
-      .order('creado_en', { ascending: false });
+    if (!error && data) {
+      const merged: Reporte[] = (data as LiquidacionReporteRpcRow[])
+          .filter(row => row.estado_orden !== 'Archivado')
+          .map(row => ({
+        id: row.reporte_id,
+        orden_id: row.orden_id,
+        tecnico_id: row.tecnico_id,
+        horas_trabajadas: row.horas_trabajadas ?? 0,
+        creado_en: row.creado_en,
+        estado_liquidacion: row.estado_liquidacion ?? 'Pendiente',
+        ordenes: {
+          id_legible: row.id_legible ?? '',
+          cliente: row.cliente ?? '',
+          estado: row.estado_orden ?? '',
+        },
+        perfiles: {
+          nombre_completo: row.nombre_completo || 'Desconocido',
+          tarifa_hora: row.tarifa_hora ?? 0,
+        },
+      }));
 
-    // Fetch all perfiles separately (Supabase doesn't recognize tecnico_id FK to perfiles)
-    const { data: perfilesData } = await supabase
-      .from('perfiles')
-      .select('id, nombre_completo, tarifa_hora');
-
-    if (!repErr && reportesData && perfilesData) {
-      // Build perfiles lookup map by id
-      const perfilesLookup: Record<string, { nombre_completo: string; tarifa_hora: number }> = {};
-      perfilesData.forEach((p: any) => {
-        perfilesLookup[p.id] = { nombre_completo: p.nombre_completo, tarifa_hora: p.tarifa_hora || 0 };
-      });
-
-      // Merge perfiles into reportes and filter out orphans (no linked order)
-      let merged = (reportesData as any[])
-        .filter((r: any) => r.ordenes !== null && r.ordenes !== undefined && r.ordenes.estado !== 'Papelera')
-        .map((r: any) => ({
-          ...r,
-          perfiles: perfilesLookup[r.tecnico_id] || null,
-        }));
-
-      // Si es trabajador, filtrar solo sus reportes
-      if (isWorker && authId) {
-        merged = merged.filter((r: any) => r.tecnico_id === authId);
-        setTrabajadorFilter(authId); // Preseleccionar filtro
-      }
-
-      setReportes(merged as Reporte[]);
+      setReportes(merged);
 
       // Build worker filter dropdown map
       const map: Record<string, { nombre: string; tarifa: number }> = {};
@@ -102,6 +101,8 @@ export default function Liquidaciones() {
         }
       });
       setPerfilesMap(map);
+    } else if (error) {
+      console.error('Error loading liquidation reports:', error.message);
     }
 
     setLoading(false);
@@ -200,101 +201,77 @@ export default function Liquidaciones() {
   };
 
   // ─── UI ──────────────────────────────────────────────────────────────────
-  const tabs: { key: TabType; label: string; icon: string }[] = isWorker
-    ? [{ key: 'trabajador', label: 'Resumen', icon: 'engineering' }]
-    : [
-        { key: 'obra', label: 'Por Obra', icon: 'construction' },
-        { key: 'trabajador', label: 'Por Trabajador', icon: 'engineering' },
-        { key: 'global', label: 'Global', icon: 'bar_chart' },
-      ];
+  const tabs: { key: TabType; label: string; icon: string }[] = [
+    { key: 'obra', label: 'Por Obra', icon: 'construction' },
+    { key: 'trabajador', label: 'Por Trabajador', icon: 'engineering' },
+    { key: 'global', label: 'Global', icon: 'bar_chart' },
+  ];
 
-  const EstadoBadge = ({ estado, id }: { estado: string; id: string }) => {
-    if (isWorker) {
-      return (
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-          estado === 'Procesada'
-            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-            : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
-        }`}>
-          {estado === 'Procesada' ? '✓ Procesada' : '⏳ Pendiente'}
-        </span>
-      );
-    }
-    return (
-      <button
-        onClick={() => toggleEstado(id, estado)}
-        title="Clic para cambiar estado"
-        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer transition-all hover:scale-105 ${
-          estado === 'Procesada'
-            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-            : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
-        }`}
-      >
-        {estado === 'Procesada' ? '✓ Procesada' : '⏳ Pendiente'}
-      </button>
-    );
-  };
+  const EstadoBadge = ({ estado, id }: { estado: string; id: string }) => (
+    <button
+      onClick={() => toggleEstado(id, estado)}
+      title="Clic para cambiar estado"
+      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer transition-all hover:scale-105 ${
+        estado === 'Procesada'
+          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+          : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+      }`}
+    >
+      {estado === 'Procesada' ? '✓ Procesada' : '⏳ Pendiente'}
+    </button>
+  );
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 h-full">
       {/* Header */}
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 w-full backdrop-blur-md">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between px-4 sm:px-8 py-4 gap-4">
-          <h2 className="text-xl font-black tracking-tight">{isWorker ? 'Mis Liquidaciones' : 'Liquidaciones'}</h2>
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            {isEditor && (
-              <button
-                onClick={exportToExcel}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-emerald-600/20"
-              >
-                <span className="material-symbols-outlined text-lg">table_view</span>
-                Exportar Excel
-              </button>
-            )}
-            <button className="p-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
-              <span className="material-symbols-outlined">notifications</span>
-            </button>
-          </div>
+      <header className="h-16 flex-shrink-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 sticky top-0 z-10 w-full backdrop-blur-md">
+        <h2 className="text-xl font-bold">Liquidaciones</h2>
+        <div className="flex items-center gap-3">
+          <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg transition-colors shadow-sm">
+            <span className="material-symbols-outlined text-lg">table_view</span>
+            Exportar Excel
+          </button>
+          <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+            <span className="material-symbols-outlined">notifications</span>
+          </button>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-5 max-w-7xl mx-auto w-full">
 
         {/* Filters */}
-        <section className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 items-end">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Desde</label>
-              <input value={desde} onChange={e => setDesde(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-11 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" type="date" />
+        <section className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Desde</label>
+              <input value={desde} onChange={e => setDesde(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none" type="date" />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Hasta</label>
-              <input value={hasta} onChange={e => setHasta(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-11 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" type="date" />
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hasta</label>
+              <input value={hasta} onChange={e => setHasta(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none" type="date" />
             </div>
-            {!isWorker && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Trabajador</label>
-                <select value={trabajadorFilter} onChange={e => setTrabajadorFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-11 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer">
-                  <option value="">Todos</option>
-                  {Object.entries(perfilesMap).map(([id, { nombre }]) => (
-                    <option key={id} value={id}>{nombre}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Obra / Ref</label>
-              <input value={obraFilter} onChange={e => setObraFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm h-11 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="Buscar..." type="text" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Estado Pago</label>
-              <select value={estadoFilter} onChange={e => setEstadoFilter(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm h-11 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer">
-                <option value="">Todos</option>
-                <option value="Pendiente">⏳ Pendiente</option>
-                <option value="Procesada">✓ Procesada</option>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Trabajador</label>
+              <select value={trabajadorFilter} onChange={e => setTrabajadorFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none">
+                <option value="">Todos los trabajadores</option>
+                {Object.entries(perfilesMap).map(([id, { nombre }]) => (
+                  <option key={id} value={id}>{nombre}</option>
+                ))}
               </select>
             </div>
-            <button onClick={() => { setDesde(''); setHasta(''); setTrabajadorFilter(''); setObraFilter(''); setEstadoFilter(''); }} className="h-11 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-black uppercase tracking-widest rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Obra / Referencia</label>
+              <input value={obraFilter} onChange={e => setObraFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none" placeholder="Ej: OT-2023-0041" type="text" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estado Pago</label>
+              <select value={estadoFilter} onChange={e => setEstadoFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none">
+                <option value="">Todos</option>
+                <option value="Pendiente">Pendiente</option>
+                <option value="Procesada">Procesada</option>
+              </select>
+            </div>
+            <button onClick={() => { setDesde(''); setHasta(''); setTrabajadorFilter(''); setObraFilter(''); setEstadoFilter(''); }} className="h-10 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-1.5">
               <span className="material-symbols-outlined text-sm">filter_alt_off</span>
               Limpiar
             </button>
@@ -330,14 +307,14 @@ export default function Liquidaciones() {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl w-full sm:w-fit overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-fit">
           {tabs.map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
                 tab === t.key
-                  ? 'bg-white dark:bg-slate-900 text-primary shadow-lg shadow-black/5'
+                  ? 'bg-white dark:bg-slate-900 text-primary shadow-sm'
                   : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >
@@ -381,11 +358,6 @@ export default function Liquidaciones() {
                             <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${rs[0]?.ordenes?.estado === 'Completada' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                               {rs[0]?.ordenes?.estado || 'Activa'}
                             </span>
-                            {rs[0]?.ordenes?.estado === 'Archivado' && rs[0]?.ordenes?.estado_previo && rs[0]?.ordenes?.estado_previo !== 'Finalizada' && (
-                              <span className="px-2 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold uppercase tracking-wider border border-red-200" title={`Archivada sin finalizar. Estado previo: ${rs[0]?.ordenes?.estado_previo}`}>
-                                Sin finalizar
-                              </span>
-                            )}
                           </div>
                         </div>
                         {/* Table */}

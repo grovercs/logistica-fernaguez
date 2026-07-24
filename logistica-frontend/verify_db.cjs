@@ -1,9 +1,19 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+if (!supabaseUrl) {
+  console.error('Missing required environment variable: SUPABASE_URL');
+  process.exit(1);
+}
+
+if (!supabaseServiceRoleKey) {
+  console.error('Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 async function testInsertOrden() {
   console.log('Fetching a trabajador...');

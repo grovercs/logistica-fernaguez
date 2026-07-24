@@ -8,7 +8,7 @@ import { uploadToCloudinary, deleteCloudinaryImages } from '../../lib/cloudinary
 const MobileDetalleOrden = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    
+
     const [orden, setOrden] = useState<any>(null);
     const [reportes, setReportes] = useState<any[]>([]); // List of all reports
     const [reporte, setReporte] = useState<any>(null); // Current report being edited
@@ -25,9 +25,9 @@ const MobileDetalleOrden = () => {
     const [materialUtilizado, setMaterialUtilizado] = useState('');
     const [selectedHora, setSelectedHora] = useState(0);
     const [selectedMinuto, setSelectedMinuto] = useState(0);
-    
+
     const [submitting, setSubmitting] = useState(false);
-    
+
     // Photo upload state
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [fotos, setFotos] = useState<string[]>([]);
@@ -47,7 +47,7 @@ const MobileDetalleOrden = () => {
     const [fotosSubidasEnSesion, setFotosSubidasEnSesion] = useState<string[]>([]);
     const [facturasSubidasEnSesion, setFacturasSubidasEnSesion] = useState<string[]>([]);
     // ─────────────────────────────────────────────────────────────────────────
-    
+
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [hasSignature, setHasSignature] = useState(false);
@@ -76,7 +76,7 @@ const MobileDetalleOrden = () => {
     const fetchOrden = async () => {
         if (!id) return;
         const cleanId = id.trim();
-        
+
         // Get the current logged-in user
         const { data: userData } = await supabase.auth.getUser();
         const userId = userData?.user?.id || null;
@@ -440,7 +440,7 @@ const MobileDetalleOrden = () => {
     const draw = (e: any) => {
         if (!isDrawing || !canvasRef.current) return;
         setHasSignature(true); // Only set to true when actual drawing/movement occurs
-        
+
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
@@ -452,7 +452,7 @@ const MobileDetalleOrden = () => {
         const isTouch = e.type.includes('touch');
         const clientX = isTouch ? e.nativeEvent.touches[0].clientX : e.clientX;
         const clientY = isTouch ? e.nativeEvent.touches[0].clientY : e.clientY;
-        
+
         const x = (clientX - rect.left) * scaleX;
         const y = (clientY - rect.top) * scaleY;
 
@@ -524,10 +524,17 @@ const MobileDetalleOrden = () => {
         const facturasFinales = [...new Set([...facturasOriginales, ...facturasSubidasEnSesion])];
         // ─────────────────────────────────────────────────────────────────────
 
+        const realOrderId = orden?.id || id;
+        if (!realOrderId) {
+            alert("No se pudo identificar la orden.");
+            setSubmitting(false);
+            return;
+        }
+
         const reportData: any = {
-            orden_id: id,
-            // Preserve the original technician when editing
-            tecnico_id: reporte?.tecnico_id || currentUserId,
+            orden_id: realOrderId,
+            // Preserve the original technician when editing.
+            tecnico_id: reporte?.id ? reporte.tecnico_id : currentUserId,
             notas: `${trabajoRealizado}\n\nMATERIALES:\n${materialUtilizado}`,
             firma_url: signatureUrl,
             horas_trabajadas: parsedHoras,
@@ -539,107 +546,109 @@ const MobileDetalleOrden = () => {
             fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
         };
 
-        const saveReport = async (data: any) => {
-            if (reporte?.id) {
-                return await supabase.from('reportes').update(data).eq('id', reporte.id);
-            } else {
-                return await supabase.from('reportes').insert(data);
+        if (currentUserRole === 'Trabajador') {
+            const { data: rpcData, error: rpcError } = await supabase.rpc('worker_save_report', {
+                p_report_id: reporte?.id ?? null,
+                p_order_id: realOrderId,
+                p_notas: reportData.notas,
+                p_firma_url: signatureUrl,
+                p_horas_trabajadas: parsedHoras,
+                p_fotos_urls: fotosFinales.length > 0 ? fotosFinales : null,
+                p_trabajo_realizado: trabajoRealizado,
+                p_material_utilizado: materialUtilizado,
+                p_facturas_urls: facturasFinales.length > 0 ? facturasFinales : null,
+                p_fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
+            });
+
+            if (rpcError) {
+                console.error('Error de worker_save_report:', rpcError);
+                alert(`Error al guardar el reporte técnico:\n\nCódigo: ${rpcError.code || ''}\n${rpcError.message}`);
+                setSubmitting(false);
+                return;
             }
-        };
 
-        let errorReporte = null;
+            const rpcResult = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+            if (!rpcResult?.report_id || !rpcResult?.order_status) {
+                console.error('Respuesta inválida de worker_save_report:', rpcData);
+                alert('La respuesta del servidor al guardar el reporte no es válida.');
+                setSubmitting(false);
+                return;
+            }
 
-        // Attempt 1: Full save with all columns
-        const { error: errFull } = await saveReport(reportData);
-        
-        // Attempt 2: Fallback if columns are missing (error 42703 is Undefined Column in PG)
-        if (errFull && (errFull.code === '42703' || errFull.message?.includes('column'))) {
-            console.warn('Fallback save: Missing specialized columns. Run migration for full support.');
-            const fallbackData = {
-                orden_id: id,
+            setReporte({
+                ...(reporte || {}),
+                id: rpcResult.report_id,
+                orden_id: realOrderId,
+                // Identity is reflected locally; the RPC sets tecnico_id from auth.uid().
                 tecnico_id: currentUserId,
                 notas: reportData.notas,
-                firma_url: reportData.firma_url,
-                horas_trabajadas: reportData.horas_trabajadas,
-                fotos_urls: reportData.fotos_urls,
-                creado_en: reportData.creado_en
+                firma_url: signatureUrl,
+                horas_trabajadas: parsedHoras,
+                fotos_urls: fotosFinales.length > 0 ? fotosFinales : null,
+                trabajo_realizado: trabajoRealizado,
+                material_utilizado: materialUtilizado,
+                facturas_urls: facturasFinales.length > 0 ? facturasFinales : null,
+                fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
+            });
+            setOrden((prev: any) => prev ? { ...prev, estado: rpcResult.order_status } : prev);
+
+            // Pending: assignment-state synchronization for workers needs a reviewed RPC.
+            // Do not write orden_asignaciones directly from the worker client.
+        } else if (currentUserRole === 'Administrador' || currentUserRole === 'Editor') {
+            const saveReport = async (data: any) => {
+                if (reporte?.id) {
+                    return await supabase.from('reportes').update(data).eq('id', reporte.id);
+                }
+                return await supabase.from('reportes').insert(data);
             };
-            const { error: errFallback } = await saveReport(fallbackData);
-            errorReporte = errFallback;
-        } else {
-            errorReporte = errFull;
-        }
 
-        if (errorReporte) {
-            console.error(errorReporte);
-            const errorMsg = errorReporte.message || 'Error desconocido';
-            const errorCode = errorReporte.code || '';
-            alert(`Error al guardar el reporte técnico:\n\nCódigo: ${errorCode}\n${errorMsg}\n\nSi el error persiste, contacta con soporte.`);
-            setSubmitting(false);
-            return;
-        }
-        
-        // 2. Update Order Status - USE orden.id (real UUID) not id (could be id_legible)
-        const realOrderId = orden?.id || id;
-        const newEstado = isFinished ? 'En revisión' : 'En Curso';
-        console.log('[Mobile Save] realOrderId:', realOrderId, 'newEstado:', newEstado);
+            let errorReporte = null;
+            const { error: errFull } = await saveReport(reportData);
 
-        try {
+            if (errFull && (errFull.code === '42703' || errFull.message?.includes('column'))) {
+                console.warn('Fallback save: Missing specialized columns. Run migration for full support.');
+                const fallbackData = {
+                    orden_id: realOrderId,
+                    tecnico_id: reporte?.id ? reporte.tecnico_id : currentUserId,
+                    notas: reportData.notas,
+                    firma_url: reportData.firma_url,
+                    horas_trabajadas: reportData.horas_trabajadas,
+                    fotos_urls: reportData.fotos_urls,
+                    creado_en: reportData.creado_en,
+                };
+                const { error: errFallback } = await saveReport(fallbackData);
+                errorReporte = errFallback;
+            } else {
+                errorReporte = errFull;
+            }
+
+            if (errorReporte) {
+                console.error('Error guardando reporte administrativo:', errorReporte);
+                const errorMsg = errorReporte.message || 'Error desconocido';
+                const errorCode = errorReporte.code || '';
+                alert(`Error al guardar el reporte técnico:\n\nCódigo: ${errorCode}\n${errorMsg}\n\nSi el error persiste, contacta con soporte.`);
+                setSubmitting(false);
+                return;
+            }
+
+            const newEstado = isFinished ? 'En revisión' : 'En Curso';
             const { error: ordenUpdateError } = await supabase
                 .from('ordenes')
-                .update({
-                    estado: newEstado,
-                })
+                .update({ estado: newEstado })
                 .eq('id', realOrderId);
 
             if (ordenUpdateError) {
-                console.error('Error updating order status:', ordenUpdateError);
+                console.error('Error actualizando estado de orden:', ordenUpdateError);
                 alert('⚠️ Error actualizando estado de orden: ' + ordenUpdateError.message);
-            } else {
-                console.log('[Mobile Save] Orden actualizada a:', newEstado);
+                setSubmitting(false);
+                return;
             }
-        } catch (e: any) {
-            console.error('Excepción updating order:', e);
-            alert('⚠️ Excepción actualizando orden: ' + (e.message || 'Error desconocido'));
+            setOrden((prev: any) => prev ? { ...prev, estado: newEstado } : prev);
+        } else {
+            alert('No tienes permisos para crear o editar reportes.');
+            setSubmitting(false);
+            return;
         }
-
-        // 3. Sync with Assignment status - USE realOrderId (UUID)
-        try {
-            const { data: userData } = await supabase.auth.getUser();
-            if (userData.user) {
-                const { data: worker } = await supabase
-                    .from('trabajadores')
-                    .select('id')
-                    .eq('auth_user_id', userData.user.id)
-                    .single();
-
-                console.log('[Mobile Save] Worker ID:', worker?.id);
-
-                if (worker?.id) {
-                    const { error: asigUpdateError } = await supabase
-                        .from('orden_asignaciones')
-                        .update({
-                            estado: isFinished ? 'completado' : 'en_progreso'
-                        })
-                        .eq('orden_id', realOrderId)
-                        .eq('trabajador_id', worker.id)
-                        .neq('estado', 'completado'); // Only update if not already completed
-
-                    if (asigUpdateError) {
-                        console.error('Error updating assignment status:', asigUpdateError);
-                        alert('⚠️ Error actualizando asignación: ' + asigUpdateError.message);
-                    } else {
-                        console.log('[Mobile Save] Asignación actualizada a:', isFinished ? 'completado' : 'en_progreso');
-                    }
-                } else {
-                    alert('⚠️ No se encontró tu perfil de trabajador. La asignación no se actualizó.');
-                }
-            }
-        } catch (e: any) {
-            console.error('Excepción updating assignment:', e);
-            alert('⚠️ Excepción actualizando asignación: ' + (e.message || 'Error desconocido'));
-        }
-
         setSubmitting(false);
         alert("¡Reporte guardado correctamente!");
         setShowForm(false); // Close Modal on success
@@ -661,7 +670,7 @@ const MobileDetalleOrden = () => {
                     <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 leading-relaxed">
                         No hemos podido localizar la orden <span className="font-bold text-slate-700 dark:text-slate-300">#{id}</span>. Es posible que haya sido eliminada o que el enlace sea incorrecto.
                     </p>
-                    <button 
+                    <button
                         onClick={() => navigate('/m/ordenes')}
                         className="w-full py-4 bg-primary text-white rounded-2xl font-black shadow-lg shadow-primary/30 active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
@@ -717,7 +726,7 @@ const MobileDetalleOrden = () => {
                          </div>
                      </div>
                  )}
-                 
+
                  {/* Dirección */}
                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
                      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-tight flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">location_on</span>Dirección Completa</p>
@@ -872,14 +881,14 @@ const MobileDetalleOrden = () => {
             {showForm && (
                 <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
                     {/* Backdrop */}
-                    <div 
+                    <div
                         className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
                         onClick={() => !submitting && setShowForm(false)}
                     />
 
                     {/* Modal Content (Bottom Sheet on mobile) */}
                     <div className="relative w-full max-w-2xl bg-[#f0f2f5] dark:bg-slate-950 rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full duration-300 max-h-[calc(100dvh-60px)] flex flex-col mb-0 sm:mb-4">
-                        
+
                         {/* Modal Header */}
                         <div className="bg-white dark:bg-slate-900 px-6 py-4 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 shrink-0">
                             <div className="flex items-center gap-3">
@@ -890,7 +899,7 @@ const MobileDetalleOrden = () => {
                                     {reporte?.id ? 'Editar Reporte' : 'Nueva Intervención'}
                                 </h2>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => !submitting && setShowForm(false)}
                                 className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 dark:text-slate-300 active:scale-95 transition-all p-1"
                             >
@@ -909,7 +918,7 @@ const MobileDetalleOrden = () => {
                                             <span className="text-[10px] opacity-90">Parte de {new Date(reporte.creado_en).toLocaleDateString()}</span>
                                         </div>
                                     </div>
-                                    <button 
+                                    <button
                                         onClick={resetForm}
                                         className="bg-white dark:bg-slate-900/20 text-white text-[10px] font-bold px-2 py-1 rounded-lg border border-white/20 hover:bg-white dark:bg-slate-900/30"
                                     >
@@ -931,19 +940,19 @@ const MobileDetalleOrden = () => {
                                     }`}>{orden?.estado || 'Pendiente'}</span>
                                 </p>
                                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-white shadow-inner italic whitespace-pre-wrap">
-                                    {misAsignaciones.length > 0 
-                                        ? misAsignaciones.map(a => a.notas).filter(Boolean).join('\n\n---\n\n') 
+                                    {misAsignaciones.length > 0
+                                        ? misAsignaciones.map(a => a.notas).filter(Boolean).join('\n\n---\n\n')
                                         : (orden?.descripcion || 'Sin descripción detallada')}
                                 </p>
                             </div>
                 <div className="space-y-4 pt-4">
                     <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Información de esta Intervención</h2>
-                    
+
                     {/* Fecha */}
                     <div>
                         <label className="block text-xs font-bold text-slate-800 dark:text-slate-100 mb-2 pl-1">Fecha de trabajo</label>
                         <div className="relative">
-                            <input 
+                            <input
                                 type="date"
                                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-3 pl-4 pr-10 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary shadow-sm appearance-none"
                                 value={fecha}
@@ -958,7 +967,7 @@ const MobileDetalleOrden = () => {
                          <div>
                              <label className="block text-xs font-bold text-slate-800 dark:text-slate-100 mb-2 pl-1">Horas dedicadas</label>
                              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 py-3">
-                                <button 
+                                <button
                                     type="button"
                                     onClick={() => setSelectedHora(Math.max(0, selectedHora - 1))}
                                     className="w-8 h-8 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 dark:bg-slate-700 active:scale-95 transition-all font-bold text-lg"
@@ -966,7 +975,7 @@ const MobileDetalleOrden = () => {
                                     −
                                 </button>
                                 <span className="text-2xl font-black text-primary">{selectedHora.toString().padStart(2, '0')}</span>
-                                <button 
+                                <button
                                     type="button"
                                     onClick={() => setSelectedHora(selectedHora + 1)}
                                     className="w-8 h-8 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 dark:bg-slate-700 active:scale-95 transition-all font-bold text-lg"
@@ -978,7 +987,7 @@ const MobileDetalleOrden = () => {
                          <div>
                              <label className="block text-xs font-bold text-slate-800 dark:text-slate-100 mb-2 pl-1">Minutos</label>
                              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 py-3">
-                                <button 
+                                <button
                                     type="button"
                                     onClick={() => setSelectedMinuto(Math.max(0, selectedMinuto - 15))}
                                     className="w-8 h-8 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 dark:bg-slate-700 active:scale-95 transition-all font-bold text-lg"
@@ -986,7 +995,7 @@ const MobileDetalleOrden = () => {
                                     −
                                 </button>
                                 <span className="text-2xl font-black text-primary">{selectedMinuto.toString().padStart(2, '0')}</span>
-                                <button 
+                                <button
                                     type="button"
                                     onClick={() => setSelectedMinuto(Math.min(45, selectedMinuto + 15))}
                                     className="w-8 h-8 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 dark:bg-slate-700 active:scale-95 transition-all font-bold text-lg"
@@ -1010,11 +1019,11 @@ const MobileDetalleOrden = () => {
                 {/* DETALLES DEL REPORTE */}
                 <div className="space-y-4 pt-2">
                     <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Detalles del Reporte</h2>
-                    
+
                     {/* Trabajo Realizado */}
                     <div>
                         <label className="block text-xs font-bold text-slate-800 dark:text-slate-100 mb-2 pl-1">Descripción del Trabajo</label>
-                        <textarea 
+                        <textarea
                             rows={3}
                             placeholder="Describa qué se ha hecho en esta visita..."
                             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary shadow-sm resize-none"
@@ -1046,7 +1055,7 @@ const MobileDetalleOrden = () => {
                             className="hidden"
                             onChange={handleFacturaUpload}
                         />
-                        <textarea 
+                        <textarea
                             rows={3}
                             placeholder="Materiales usados, repuestos, peajes, etc..."
                             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary shadow-sm resize-none"
@@ -1084,7 +1093,7 @@ const MobileDetalleOrden = () => {
                                         Firmar aquí
                                     </span>
                                 )}
-                                <canvas 
+                                <canvas
                                     ref={canvasRef}
                                     className={`w-full h-full relative z-10 cursor-crosshair transition-all ${!canSign ? 'pointer-events-none grayscale opacity-30' : ''}`}
                                     onMouseDown={startDrawing}
@@ -1105,7 +1114,7 @@ const MobileDetalleOrden = () => {
                     <div className="flex justify-between items-center px-1">
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 italic">Obligatorio para cerrar el parte</p>
                         <div className="flex gap-2">
-                            <button 
+                            <button
                                 type="button"
                                 onClick={() => setCanSign(!canSign)}
                                 className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all shadow-sm ${canSign ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'}`}
@@ -1113,7 +1122,7 @@ const MobileDetalleOrden = () => {
                                 <span className="material-symbols-outlined text-[16px]">{canSign ? 'lock_open' : 'edit_square'}</span>
                                 {canSign ? 'BLOQUEAR' : 'FIRMAR'}
                             </button>
-                            <button 
+                            <button
                                 type="button"
                                 onClick={clearSignature}
                                 className="text-xs font-bold text-red-500 flex items-center gap-1 bg-red-50 dark:bg-red-900/20 border border-red-100 px-3 py-1.5 rounded-lg transition-all"
@@ -1147,8 +1156,8 @@ const MobileDetalleOrden = () => {
                         </button>
                     </div>
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 italic text-center px-4">
-                        {isFinished 
-                            ? "La orden pasará a 'En revisión' para que el administrador la finalice." 
+                        {isFinished
+                            ? "La orden pasará a 'En revisión' para que el administrador la finalice."
                             : "La orden seguirá activa como 'En Curso' para futuras visitas."}
                     </p>
                 </div>
@@ -1156,7 +1165,7 @@ const MobileDetalleOrden = () => {
                 {/* MAIN ACTIONS */}
                 <div className="space-y-4 pt-8">
                     <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFotoUpload} />
-                    
+
                     {fotoPreviews.length > 0 && (
                         <div className="flex gap-2 overflow-x-auto pb-2">
                             {fotoPreviews.map((src, i) => (
@@ -1170,7 +1179,7 @@ const MobileDetalleOrden = () => {
                         </div>
                     )}
 
-                    <button 
+                    <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploadingFoto}
@@ -1180,7 +1189,7 @@ const MobileDetalleOrden = () => {
                         {uploadingFoto ? 'SUBIENDO...' : 'AÑADIR FOTOS DE LA VISITA'}
                     </button>
 
-                    <button 
+                    <button
                         onClick={handleComplete}
                         disabled={submitting || uploadingFoto}
                         className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl active:scale-95 transition-all flex justify-center items-center gap-3 text-lg"

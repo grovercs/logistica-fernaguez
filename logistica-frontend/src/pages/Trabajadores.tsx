@@ -1,15 +1,12 @@
 import { useState, useEffect } from 'react';
 import AltaTrabajadorModal from '../components/modals/AltaTrabajadorModal';
 import EditarTrabajadorModal from '../components/modals/EditarTrabajadorModal';
-import CrearAccesoModal from '../components/modals/CrearAccesoModal';
 import { supabase } from '../lib/supabase';
 
 export default function Trabajadores() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isAccesoModalOpen, setIsAccesoModalOpen] = useState(false);
   const [trabajadorToEdit, setTrabajadorToEdit] = useState<any>(null);
-  const [trabajadorAcceso, setTrabajadorAcceso] = useState<any>(null);
   const [trabajadores, setTrabajadores] = useState<any[]>([]);
   const [especialidadesList, setEspecialidadesList] = useState<string[]>([]);
   const [filterEspecialidad, setFilterEspecialidad] = useState('');
@@ -217,7 +214,6 @@ export default function Trabajadores() {
                            </td>
                            <td className="px-6 py-4 text-right">
                               <div className="flex justify-end gap-2">
-                                <button onClick={() => { setTrabajadorAcceso(trabajador); setIsAccesoModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-emerald-500" title="Accesos"><span className="material-symbols-outlined text-[18px]">key</span></button>
                                 <button onClick={() => { setTrabajadorToEdit(trabajador); setIsEditModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-sky-500" title="Editar"><span className="material-symbols-outlined text-[18px]">edit</span></button>
                                 <button onClick={() => handleArchive(trabajador.id)} className="p-1.5 text-slate-400 hover:text-amber-500" title="Dar de baja"><span className="material-symbols-outlined text-[18px]">person_off</span></button>
                               </div>
@@ -263,7 +259,6 @@ export default function Trabajadores() {
       {/* Modals */}
       <AltaTrabajadorModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onCreated={fetchTrabajadores} />
       {trabajadorToEdit && <EditarTrabajadorModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} onUpdated={fetchTrabajadores} trabajadorData={trabajadorToEdit} />}
-      {trabajadorAcceso && <CrearAccesoModal isOpen={isAccesoModalOpen} onClose={() => setIsAccesoModalOpen(false)} onCreated={fetchTrabajadores} trabajador={trabajadorAcceso} />}
     </div>
   );
 }

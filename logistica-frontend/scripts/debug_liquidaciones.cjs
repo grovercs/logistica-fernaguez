@@ -7,7 +7,7 @@ envContent.split('\n').forEach(line => {
     if (k && v.length) process.env[k.trim()] = v.join('=').trim().replace(/^["']|["']$/g, '');
 });
 
-const s = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_SERVICE_ROLE_KEY);
+const s = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 async function debug() {
     console.log('=== REPORTES COUNT ===');
