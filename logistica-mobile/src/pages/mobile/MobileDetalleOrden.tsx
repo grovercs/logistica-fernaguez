@@ -420,7 +420,7 @@ const MobileDetalleOrden = () => {
         const reportData: any = {
             orden_id: id,
             // Preserve the original technician when editing
-            tecnico_id: reporte?.tecnico_id || currentUserId,
+            tecnico_id: reporte?.id ? reporte.tecnico_id : currentUserId,
             notas: `${trabajoRealizado}\n\nMATERIALES:\n${materialUtilizado}`,
             firma_url: signatureUrl,
             horas_trabajadas: parsedHoras,
@@ -433,55 +433,111 @@ const MobileDetalleOrden = () => {
             fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
         };
 
-        const saveReport = async (data: any) => {
-            if (reporte?.id) {
-                return await supabase.from('reportes').update(data).eq('id', reporte.id);
-            } else {
-                return await supabase.from('reportes').insert(data);
-            }
-        };
-
-        let errorReporte = null;
-
-        // Attempt 1: Full save with all columns
-        const { error: errFull } = await saveReport(reportData);
-        
-        // Attempt 2: Fallback if columns are missing (error 42703 is Undefined Column in PG)
-        if (errFull && (errFull.code === '42703' || errFull.message?.includes('column'))) {
-            console.warn('Fallback save: Missing specialized columns. Run migration for full support.');
-            const fallbackData = {
-                orden_id: id,
-                tecnico_id: currentUserId,
-                notas: reportData.notas,
-                firma_url: reportData.firma_url,
-                horas_trabajadas: reportData.horas_trabajadas,
-                fotos_urls: reportData.fotos_urls,
-                creado_en: reportData.creado_en
-            };
-            const { error: errFallback } = await saveReport(fallbackData);
-            errorReporte = errFallback;
-        } else {
-            errorReporte = errFull;
-        }
-
-        if (errorReporte) {
-            console.error(errorReporte);
-            alert("Error al guardar el reporte técnico.");
+        if (!id) {
+            alert("No se pudo identificar la orden.");
             setSubmitting(false);
             return;
         }
-        
-        // AUTOMATION:
-        // 1. If there is a signature, set to 'En revisión'
-        // 2. If no signature but was 'Pendiente', set to 'En Curso'
-        const newEstado = signatureUrl ? 'En revisión' : 'En Curso';
-        
-        await supabase
-            .from('ordenes')
-            .update({ 
-                estado: newEstado,
-            })
-            .eq('id', id);
+
+        if (currentUserRole === 'Trabajador') {
+            const { data: rpcData, error: rpcError } = await supabase.rpc('worker_save_report', {
+                p_report_id: reporte?.id ?? null,
+                p_order_id: id,
+                p_notas: reportData.notas,
+                p_firma_url: signatureUrl,
+                p_horas_trabajadas: parsedHoras,
+                p_fotos_urls: fotos.length > 0 ? fotos : null,
+                p_trabajo_realizado: trabajoRealizado,
+                p_material_utilizado: materialUtilizado,
+                p_facturas_urls: facturas.length > 0 ? facturas : null,
+                p_fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
+            });
+
+            if (rpcError) {
+                console.error(rpcError);
+                alert("Error al guardar el reporte técnico: " + rpcError.message);
+                setSubmitting(false);
+                return;
+            }
+
+            const rpcResult = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+            if (!rpcResult?.report_id || !rpcResult?.order_status) {
+                console.error('Respuesta inválida de worker_save_report', rpcData);
+                alert("La respuesta del servidor al guardar el reporte no es válida.");
+                setSubmitting(false);
+                return;
+            }
+
+            setReporte({
+                ...(reporte || {}),
+                id: rpcResult.report_id,
+                orden_id: id,
+                tecnico_id: currentUserId,
+                notas: reportData.notas,
+                firma_url: signatureUrl,
+                horas_trabajadas: parsedHoras,
+                fotos_urls: fotos.length > 0 ? fotos : null,
+                trabajo_realizado: trabajoRealizado,
+                material_utilizado: materialUtilizado,
+                facturas_urls: facturas.length > 0 ? facturas : null,
+                fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
+            });
+            setOrden((prev: any) => prev ? { ...prev, estado: rpcResult.order_status } : prev);
+        } else if (currentUserRole === 'Administrador' || currentUserRole === 'Editor') {
+            const saveReport = async (data: any) => {
+                if (reporte?.id) {
+                    return await supabase.from('reportes').update(data).eq('id', reporte.id);
+                } else {
+                    return await supabase.from('reportes').insert(data);
+                }
+            };
+
+            let errorReporte = null;
+
+            // Attempt 1: Full save with all columns
+            const { error: errFull } = await saveReport(reportData);
+            
+            // Attempt 2: Fallback if columns are missing (error 42703 is Undefined Column in PG)
+            if (errFull && (errFull.code === '42703' || errFull.message?.includes('column'))) {
+                console.warn('Fallback save: Missing specialized columns. Run migration for full support.');
+                const fallbackData = {
+                    orden_id: id,
+                    tecnico_id: reporte?.id ? reporte.tecnico_id : currentUserId,
+                    notas: reportData.notas,
+                    firma_url: reportData.firma_url,
+                    horas_trabajadas: reportData.horas_trabajadas,
+                    fotos_urls: reportData.fotos_urls,
+                    creado_en: reportData.creado_en
+                };
+                const { error: errFallback } = await saveReport(fallbackData);
+                errorReporte = errFallback;
+            } else {
+                errorReporte = errFull;
+            }
+
+            if (errorReporte) {
+                console.error(errorReporte);
+                alert("Error al guardar el reporte técnico.");
+                setSubmitting(false);
+                return;
+            }
+            
+            // AUTOMATION:
+            // 1. If there is a signature, set to 'En revisión'
+            // 2. If no signature but was 'Pendiente', set to 'En Curso'
+            const newEstado = signatureUrl ? 'En revisión' : 'En Curso';
+            
+            await supabase
+                .from('ordenes')
+                .update({ 
+                    estado: newEstado,
+                })
+                .eq('id', id);
+        } else {
+            alert("No tienes permisos para crear o editar reportes.");
+            setSubmitting(false);
+            return;
+        }
 
         setSubmitting(false);
         alert("¡Reporte guardado correctamente!");
