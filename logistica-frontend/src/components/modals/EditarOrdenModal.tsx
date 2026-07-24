@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { notifyNewOrder } from '../../lib/notifications';
 
 interface Props {
   isOpen: boolean;
@@ -33,23 +34,32 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isOpen && ordenData) {
+    if (isOpen) {
        fetchTecnicos();
        fetchAseguradoras();
-       
-       let fechaObj = new Date(ordenData.creado_en);
-       let fecha = isNaN(fechaObj.getTime()) ? '' : fechaObj.toISOString().split('T')[0];
-       let hora = isNaN(fechaObj.getTime()) ? '' : fechaObj.toTimeString().split(' ')[0].substring(0, 5);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && ordenData) {
+       // Usar fecha_programada si existe, si no fallback a creado_en
+       const dateSource = ordenData.fecha_programada || ordenData.creado_en;
+       let fechaObj = new Date(dateSource);
+       let fecha = isNaN(fechaObj.getTime()) ? '' : (ordenData.fecha_programada || fechaObj.toISOString().split('T')[0]);
+       let hora = ordenData.hora_programada || (isNaN(fechaObj.getTime()) ? '' : fechaObj.toTimeString().split(' ')[0].substring(0, 5));
+
+       // Mapear tecnico_id (puede ser auth_user_id o trabajadores.id) al ID interno del select
+       const matchedTecnico = tecnicos.find(t => t.id === ordenData.tecnico_id || t.auth_user_id === ordenData.tecnico_id);
 
        setFormData({
          referencia: ordenData.poliza || '',
          cliente: ordenData.cliente || '',
          aseguradora: ordenData.aseguradora || '',
-         tecnico: ordenData.tecnico_id || '',
+         tecnico: matchedTecnico?.id || ordenData.tecnico_id || '',
          fecha: fecha,
          hora: hora,
          observaciones: ordenData.descripcion || '',
-         esUrgente: false, // You might have a specific flag in DB
+         esUrgente: false,
          asegurado: ordenData.asegurado || '',
          telefono_asegurado: ordenData.telefono_asegurado || '',
          email: ordenData.email || '',
@@ -62,8 +72,22 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
     }
   }, [isOpen, ordenData]);
 
+  // Mapear el tecnico una vez que se cargan los tecnicos si no se ha mapeado aun
+  useEffect(() => {
+    if (isOpen && ordenData && tecnicos.length > 0 && formData.tecnico === ordenData.tecnico_id) {
+       const matchedTecnico = tecnicos.find(t => t.id === ordenData.tecnico_id || t.auth_user_id === ordenData.tecnico_id);
+       if (matchedTecnico && matchedTecnico.id !== formData.tecnico) {
+         setFormData(prev => ({ ...prev, tecnico: matchedTecnico.id }));
+       }
+    }
+  }, [tecnicos, isOpen, ordenData, formData.tecnico]);
+
   const fetchTecnicos = async () => {
-    const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos').eq('estado', 'Disponible');
+    // Traer todos los técnicos que no estén de baja para poder asignarles órdenes incluso si están "En Obra"
+    const { data } = await supabase
+      .from('trabajadores')
+      .select('id, auth_user_id, nombre, apellidos, telefono, telegram_chat_id, estado')
+      .neq('estado', 'Baja');
     if (data) setTecnicos(data);
   };
 
@@ -78,10 +102,8 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
     e.preventDefault();
     setLoading(true);
 
-    let createdAt = ordenData.creado_en;
-    if (formData.fecha) {
-        createdAt = new Date(`${formData.fecha}T${formData.hora || '12:00'}:00`).toISOString();
-    }
+    const selectedTecnico = formData.tecnico ? tecnicos.find(t => t.id === formData.tecnico) : null;
+    const originalTecnico = tecnicos.find(t => t.id === ordenData.tecnico_id || t.auth_user_id === ordenData.tecnico_id);
 
     const { error } = await supabase
       .from('ordenes')
@@ -98,19 +120,104 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
          otras_ordenes: formData.otras_ordenes,
          descripcion: formData.observaciones,
          estado: formData.estado,
-         tecnico_id: formData.tecnico || null,
-         creado_en: createdAt
+         tecnico_id: selectedTecnico ? (selectedTecnico.auth_user_id || selectedTecnico.id) : null,
+         fecha_programada: formData.fecha,
+         hora_programada: formData.hora
       })
       .eq('id', ordenData.id);
 
-    setLoading(false);
     if (!error) {
+       // Si el técnico ha cambiado o es nuevo, creamos la asignación oficial
+       if (selectedTecnico && selectedTecnico.id !== originalTecnico?.id) {
+         const { data: existing } = await supabase
+           .from('orden_asignaciones')
+           .select('id')
+           .eq('orden_id', ordenData.id)
+           .eq('trabajador_id', selectedTecnico.id)
+           .maybeSingle();
+
+         if (!existing) {
+           await supabase.from('orden_asignaciones').insert({
+             orden_id: ordenData.id,
+             trabajador_id: selectedTecnico.id,
+             fecha_asignacion: formData.fecha,
+             hora_programada: formData.hora,
+             estado: 'pendiente'
+           });
+         }
+       }
+
+       // Auto-registro de Cliente Particular si no se seleccionó una aseguradora
+       if (!formData.aseguradora && formData.cliente) {
+         try {
+           await supabase.from('aseguradoras').upsert({
+             nombre: formData.cliente,
+             telefono: formData.telefono_asegurado || formData.telefono_contacto,
+             email: formData.email,
+             direccion: formData.direccion,
+             estado: 'Activa'
+           }, { onConflict: 'nombre' });
+         } catch (err) {
+           console.warn("No se pudo auto-registrar el cliente.", err);
+         }
+       }
+
        if (onUpdated) onUpdated();
-       onClose();
+
+        // Notificación Telegram al técnico si se asignó uno nuevo o cambió
+        if (selectedTecnico && selectedTecnico.id !== originalTecnico?.id) {
+          if (selectedTecnico.telegram_chat_id) {
+             console.log("Telegram: Detectado cambio de técnico, enviando notificación...");
+              await notifyNewOrder(selectedTecnico, {
+               id: ordenData.id,
+               id_legible: ordenData.id_legible,
+               cliente: formData.cliente,
+               direccion: formData.direccion,
+               descripcion: formData.observaciones
+             }).catch(err => console.error("Error enviando Telegram automático:", err));
+          }
+        }
+
+        onClose();
     } else {
        console.error("Error updating order", error);
        alert("Error al actualizar la orden.");
     }
+    setLoading(false);
+  };
+
+  const handleManualTelegram = async () => {
+    if (!formData.tecnico) {
+      alert("Asigna un técnico primero para enviar la notificación.");
+      return;
+    }
+
+    const selectedTecnico = tecnicos.find(t => t.id === formData.tecnico || t.auth_user_id === formData.tecnico);
+    if (!selectedTecnico || !selectedTecnico.telegram_chat_id) {
+      alert("El técnico seleccionado no tiene un Chat ID de Telegram configurado. Añádeselo desde el panel de Trabajadores.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await notifyNewOrder(selectedTecnico, {
+        id: ordenData.id,
+        id_legible: ordenData.id_legible,
+        cliente: formData.cliente,
+        direccion: formData.direccion,
+        descripcion: formData.observaciones
+      });
+
+      if (result.success) {
+        alert("✅ Notificación de Telegram enviada correctamente.");
+      } else {
+        alert("⚠️ No se pudo enviar la notificación. Revisa que el token del bot esté configurado en Configuración.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("❌ Error al conectar con el servicio de Telegram.");
+    }
+    setLoading(false);
   };
 
   return (
@@ -148,7 +255,6 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder={formData.aseguradora ? "Ej: B12345678" : "Ej: 12345678A"}
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.referencia}
@@ -185,6 +291,10 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
                   {aseguradoras.map(a => (
                      <option key={a.id} value={a.nombre}>{a.nombre}</option>
                   ))}
+                  {/* Fallback si la empresa original ya no existe en aseguradoras */}
+                  {formData.aseguradora && !aseguradoras.some(a => a.nombre === formData.aseguradora) && (
+                    <option value={formData.aseguradora}>{formData.aseguradora} (empresa eliminada)</option>
+                  )}
                 </select>
               </div>
 
@@ -300,7 +410,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
                 >
                   <option value="">-- Sin Asignar (Pendiente) --</option>
                   {tecnicos.map(t => (
-                      <option key={t.id} value={t.auth_user_id || t.id}>{t.nombre} {t.apellidos}</option>
+                      <option key={t.id} value={t.id}>{t.nombre} {t.apellidos}</option>
                   ))}
                 </select>
               </div>
@@ -313,7 +423,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
                 <textarea 
                   rows={3}
                   required
-                  placeholder="Descripción del siniestro, tareas requeridas, etc."
+                  placeholder="Descripción del encargo, tareas requeridas, etc."
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm resize-none"
                   value={formData.observaciones}
                   onChange={(e) => setFormData({...formData, observaciones: e.target.value})}
@@ -324,7 +434,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
           </form>
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-end items-center gap-3">
           <button 
             type="button"
             onClick={onClose}
@@ -332,6 +442,17 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
           >
             Cancelar
           </button>
+
+          <button
+            type="button"
+            onClick={handleManualTelegram}
+            disabled={loading}
+            className="px-5 py-2.5 bg-green-500 text-white rounded-xl font-bold shadow-lg shadow-green-500/30 hover:bg-green-600 hover:shadow-green-500/40 focus:ring-4 focus:ring-green-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[20px]">chat</span>
+            {loading ? '...' : 'Re-notificar'}
+          </button>
+
           <button 
             type="submit"
             disabled={loading}

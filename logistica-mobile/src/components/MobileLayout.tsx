@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Outlet, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../hooks/useTheme';
 
 const MobileLayout = () => {
     const location = useLocation();
@@ -8,6 +9,7 @@ const MobileLayout = () => {
     const isLoginPage = location.pathname === '/m/login';
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const { isDark, toggle: toggleTheme } = useTheme();
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -40,14 +42,21 @@ const MobileLayout = () => {
         <div className="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen flex flex-col">
             {/* Solo mostramos la barra superior móvil si no estamos en el login */}
             {!isLoginPage && (
-                <header className="bg-primary text-white shadow-md sticky top-0 z-20">
-                    <div className="px-4 py-3 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-[24px]">construction</span>
-                            <h1 className="font-bold text-lg leading-none">Fernaguez</h1>
-                        </div>
-                        <button className="p-1 rounded-full hover:bg-white/20 transition-colors">
-                            <span className="material-symbols-outlined text-[24px]">menu</span>
+                <header className="bg-primary dark:bg-primary-dark text-white shadow-md sticky top-0 z-20">
+                    <div className="px-4 py-2.5 flex items-center justify-between">
+                        <img
+                            src={isDark ? '/logo_fernaguez_white.png' : '/logo_fernaguez_blk.png'}
+                            alt="Logística Fernaguez"
+                            className="h-12 w-auto object-contain"
+                        />
+                        <button
+                            onClick={toggleTheme}
+                            className="p-1 rounded-full hover:bg-white/20 transition-colors"
+                            title={isDark ? 'Modo claro' : 'Modo oscuro'}
+                        >
+                            <span className="material-symbols-outlined text-[24px]">
+                                {isDark ? 'light_mode' : 'dark_mode'}
+                            </span>
                         </button>
                     </div>
                 </header>
@@ -57,6 +66,27 @@ const MobileLayout = () => {
             <main className="flex-1 w-full bg-slate-50 dark:bg-slate-900 relative">
                 <Outlet />
             </main>
+
+            {/* Footer sutil */}
+            {!isLoginPage && (
+                <div className="bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-1.5">
+                    <a
+                        href="https://vielhacomputer.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-1.5 group"
+                    >
+                        <img
+                            src="/vielha-computer-logo.png"
+                            alt="Vielha Computer"
+                            className="h-10 w-auto object-contain opacity-40 group-hover:opacity-70 transition-opacity"
+                        />
+                        <span className="text-[10px] text-slate-400 group-hover:text-slate-500 transition-colors">
+                            Desarrollado por Vielha Computer
+                        </span>
+                    </a>
+                </div>
+            )}
 
             {/* Navegación Inferior (Opcional - solo para trabajadores logueados) */}
             {!isLoginPage && (

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { notifyNewOrder } from '../lib/notifications';
+import { useUserRole } from '../hooks/useUserRole';
 
 interface Asignacion {
   id: string;
@@ -8,6 +10,7 @@ interface Asignacion {
   trabajador?: {
     nombre: string;
     apellidos: string;
+    telefono?: string;
   };
   fecha_asignacion: string;
   hora_programada: string;
@@ -17,37 +20,48 @@ interface Asignacion {
 }
 
 interface Trabajador {
-  id: string;
-  auth_user_id: string | null;
-  nombre: string;
-  apellidos: string;
+    id: string;
+    auth_user_id: string | null;
+    nombre: string;
+    apellidos: string;
+    telefono?: string | null;
+    telegram_chat_id?: string | null;
 }
 
 interface Props {
   ordenId: string;
+  orden?: any; // Objeto de la orden para las notificaciones
   onUpdate?: () => void;
 }
 
-export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
+export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props) {
+  const { isEditor } = useUserRole();
   const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showCancelled, setShowCancelled] = useState(false);
 
   // Form state
   const [formTrabajador, setFormTrabajador] = useState('');
-  const [formFecha, setFormFecha] = useState(new Date().toISOString().split('T')[0]);
+  const [formFecha, setFormFecha] = useState(new Date().toLocaleDateString('en-CA'));
   const [formHora, setFormHora] = useState('10:00');
   const [formNotas, setFormNotas] = useState('');
 
   useEffect(() => {
-    fetchAsignaciones();
+    fetchAsignaciones(false);
     fetchTrabajadores();
+
+    // Polling: refrescar asignaciones cada 10s para ver cambios del tecnico en mobile
+    const interval = setInterval(() => {
+      fetchAsignaciones(true);
+    }, 10000);
+    return () => clearInterval(interval);
   }, [ordenId]);
 
-  const fetchAsignaciones = async () => {
-    setLoading(true);
+  const fetchAsignaciones = async (silent = false) => {
+    if (!silent) setLoading(true);
     const { data, error } = await supabase
       .from('orden_asignaciones')
       .select(`
@@ -64,32 +78,31 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
       .order('creado_en', { ascending: false });
 
     if (!error && data) {
-      // Fetch worker names separately
-      const trabajadorIds = data.map(a => a.trabajador_id).filter(Boolean);
-      if (trabajadorIds.length > 0) {
-        const { data: trabajadoresData } = await supabase
-          .from('trabajadores')
-          .select('id, auth_user_id, nombre, apellidos')
-          .in('id', trabajadorIds);
+      // 2. Cargamos todos los trabajadores para poder cruzar los datos
+      const { data: rawTrab } = await supabase
+        .from('trabajadores')
+        .select('id, auth_user_id, nombre, apellidos, telegram_chat_id, telefono');
 
-        if (trabajadoresData) {
-          const merged = data.map(a => ({
-            ...a,
-            trabajador: trabajadoresData.find(t => t.id === a.trabajador_id)
-          }));
-          setAsignaciones(merged);
-        }
-      } else {
-        setAsignaciones(data);
-      }
+      // 3. Cruzamos los datos manualmente (mucho más fiable)
+      const mergedAsignaciones = (data || []).map(asig => {
+        const trabajador = rawTrab?.find(t =>
+          t.id === asig.trabajador_id || t.auth_user_id === asig.trabajador_id
+        );
+        return {
+          ...asig,
+          trabajador
+        };
+      });
+
+      setAsignaciones(mergedAsignaciones);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
   const fetchTrabajadores = async () => {
     const { data } = await supabase
       .from('trabajadores')
-      .select('id, auth_user_id, nombre, apellidos')
+      .select('id, auth_user_id, nombre, apellidos, telefono, telegram_chat_id')
       .eq('estado', 'Disponible');
     if (data) setTrabajadores(data);
   };
@@ -101,29 +114,125 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
       return;
     }
 
+    if (!formNotas.trim()) {
+      alert('Por favor, escribe una nota o instrucción para el trabajador.');
+      return;
+    }
+
     setSaving(true);
-    const { error } = await supabase
-      .from('orden_asignaciones')
-      .insert({
+
+    try {
+      const selectedWorker = trabajadores.find(t => t.id === formTrabajador);
+      console.log('[Asignacion] formTrabajador:', formTrabajador);
+      console.log('[Asignacion] selectedWorker:', selectedWorker);
+      console.log('[Asignacion] selectedWorker.id:', selectedWorker?.id);
+
+      if (!selectedWorker) {
+        alert('Trabajador no encontrado. Recarga la página e inténtalo de nuevo.');
+        setSaving(false);
+        return;
+      }
+
+      if (!selectedWorker.id) {
+        alert('El trabajador seleccionado no tiene un ID válido. Revisa la ficha del trabajador.');
+        setSaving(false);
+        return;
+      }
+
+      // 0. Verificar que el trabajador existe realmente en la base de datos
+      const { data: existsCheck, error: existsErr } = await supabase
+        .from('trabajadores')
+        .select('id')
+        .eq('id', selectedWorker.id)
+        .maybeSingle();
+      console.log('[Asignacion] existsCheck:', existsCheck, 'existsErr:', existsErr);
+
+      if (!existsCheck) {
+        alert(`El trabajador "${selectedWorker.nombre} ${selectedWorker.apellidos}" no se encontró en la base de datos. Es posible que haya sido borrado. Recarga la página.`);
+        setSaving(false);
+        return;
+      }
+
+      // 1. Insertamos la nueva asignación (FK apunta a trabajadores.id)
+      const insertPayload = {
         orden_id: ordenId,
-        trabajador_id: formTrabajador,
+        trabajador_id: selectedWorker.id,
         fecha_asignacion: formFecha,
         hora_programada: formHora,
         notas: formNotas,
         estado: 'pendiente'
-      });
+      };
+      console.log('[Asignacion] insertPayload:', insertPayload);
+      console.log('[Asignacion] typeof trabajador_id:', typeof insertPayload.trabajador_id, '| value:', JSON.stringify(insertPayload.trabajador_id));
 
-    setSaving(false);
+      const { error: assignError } = await supabase
+        .from('orden_asignaciones')
+        .insert(insertPayload);
 
-    if (error) {
-      console.error('Error asignando:', error);
-      alert('Error al asignar trabajador. ¿Está creada la tabla orden_asignaciones?');
-    } else {
+      console.log('[Asignacion] assignError:', assignError);
+      if (assignError) throw assignError;
+
+      // 2. Sincronizamos la tabla principal de ordenes (tecnico_id suele ser auth_user_id)
+      // Si la orden estaba cerrada, la reabrimos a En Curso para el nuevo tecnico
+      const updates: any = { tecnico_id: selectedWorker.auth_user_id || selectedWorker.id };
+      if (orden?.estado === 'En revisión' || orden?.estado === 'Finalizada' || orden?.estado === 'Archivado') {
+        updates.estado = 'En Curso';
+      }
+
+      const { error: updateError } = await supabase
+        .from('ordenes')
+        .update(updates)
+        .eq('id', ordenId);
+
+      if (updateError) throw updateError;
+
+      console.log("✅ Asignación completada con éxito");
+
+      // 3. Notificación al trabajador
+      if (orden) {
+        const hasTelegram = !!selectedWorker.telegram_chat_id;
+        const hasPhone = !!selectedWorker.telefono;
+
+        if (!hasTelegram && !hasPhone) {
+          const continuar = window.confirm(
+            `⚠️ ${selectedWorker.nombre} ${selectedWorker.apellidos} no tiene medio de contacto configurado (ni Chat ID de Telegram ni teléfono).\n\n` +
+            `¿Quieres guardar la asignación igualmente sin notificar?\n\n` +
+            `Pulsa Aceptar para asignar sin notificar, o Cancelar para detenerte y añadir los datos de contacto desde la página de Trabajadores.`
+          );
+          if (!continuar) {
+            setSaving(false);
+            return;
+          }
+        } else {
+          try {
+            console.log("Enviando notificación al trabajador...");
+            const notifResult = await notifyNewOrder(selectedWorker, {
+              id: ordenId,
+              id_legible: orden.id_legible,
+              cliente: orden.cliente,
+              direccion: orden.direccion,
+              descripcion: `${orden.descripcion}\n\n*Notas de asignación:* ${formNotas}`
+            });
+            console.log("[Notificación] resultado:", notifResult);
+          } catch (wsErr) {
+            console.error("Error al enviar notificación:", wsErr);
+          }
+        }
+      }
+
+      setSaving(false);
       setShowAddForm(false);
       setFormTrabajador('');
       setFormNotas('');
-      fetchAsignaciones();
+      fetchAsignaciones(false);
       onUpdate?.();
+
+    } catch (error: any) {
+      console.error('Error detallado en asignación:', error);
+      const errorMsg = error.message || 'Error desconocido';
+      const errorDetail = error.details || '';
+      alert(`Error al asignar: ${errorMsg} ${errorDetail ? `(${errorDetail})` : ''}`);
+      setSaving(false);
     }
   };
 
@@ -134,7 +243,7 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
       .eq('id', asignacionId);
 
     if (!error) {
-      fetchAsignaciones();
+      fetchAsignaciones(false);
       onUpdate?.();
     }
   };
@@ -148,9 +257,37 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
       .eq('id', asignacionId);
 
     if (!error) {
-      fetchAsignaciones();
+      fetchAsignaciones(false);
       onUpdate?.();
     }
+  };
+
+  const handleManualWhatsApp = async (asig: Asignacion) => {
+    if (!asig.trabajador) {
+      alert("No se encontró el técnico asignado.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await notifyNewOrder(asig.trabajador, {
+        id: ordenId,
+        id_legible: orden?.id_legible || '',
+        cliente: orden?.cliente || '',
+        direccion: orden?.direccion || '',
+        descripcion: `${orden?.descripcion || ''}\n\n*Notas de asignación:* ${asig.notas || ''}`
+      });
+
+      if (result.success) {
+        alert("✅ Notificación reenviada a " + asig.trabajador.nombre);
+      } else {
+        alert("⚠️ No se pudo enviar la notificación: " + (result.error || 'Error desconocido'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("❌ Error al enviar la notificación.");
+    }
+    setSaving(false);
   };
 
   const getEstadoBadge = (estado: string) => {
@@ -171,79 +308,89 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
           <span className="material-symbols-outlined text-primary">group_add</span>
           <h3 className="font-bold text-slate-800 dark:text-white">Asignaciones de Trabajo</h3>
         </div>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors"
-        >
-          <span className="material-symbols-outlined text-[18px]">add</span>
-          Asignar
-        </button>
+        {isEditor && (
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            Asignar
+          </button>
+        )}
       </div>
 
       {/* Add Form */}
       {showAddForm && (
-        <form onSubmit={handleAddAsignacion} className="p-4 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-200 dark:border-slate-800">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <form onSubmit={handleAddAsignacion} className="p-5 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-200 dark:border-slate-800 space-y-4">
+          {/* Línea 1: Trabajador */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Trabajador *</label>
+            <select
+              value={formTrabajador}
+              onChange={(e) => setFormTrabajador(e.target.value)}
+              className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+              required
+            >
+              <option value="">Seleccionar trabajador...</option>
+              {trabajadores.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.nombre} {t.apellidos} {t.telefono ? `(${t.telefono})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Línea 2: Fecha | Hora */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Trabajador *</label>
-              <select
-                value={formTrabajador}
-                onChange={(e) => setFormTrabajador(e.target.value)}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
-                required
-              >
-                <option value="">Seleccionar...</option>
-                {trabajadores.map(t => (
-                  <option key={t.id} value={t.id}>
-                    {t.nombre} {t.apellidos}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fecha</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Fecha</label>
               <input
                 type="date"
                 value={formFecha}
                 onChange={(e) => setFormFecha(e.target.value)}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+                className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Hora</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Hora</label>
               <input
                 type="time"
                 value={formHora}
                 onChange={(e) => setFormHora(e.target.value)}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+                className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
               />
             </div>
-            <div className="flex items-end gap-2">
+          </div>
+
+          {/* Línea 3: Instrucciones + Botones */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-8">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Instrucciones *</label>
+              <input
+                type="text"
+                value={formNotas}
+                onChange={(e) => setFormNotas(e.target.value)}
+                placeholder="Instrucciones para el trabajador..."
+                className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                required
+              />
+            </div>
+            <div className="lg:col-span-4 flex flex-col gap-2">
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-50"
+                className="w-full px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 shadow-sm"
               >
-                {saving ? 'Guardando...' : 'Guardar'}
+                {saving ? 'Guardando...' : 'Notificar'}
               </button>
               <button
                 type="button"
                 onClick={() => setShowAddForm(false)}
-                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded-lg text-sm font-semibold"
+                className="w-full px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
               >
                 Cancelar
               </button>
             </div>
-          </div>
-          <div className="mt-3">
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Notas</label>
-            <input
-              type="text"
-              value={formNotas}
-              onChange={(e) => setFormNotas(e.target.value)}
-              placeholder="Instrucciones para el trabajador..."
-              className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
-            />
           </div>
         </form>
       )}
@@ -255,47 +402,101 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
         ) : asignaciones.length === 0 ? (
           <div className="p-6 text-center text-slate-500">
             <span className="material-symbols-outlined text-3xl text-slate-300 block mb-2">person_add_disabled</span>
-            Sin asignaciones. Haz clic en "Asignar" para añadir trabajadores.
+            Sin asignaciones.{isEditor && ' Haz clic en "Asignar" para añadir trabajadores.'}
           </div>
-        ) : (
-          asignaciones.map(asig => (
-            <div key={asig.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                  {asig.trabajador?.nombre?.charAt(0) || '?'}
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-800 dark:text-white">
-                    {asig.trabajador?.nombre} {asig.trabajador?.apellidos}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {asig.fecha_asignacion} {asig.hora_programada && `• ${asig.hora_programada}`}
-                  </p>
-                  {asig.notas && <p className="text-xs text-slate-400 italic">{asig.notas}</p>}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={asig.estado}
-                  onChange={(e) => handleUpdateEstado(asig.id, e.target.value)}
-                  className={`px-3 py-1 rounded-full text-xs font-bold border-0 cursor-pointer ${getEstadoBadge(asig.estado)}`}
-                >
-                  <option value="pendiente">⏳ Pendiente</option>
-                  <option value="en_progreso">🔵 En Progreso</option>
-                  <option value="completado">✅ Completado</option>
-                  <option value="cancelado">❌ Cancelado</option>
-                </select>
+        ) : (() => {
+          const activas   = asignaciones.filter(a => a.estado !== 'cancelado');
+          const canceladas = asignaciones.filter(a => a.estado === 'cancelado');
+          const visibles  = showCancelled ? asignaciones : activas;
+
+          return (
+            <>
+              {visibles.length === 0 && !showCancelled ? (
+                <div className="p-4 text-center text-slate-400 text-sm italic">Sin asignaciones activas.</div>
+              ) : (
+                visibles.map(asig => (
+                  <div
+                    key={asig.id}
+                    className={`p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30 ${
+                      asig.estado === 'cancelado' ? 'opacity-50' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                        {asig.trabajador?.nombre?.charAt(0) || '?'}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-800 dark:text-white">
+                          {asig.trabajador?.nombre} {asig.trabajador?.apellidos}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {asig.fecha_asignacion} {asig.hora_programada && `• ${asig.hora_programada}`}
+                        </p>
+                        {asig.notas && <p className="text-xs text-slate-400 italic">{asig.notas}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isEditor ? (
+                        <select
+                          value={asig.estado}
+                          onChange={(e) => handleUpdateEstado(asig.id, e.target.value)}
+                          className={`px-3 py-1 rounded-full text-xs font-bold border-0 cursor-pointer ${getEstadoBadge(asig.estado)}`}
+                        >
+                          <option value="pendiente">⏳ Pendiente</option>
+                          <option value="en_progreso">🔵 En Progreso</option>
+                          <option value="completado">✅ Completado</option>
+                          <option value="cancelado">❌ Cancelado</option>
+                        </select>
+                      ) : (
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${getEstadoBadge(asig.estado)}`}>
+                          {asig.estado === 'pendiente' && '⏳ Pendiente'}
+                          {asig.estado === 'en_progreso' && '🔵 En Progreso'}
+                          {asig.estado === 'completado' && '✅ Completado'}
+                          {asig.estado === 'cancelado' && '❌ Cancelado'}
+                        </span>
+                      )}
+                      {isEditor && (
+                        <>
+                          <button
+                            onClick={() => handleManualWhatsApp(asig)}
+                            disabled={saving}
+                            className="p-1.5 text-slate-400 hover:text-green-500 hover:bg-green-50 rounded-full transition-colors disabled:opacity-50"
+                            title="Reenviar notificación al técnico"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">chat</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAsignacion(asig.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                            title="Eliminar asignación"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+
+              {/* Toggle de canceladas */}
+              {canceladas.length > 0 && (
                 <button
-                  onClick={() => handleDeleteAsignacion(asig.id)}
-                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                  title="Eliminar asignación"
+                  onClick={() => setShowCancelled(prev => !prev)}
+                  className="w-full py-2.5 px-4 text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors flex items-center justify-center gap-1.5"
                 >
-                  <span className="material-symbols-outlined text-[18px]">delete</span>
+                  <span className="material-symbols-outlined text-[14px]">
+                    {showCancelled ? 'expand_less' : 'expand_more'}
+                  </span>
+                  {showCancelled
+                    ? 'Ocultar canceladas'
+                    : `Ver ${canceladas.length} asignación${canceladas.length > 1 ? 'es' : ''} cancelada${canceladas.length > 1 ? 's' : ''}`
+                  }
                 </button>
-              </div>
-            </div>
-          ))
-        )}
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );

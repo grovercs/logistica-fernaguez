@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { notifyNewOrder } from '../../lib/notifications';
 
 interface Props {
   isOpen: boolean;
@@ -12,7 +13,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
   const [formData, setFormData] = useState({
     referencia: '',
     cliente: '',
-    aseguradora: '',
+    cif_nif: '',
     tecnico: '',
     fecha: '',
     hora: '',
@@ -24,6 +25,8 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
     persona_contacto: '',
     telefono_contacto: '',
     direccion: '',
+    direccion_fiscal: '',
+    estado: 'Pendiente',
   });
 
   const [tecnicos, setTecnicos] = useState<any[]>([]);
@@ -39,17 +42,23 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
        fetchAseguradoras();
        fetchTareasFrecuentes();
        setFormData({
-         referencia: '', cliente: '', aseguradora: '', tecnico: '',
-         fecha: fechaInicial || new Date().toISOString().split('T')[0],
+         referencia: '', cliente: '', cif_nif: '', tecnico: '',
+         fecha: fechaInicial || new Date().toLocaleDateString('en-CA'),
          hora: '10:00', observaciones: '', esUrgente: false,
          asegurado: '', telefono_asegurado: '', email: '',
          persona_contacto: '', telefono_contacto: '', direccion: '',
+         direccion_fiscal: '',
+         estado: 'Pendiente',
        });
     }
   }, [isOpen, fechaInicial]);
 
   const fetchTecnicos = async () => {
-    const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos').eq('estado', 'Disponible');
+    // Cargar todos los técnicos activos para poder asignarles órdenes futuras incluso si están ocupados ahora
+    const { data } = await supabase
+      .from('trabajadores')
+      .select('id, auth_user_id, nombre, apellidos, telefono, telegram_chat_id')
+      .neq('estado', 'Baja');
     if (data) setTecnicos(data);
   };
 
@@ -95,38 +104,24 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
     }
   };
 
-  const handleAseguradoraChange = (nombreAseguradora: string) => {
-    const aseguradoraSeleccionada = aseguradoras.find(a => a.nombre === nombreAseguradora);
+  const handleClienteChange = (nombre: string) => {
+    const existente = aseguradoras.find(a => a.nombre.toLowerCase() === nombre.toLowerCase());
 
-    if (aseguradoraSeleccionada) {
+    if (existente) {
       setFormData({
         ...formData,
-        aseguradora: nombreAseguradora,
-        cliente: aseguradoraSeleccionada.nombre || '',
-        // Mapear campos de la BD a los campos del formulario
-        asegurado: aseguradoraSeleccionada.persona_contacto || '', // Persona responsable
-        telefono_asegurado: aseguradoraSeleccionada.telefono || '', // Teléfono principal
-        email: aseguradoraSeleccionada.email || '',
-        referencia: aseguradoraSeleccionada.cif || '',
-        // NO autocompletar dirección - el usuario puede elegir copiarla
+        cliente: existente.nombre,
+        cif_nif: existente.cif || '',
+        asegurado: existente.persona_contacto || '',
+        telefono_asegurado: existente.telefono || '',
+        email: existente.email || '',
+        direccion: existente.direccion || '',
+        direccion_fiscal: existente.direccion || '',
       });
-      // Guardar la dirección del cliente para mostrar opción de copiarla
-      setDireccionCliente(aseguradoraSeleccionada.direccion || '');
-      fetchOrdenesPrevias(aseguradoraSeleccionada.nombre);
+      setDireccionCliente(existente.direccion || '');
+      fetchOrdenesPrevias(existente.nombre);
     } else {
-      // Cliente Particular - limpiar campos
-      setFormData({
-        ...formData,
-        aseguradora: '',
-        cliente: '',
-        asegurado: '',
-        telefono_asegurado: '',
-        email: '',
-        direccion: '',
-        referencia: '',
-      });
-      setDireccionCliente('');
-      setOrdenesPrevias([]);
+      setFormData({ ...formData, cliente: nombre });
     }
   };
 
@@ -153,19 +148,36 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
     setLoading(true);
 
     const year = new Date().getFullYear();
-    const id_legible = `OB-${year}-${Math.floor(1000 + Math.random() * 9000)}`;
-    
-    let createdAt = new Date().toISOString();
-    if (formData.fecha) {
-        createdAt = new Date(`${formData.fecha}T${formData.hora || '12:00'}:00`).toISOString();
+    const { data: ordenesExistentes } = await supabase
+      .from('ordenes')
+      .select('id_legible')
+      .ilike('id_legible', `OB-${year}-____`)
+      .order('creado_en', { ascending: false })
+      .limit(100);
+
+    let maxNum = 0;
+    const regex = new RegExp(`^OB-${year}-(\\d{4})$`);
+    for (const o of (ordenesExistentes || [])) {
+      const match = o.id_legible?.match(regex);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
     }
 
-    const { error } = await supabase
+    const nextNum = maxNum + 1;
+    const id_legible = `OB-${year}-${String(nextNum).padStart(4, '0')}`;
+
+    const now = new Date().toISOString();
+
+    const selectedTecnico = formData.tecnico ? tecnicos.find(t => t.id === formData.tecnico) : null;
+
+    const { data: newOrder, error } = await supabase
       .from('ordenes')
       .insert({
          id_legible,
          cliente: formData.cliente,
-         aseguradora: formData.aseguradora,
+         aseguradora: formData.cliente, // Usamos el nombre del cliente como aseguradora para compatibilidad
          poliza: formData.referencia,
          asegurado: formData.asegurado,
          telefono_asegurado: formData.telefono_asegurado,
@@ -174,19 +186,91 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
          telefono_contacto: formData.telefono_contacto,
          direccion: formData.direccion,
          descripcion: formData.observaciones,
-         estado: formData.esUrgente ? 'Urgente' : (formData.tecnico ? 'En Curso' : 'Pendiente'),
-         tecnico_id: formData.tecnico || null,
-         creado_en: createdAt
-      });
+         estado: formData.esUrgente ? 'Urgente' : (formData.estado || 'Pendiente'),
+         tecnico_id: selectedTecnico ? (selectedTecnico.auth_user_id || selectedTecnico.id) : null,
+         fecha_programada: formData.fecha,
+         hora_programada: formData.hora,
+         creado_en: now
+      })
+      .select('id, id_legible')
+      .single();
 
-    setLoading(false);
-    if (!error) {
+    if (!error && newOrder) {
+       // Crear asignación oficial en la tabla de asignaciones
+       if (selectedTecnico) {
+         await supabase.from('orden_asignaciones').insert({
+           orden_id: newOrder.id,
+           trabajador_id: selectedTecnico.id,
+           fecha_asignacion: formData.fecha,
+           hora_programada: formData.hora,
+           estado: 'pendiente'
+         });
+       }
+
+       // Notificación Telegram al técnico con el ID interno para el link
+       if (selectedTecnico && selectedTecnico.telegram_chat_id) {
+         await notifyNewOrder(selectedTecnico, {
+          id: newOrder.id,
+          id_legible: newOrder.id_legible,
+          cliente: formData.cliente,
+          direccion: formData.direccion,
+          descripcion: formData.observaciones
+        }).catch(err => console.error("Error enviando Telegram automático:", err));
+       }
+
+       // Auto-registro o actualización del Cliente/Empresa
+       if (formData.cliente) {
+         try {
+           console.log("Comprobando existencia del cliente:", formData.cliente);
+           
+           // 1. Buscar si ya existe el cliente por nombre
+           const { data: clienteExistente } = await supabase
+             .from('aseguradoras')
+             .select('id')
+             .eq('nombre', formData.cliente)
+             .single();
+
+           const clientData = {
+             nombre: formData.cliente,
+             cif: formData.cif_nif,
+             telefono: formData.telefono_asegurado || formData.telefono_contacto,
+             email: formData.email,
+             direccion: formData.direccion_fiscal || formData.direccion,
+             persona_contacto: formData.asegurado || formData.persona_contacto,
+             web: formData.referencia,
+             estado: 'Activa'
+           };
+
+           if (clienteExistente) {
+             console.log("Cliente encontrado, actualizando ficha...");
+             const { error: updateError } = await supabase
+               .from('aseguradoras')
+               .update(clientData)
+               .eq('id', clienteExistente.id);
+             
+             if (updateError) console.error("Error actualizando cliente:", updateError.message);
+             else console.log("Ficha de cliente actualizada con éxito");
+           } else {
+             console.log("Cliente nuevo, insertando ficha...");
+             const { error: insertError } = await supabase
+               .from('aseguradoras')
+               .insert(clientData);
+             
+             if (insertError) console.error("Error insertando cliente nuevo:", insertError.message);
+             else console.log("Nuevo cliente registrado con éxito");
+           }
+         } catch (err) {
+           console.error("Excepción en gestión de clientes:", err);
+         }
+       }
+
        if (onCreated) onCreated();
        onClose();
     } else {
        console.error("Error creating order", error);
        alert("Error al crear la orden.");
     }
+    setLoading(false);
   };
 
   return (
@@ -232,49 +316,15 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
               </label>
             </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Empresa / Cliente */}
-              <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px] text-slate-400">business</span>
-                  Empresa / Cliente
-                </label>
-                <select
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
-                  value={formData.aseguradora}
-                  onChange={(e) => handleAseguradoraChange(e.target.value)}
-                >
-                  <option value="">Cliente Particular</option>
-                  {aseguradoras.map(a => (
-                     <option key={a.id} value={a.nombre}>
-                       {a.nombre}{a.estado === 'Inactiva' ? ' (Inactiva)' : ''}
-                     </option>
-                  ))}
-                </select>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-              {/* CIF / DNI */}
-              <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px] text-slate-400">badge</span>
-                  {formData.aseguradora ? 'CIF de la Empresa' : 'DNI / NIF'}
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder={formData.aseguradora ? "Ej: B12345678" : "Ej: 12345678A"}
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
-                  value={formData.referencia}
-                  onChange={(e) => setFormData({...formData, referencia: e.target.value})}
-                />
-              </div>
 
               {/* Histórico de trabajos del cliente */}
               {ordenesPrevias.length > 0 && (
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                     <span className="material-symbols-outlined text-[16px] text-slate-400">history</span>
-                    Trabajos Previos de {formData.aseguradora}
+                    Trabajos Previos de {formData.cliente}
                   </label>
                   <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-3 max-h-40 overflow-y-auto">
                     {ordenesPrevias.map(orden => (
@@ -296,34 +346,64 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                 </div>
               )}
 
-              {/* Nombre del Cliente (solo para Particulares) */}
-              {!formData.aseguradora && (
-                <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[16px] text-slate-400">person</span>
-                    Nombre del Cliente *
-                  </label>
-                  <input
-                    type="text"
-                    required={!formData.aseguradora}
-                    placeholder="Nombre completo del cliente"
-                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
-                    value={formData.cliente}
-                    onChange={(e) => setFormData({...formData, cliente: e.target.value})}
-                  />
+              {/* Nombre del Cliente / Empresa */}
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-slate-400">corporate_fare</span>
+                  Nombre del Cliente o Empresa *
+                </label>
+                <input
+                  type="text"
+                  list="clientes-list"
+                  placeholder="Escribe el nombre del cliente o empresa..."
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm font-bold"
+                  value={formData.cliente || ''}
+                  onChange={(e) => handleClienteChange(e.target.value)}
+                  required
+                />
+                <datalist id="clientes-list">
+                  {aseguradoras.map((a: any) => (
+                    <option key={a.id} value={a.nombre} />
+                  ))}
+                </datalist>
+              </div>
+
+              {/* DNI / CIF y Dirección Fiscal */}
+              <div className="space-y-4 md:col-span-2">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase">DNI / CIF</label>
+                    <input 
+                      type="text" 
+                      value={formData.cif_nif || ''} 
+                      onChange={e => setFormData({...formData, cif_nif: e.target.value})} 
+                      placeholder="Ej: 12345678A" 
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold" 
+                    />
+                  </div>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Dirección Fiscal / Empresa</label>
+                    <input 
+                      type="text" 
+                      value={formData.direccion_fiscal || ''} 
+                      onChange={e => setFormData({...formData, direccion_fiscal: e.target.value})} 
+                      placeholder="Dirección que aparecerá en la ficha del cliente" 
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" 
+                    />
+                  </div>
                 </div>
-              )}
+              </div>
 
               {/* Contacto en Domicilio / Persona Responsable */}
               <div className="space-y-1.5 md:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">{formData.aseguradora ? 'Persona Responsable' : 'Contacto en Domicilio'}</label>
-                        <input type="text" value={formData.asegurado} onChange={e => setFormData({...formData, asegurado: e.target.value})} placeholder={formData.aseguradora ? "Persona de contacto en la empresa" : "Persona en el domicilio"} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                        <label className="text-xs font-bold text-slate-500 uppercase">Persona de Contacto / Responsable</label>
+                        <input type="text" value={formData.asegurado || ''} onChange={e => setFormData({...formData, asegurado: e.target.value})} placeholder="Persona de contacto" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 uppercase">Teléfono</label>
-                        <input type="tel" value={formData.telefono_asegurado} onChange={e => setFormData({...formData, telefono_asegurado: e.target.value})} placeholder="Ej: 600123456" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                        <input type="tel" value={formData.telefono_asegurado || ''} onChange={e => setFormData({...formData, telefono_asegurado: e.target.value})} placeholder="Ej: 600123456" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                 </div>
               </div>
@@ -333,7 +413,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 uppercase">Dirección Completa de Intervención</label>
                         <div className="flex gap-2">
-                          <input type="text" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} placeholder="Ej: Calle Gran Vía 123, 1ºA, Madrid" className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                          <input type="text" value={formData.direccion || ''} onChange={e => setFormData({...formData, direccion: e.target.value})} placeholder="Ej: Calle Gran Vía 123, 1ºA, Madrid" className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                           {formData.direccion && (
                             <a
                               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.direccion)}`}
@@ -359,7 +439,11 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                     </div>
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 uppercase">Email del Cliente</label>
-                        <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="correo@ejemplo.com" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                        <input type="email" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="correo@ejemplo.com" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Sitio Web (Opcional)</label>
+                        <input type="url" value={formData.referencia || ''} onChange={e => setFormData({...formData, referencia: e.target.value})} placeholder="Ej: https://tudominio.com" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                 </div>
               </div>
@@ -368,11 +452,11 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 uppercase">Persona de Contacto Adicional</label>
-                        <input type="text" value={formData.persona_contacto} onChange={e => setFormData({...formData, persona_contacto: e.target.value})} placeholder="Otra persona de contacto" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                        <input type="text" value={formData.persona_contacto || ''} onChange={e => setFormData({...formData, persona_contacto: e.target.value})} placeholder="Otra persona de contacto" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 uppercase">Teléfono de Contacto Adicional</label>
-                        <input type="tel" value={formData.telefono_contacto} onChange={e => setFormData({...formData, telefono_contacto: e.target.value})} placeholder="Ej: 600123456" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                        <input type="tel" value={formData.telefono_contacto || ''} onChange={e => setFormData({...formData, telefono_contacto: e.target.value})} placeholder="Ej: 600123456" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                 </div>
               </div>
@@ -409,22 +493,41 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                 />
               </div>
 
-              {/* Tecnico */}
+              {/* Técnico Asignado y Estado */}
               <div className="space-y-1.5 md:col-span-2">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px] text-slate-400">engineering</span>
-                  Técnico Asignado
-                </label>
-                <select 
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
-                  value={formData.tecnico}
-                  onChange={(e) => setFormData({...formData, tecnico: e.target.value})}
-                >
-                  <option value="">-- Sin Asignar (Pendiente) --</option>
-                  {tecnicos.map(t => (
-                      <option key={t.id} value={t.auth_user_id || t.id}>{t.nombre} {t.apellidos}</option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[16px] text-slate-400">engineering</span>
+                      Técnico Asignado (Opcional)
+                    </label>
+                    <select
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
+                      value={formData.tecnico}
+                      onChange={(e) => setFormData({...formData, tecnico: e.target.value})}
+                    >
+                      <option value="">No asignar todavía</option>
+                      {tecnicos.map((t: any) => (
+                        <option key={t.id} value={t.id}>{t.nombre} {t.apellidos}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[16px] text-slate-400">info</span>
+                      Estado Inicial
+                    </label>
+                    <select
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
+                      value={formData.estado}
+                      onChange={(e) => setFormData({...formData, estado: e.target.value})}
+                    >
+                      <option value="Pendiente">⏳ Pendiente</option>
+                      <option value="En Revisión">🔍 En Revisión</option>
+                      <option value="En Curso">🔵 En Curso</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
               {/* Tareas Frecuentes + Observaciones */}

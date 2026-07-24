@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Compactar BD - WorkOrder Pro</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
+<div class="flex min-h-screen">
+<!-- Sidebar Navigation -->
+<aside class="w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col fixed h-full">
+<div class="p-6 flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-white">
+<span class="material-symbols-outlined">database</span>
+</div>
+<div>
+<h1 class="text-slate-900 dark:text-white font-bold text-lg leading-none">WorkOrder Pro</h1>
+<p class="text-slate-500 dark:text-slate-400 text-xs">Admin Console</p>
+</div>
+</div>
+<nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+<span class="text-sm font-medium">Tablero</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">description</span>
+<span class="text-sm font-medium">Reportes</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">payments</span>
+<span class="text-sm font-medium">Liquidaciones</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">verified_user</span>
+<span class="text-sm font-medium">Aseguradoras</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">engineering</span>
+<span class="text-sm font-medium">Trabajadores</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">group</span>
+<span class="text-sm font-medium">Usuarios</span>
+</a>
+<div class="pt-4 pb-2">
+<p class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sistema</p>
+</div>
+<a class="flex items-center gap-3 px-3 py-2 bg-primary/10 text-primary rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">layers</span>
+<span class="text-sm font-medium">Compactar BD</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">manage_accounts</span>
+<span class="text-sm font-medium">Roles Management</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">vpn_key</span>
+<span class="text-sm font-medium">Permissions</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">admin_panel_settings</span>
+<span class="text-sm font-medium">RBAC Dashboard</span>
+</a>
+</nav>
+<div class="p-4 border-t border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-3 p-2">
+<div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+<img alt="Admin Avatar" data-alt="User avatar for administrator" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBv-CkdoQXihoamprWhoK5R-EWy0BKZPabmt63-s9EKDY0-M5u4RRHdzK7w4aU4mfLckkmG1OxyX38f6OlED0QgsLsV8Y18qFPRFs2QYJljeqK7-ozeyHTZFVK0vh8zdYfq_IC0xM_RavAEzFcBeOGUbkbS7xsJWEf_aZrj1pxVpXq8venmih-ATemuUu9DVUj5-I6GW0-f_aKLRSjS5XLWx4-DhnEMixE1iltQYf51cMQpjKnYEAyIXz0BOJYSkCVMU0HmZvmFoaA"/>
+</div>
+<div class="flex-1 overflow-hidden">
+<p class="text-xs font-semibold truncate">Admin User</p>
+<p class="text-[10px] text-slate-500 truncate">admin@workorder.pro</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 ml-72 p-8">
+<!-- Header Section -->
+<div class="max-w-6xl mx-auto">
+<div class="mb-8">
+<h2 class="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Compactar Base de Datos</h2>
+<p class="mt-2 text-slate-600 dark:text-slate-400 max-w-3xl leading-relaxed">
+                        Esta herramienta permite archivar las intervenciones de obras que ya han sido marcadas como finalizadas (color verde). Una vez compactadas, dejarán de aparecer en el calendario diario para mejorar el rendimiento y la visibilidad.
+                    </p>
+</div>
+<!-- Stats Summary -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<p class="text-sm font-medium text-slate-500 dark:text-slate-400">Obras listas para compactar</p>
+<div class="flex items-end gap-2 mt-2">
+<span class="text-3xl font-bold text-slate-900 dark:text-white leading-none">42</span>
+<span class="text-xs text-green-600 font-medium pb-1">Registros finalizados</span>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<p class="text-sm font-medium text-slate-500 dark:text-slate-400">Intervenciones a archivar</p>
+<div class="flex items-end gap-2 mt-2">
+<span class="text-3xl font-bold text-slate-900 dark:text-white leading-none">156</span>
+<span class="text-xs text-slate-400 font-medium pb-1">Acciones individuales</span>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm border-l-4 border-l-primary">
+<p class="text-sm font-medium text-slate-500 dark:text-slate-400">Espacio a liberar</p>
+<div class="flex items-end gap-2 mt-2">
+<span class="text-3xl font-bold text-primary leading-none">24.5 MB</span>
+<span class="text-xs text-slate-400 font-medium pb-1">Optimización estimada</span>
+</div>
+</div>
+</div>
+<!-- Table Section -->
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-8">
+<div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
+<h3 class="font-bold text-slate-800 dark:text-slate-200">Obras Finalizadas Pendientes</h3>
+<div class="flex gap-2">
+<button class="text-xs font-semibold px-3 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded shadow-sm hover:bg-slate-50">
+                                Filtrar
+                            </button>
+<button class="text-xs font-semibold px-3 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded shadow-sm hover:bg-slate-50">
+                                Exportar PDF
+                            </button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider">
+<th class="px-6 py-4 font-semibold">Referencia</th>
+<th class="px-6 py-4 font-semibold">Cliente</th>
+<th class="px-6 py-4 font-semibold">Fecha Inicio</th>
+<th class="px-6 py-4 font-semibold">Fecha Fin</th>
+<th class="px-6 py-4 font-semibold">Total Horas</th>
+<th class="px-6 py-4 font-semibold">Estado</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+<td class="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">#WO-2023-0891</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Residencial Las Palmas</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">12/10/2023</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">15/11/2023</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">142h</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[11px] font-bold rounded uppercase tracking-tighter">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                            Finalizado
+                                        </span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+<td class="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">#WO-2023-0942</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Corporativo Tech Solutions</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">01/11/2023</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">20/11/2023</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">88h</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[11px] font-bold rounded uppercase tracking-tighter">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                            Finalizado
+                                        </span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+<td class="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">#WO-2023-1005</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Clínica San Gabriel</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">15/11/2023</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">22/11/2023</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">32h</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[11px] font-bold rounded uppercase tracking-tighter">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                            Finalizado
+                                        </span>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+<td class="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">#WO-2023-1012</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Edificio Miraflores</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">18/11/2023</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">25/11/2023</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">54h</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[11px] font-bold rounded uppercase tracking-tighter">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                            Finalizado
+                                        </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/30 text-center">
+<button class="text-xs font-semibold text-primary hover:underline">Ver todas las obras finalizadas (42)</button>
+</div>
+</div>
+<!-- Action and Notes Section -->
+<div class="flex flex-col md:flex-row gap-8 items-start">
+<div class="flex-1">
+<div class="p-6 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800/50">
+<div class="flex gap-3">
+<span class="material-symbols-outlined text-amber-600">info</span>
+<div class="space-y-2">
+<p class="text-sm font-bold text-amber-800 dark:text-amber-200 uppercase tracking-wide">Nota Importante</p>
+<p class="text-sm text-amber-700 dark:text-amber-300 leading-relaxed">
+                                        Las obras en progreso o pendientes (otros colores en el sistema) no se muestran en este listado y no pueden ser compactadas. Solo las obras totalmente finalizadas son elegibles para el archivado histórico.
+                                    </p>
+</div>
+</div>
+</div>
+</div>
+<div class="w-full md:w-auto flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg text-center gap-4">
+<div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-3xl">warning</span>
+</div>
+<div class="space-y-1">
+<p class="font-bold text-slate-900 dark:text-white">Acción Irreversible</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">Esta acción moverá los registros al histórico de archivos.</p>
+</div>
+<button class="w-full md:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-primary text-white rounded-lg font-bold hover:bg-primary/90 transition-all shadow-md shadow-primary/20">
+<span class="material-symbols-outlined text-xl">database_upload</span>
+                            Ejecutar Compactación de Datos
+                        </button>
+<p class="text-[10px] text-slate-400">Última compactación: 15 de Octubre, 2023</p>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

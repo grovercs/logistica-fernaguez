@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { smartCompress } from '../../lib/compressImage';
-import { uploadToCloudinary } from '../../lib/cloudinary';
+import { uploadToCloudinary, deleteCloudinaryImages } from '../../lib/cloudinary';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onUpdated?: () => void;
   reporteData: any;
+  ordenIdLegible?: string;
 }
 
-export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporteData }: Props) {
+export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporteData, ordenIdLegible }: Props) {
   const [loading, setLoading] = useState(false);
   const [fotos, setFotos] = useState<string[]>([]);
   const [facturas, setFacturas] = useState<string[]>([]);
@@ -53,11 +54,11 @@ export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporte
       // Compress image before upload (1280px max, 70% quality)
       const compressedFile = await smartCompress(file);
 
-      // Generate descriptive filename: OB-2026-1234_2026-04-01_foto_1
-      const ordenId = reporteData?.orden_id || 'unknown';
+      // Generate descriptive filename: OB-2026-0001_2026-04-01_foto_1
+      const orderRef = ordenIdLegible || reporteData?.orden_id || 'unknown';
       const fecha = new Date().toISOString().split('T')[0];
       const count = type === 'foto' ? fotos.length + 1 : facturas.length + 1;
-      const filename = `${ordenId}_${fecha}_${type}_${count}`;
+      const filename = `${orderRef}_${fecha}_${type}_${count}`;
 
       // Upload to Cloudinary with organized folder
       const folder = type === 'foto' ? 'logistica/visitas' : 'logistica/facturas';
@@ -73,7 +74,14 @@ export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporte
     }
   };
 
-  const removeFile = (url: string, type: 'foto' | 'factura') => {
+  const removeFile = async (url: string, type: 'foto' | 'factura') => {
+    // Borrar de Cloudinary
+    const result = await deleteCloudinaryImages([url], supabase);
+    if (!result.success) {
+      console.error('Error borrando imagen de Cloudinary:', result.error);
+      // Continuamos igual: quitamos la referencia de la BD aunque Cloudinary falle
+    }
+
     if (type === 'foto') setFotos(prev => prev.filter(u => u !== url));
     else setFacturas(prev => prev.filter(u => u !== url));
   };
@@ -185,10 +193,10 @@ export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporte
                 {fotos.map((url, i) => (
                   <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-100 group">
                     <img src={url} alt="Visita" className="w-full h-full object-cover" />
-                    <button 
+                    <button
                       type="button"
                       onClick={() => removeFile(url, 'foto')}
-                      className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-md shadow-sm hover:bg-red-600 transition-colors"
                     >
                       <span className="material-symbols-outlined text-[14px]">close</span>
                     </button>
@@ -217,10 +225,10 @@ export default function EditarReporteModal({ isOpen, onClose, onUpdated, reporte
                 {facturas.map((url, i) => (
                   <div key={i} className="relative aspect-square rounded-lg overflow-hidden border-2 border-amber-100 group">
                     <img src={url} alt="Factura" className="w-full h-full object-cover" />
-                    <button 
+                    <button
                       type="button"
                       onClick={() => removeFile(url, 'factura')}
-                      className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-md shadow-sm hover:bg-red-600 transition-colors"
                     >
                       <span className="material-symbols-outlined text-[14px]">close</span>
                     </button>

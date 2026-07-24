@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, CalendarClock, Briefcase, UserPlus, Shield, Key, Database, ClipboardList, Settings, LogOut, ListChecks } from 'lucide-react';
+import { NavLink, Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import {
+  LayoutDashboard, Users, CalendarClock, Briefcase, UserPlus,
+  Shield, Key, Database, ClipboardList, Settings, LogOut,
+  ListChecks, Menu, X, Moon, Sun, Wrench, BookOpen
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../hooks/useTheme';
 
 const Layout = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<{ nombre_completo: string; rol: string } | null>(null);
+  const { isDark, toggle: toggleTheme } = useTheme();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -23,8 +32,31 @@ const Layout = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  useEffect(() => {
+    if (session?.user?.id) {
+      supabase
+        .from('perfiles')
+        .select('nombre_completo, roles(nombre)')
+        .eq('id', session.user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setUserProfile({
+              nombre_completo: data.nombre_completo || 'Usuario',
+              rol: (data.roles as any)?.nombre || 'Sin rol'
+            });
+          }
+        });
+    }
+  }, [session]);
+
+  // Close sidebar on navigation (mobile)
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [location]);
+
   if (loading) {
-    return <div className="h-screen w-screen flex items-center justify-center bg-gray-50 text-blue-600 font-bold">Cargando sistema...</div>;
+    return <div className="h-screen w-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 text-blue-600 font-bold">Cargando sistema...</div>;
   }
 
   if (!session) {
@@ -36,20 +68,67 @@ const Layout = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 dark:bg-slate-950 overflow-hidden">
+      {/* Mobile Backdrop */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        ></div>
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200">
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
         <div className="flex flex-col h-full">
-          <div className="flex items-center justify-center p-6 border-b border-gray-200">
-            <h1 className="text-2xl font-bold text-blue-600">Fernaguez</h1>
+          <div className="flex items-center justify-center p-4 border-b border-gray-200 dark:border-slate-800">
+            <img
+              src={isDark ? '/logo_fernaguez_white.png' : '/logo_fernaguez_blk.png'}
+              alt="Logística Fernaguez"
+              className="h-14 w-auto object-contain"
+            />
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400"
+            >
+              <X className="w-6 h-6" />
+            </button>
           </div>
-          
-          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+
+          {/* User Profile */}
+          <div className="px-5 py-3 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate min-w-0">
+                {userProfile?.nombre_completo || session?.user?.email || 'Usuario'}
+              </p>
+              <button
+                onClick={toggleTheme}
+                className="p-1.5 rounded-md text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors shrink-0"
+                title={isDark ? 'Modo claro' : 'Modo oscuro'}
+              >
+                {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+              <button
+                onClick={handleLogout}
+                className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
+                title="Cerrar Sesión"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate mt-0.5">
+              {userProfile?.rol || 'Cargando...'}
+            </p>
+          </div>
+
+          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto custom-scrollbar">
             <NavLink
               to="/"
               className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
-                  isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
+                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -57,8 +136,8 @@ const Layout = () => {
               Dashboard Principal
             </NavLink>
 
-            <div className="pt-4 pb-2">
-              <p className="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase">
+            <div className="pt-6 pb-2">
+              <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
                 Operaciones
               </p>
             </div>
@@ -66,8 +145,8 @@ const Layout = () => {
             <NavLink
               to="/calendario"
               className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
-                  isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
+                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -78,8 +157,8 @@ const Layout = () => {
             <NavLink
               to="/ordenes"
               className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
-                  isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
+                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
@@ -87,146 +166,245 @@ const Layout = () => {
               Órdenes de Trabajo
             </NavLink>
             
-             <NavLink
+            <NavLink
               to="/liquidaciones"
               className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
-                  isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
+                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
               <Briefcase className="w-5 h-5 mr-3" />
-              Liquidaciones
+              {userProfile?.rol === 'Técnico' || userProfile?.rol === 'Visualizador' ? 'Mis Liquidaciones' : 'Liquidaciones'}
             </NavLink>
 
-            <div className="pt-4 pb-2">
-              <p className="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-                Administración
+            {(userProfile?.rol === 'Administrador' || userProfile?.rol === 'Editor') && (
+              <>
+                <NavLink
+                  to="/trabajadores"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <UserPlus className="w-5 h-5 mr-3" />
+                  Trabajadores
+                </NavLink>
+
+                <NavLink
+                  to="/usuarios"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Users className="w-5 h-5 mr-3" />
+                  Usuarios
+                </NavLink>
+              </>
+            )}
+
+            {userProfile?.rol === 'Administrador' && (
+              <>
+                <div className="pt-6 pb-2">
+                  <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
+                    Administración
+                  </p>
+                </div>
+
+                <NavLink
+                  to="/aseguradoras"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Users className="w-5 h-5 mr-3" />
+                  Clientes
+                </NavLink>
+
+                <NavLink
+                  to="/tareas-frecuentes"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <ListChecks className="w-5 h-5 mr-3" />
+                  Tareas Frecuentes
+                </NavLink>
+
+                <NavLink
+                  to="/especialidades"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Wrench className="w-5 h-5 mr-3" />
+                  Especialidades
+                </NavLink>
+
+                <div className="pt-6 pb-2">
+                  <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
+                    Sistema
+                  </p>
+                </div>
+
+                <NavLink
+                  to="/roles"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Shield className="w-5 h-5 mr-3" />
+                  Gestión de Roles
+                </NavLink>
+
+                <NavLink
+                  to="/permisos"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Key className="w-5 h-5 mr-3" />
+                  Lista de Permisos
+                </NavLink>
+
+                <NavLink
+                  to="/rbac"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Settings className="w-5 h-5 mr-3" />
+                  Panel RBAC
+                </NavLink>
+
+                <NavLink
+                  to="/bd"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Database className="w-5 h-5 mr-3" />
+                  Gestión BD
+                </NavLink>
+
+                <NavLink
+                  to="/configuracion"
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <Settings className="w-5 h-5 mr-3" />
+                  Configuración
+                </NavLink>
+              </>
+            )}
+
+            <div className="pt-6 pb-2">
+              <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
+                Soporte
               </p>
             </div>
 
             <NavLink
-              to="/usuarios"
+              to="/ayuda"
               className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
-                  isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
+                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`
               }
             >
-              <Users className="w-5 h-5 mr-3" />
-              Usuarios
+              <BookOpen className="w-5 h-5 mr-3" />
+              Manual de Usuario
             </NavLink>
-
-            <NavLink
-              to="/trabajadores"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
-                  isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
-                }`
-              }
-            >
-              <UserPlus className="w-5 h-5 mr-3" />
-              Trabajadores
-            </NavLink>
-
-            <NavLink
-              to="/aseguradoras"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
-                  isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
-                }`
-              }
-            >
-              <Users className="w-5 h-5 mr-3" />
-              Clientes
-            </NavLink>
-
-            <NavLink
-              to="/tareas-frecuentes"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
-                  isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
-                }`
-              }
-            >
-              <ListChecks className="w-5 h-5 mr-3" />
-              Tareas Frecuentes
-            </NavLink>
-
-            <div className="pt-4 pb-2">
-              <p className="px-4 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-                Sistema
-              </p>
-            </div>
-
-            <NavLink
-              to="/roles"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
-                  isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
-                }`
-              }
-            >
-              <Shield className="w-5 h-5 mr-3" />
-              Gestión de Roles
-            </NavLink>
-
-            <NavLink
-              to="/permisos"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
-                  isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
-                }`
-              }
-            >
-              <Key className="w-5 h-5 mr-3" />
-              Lista de Permisos
-            </NavLink>
-
-            <NavLink
-              to="/rbac"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
-                  isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
-                }`
-              }
-            >
-              <Settings className="w-5 h-5 mr-3" />
-              Panel RBAC
-            </NavLink>
-
-            <NavLink
-              to="/bd"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
-                  isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
-                }`
-              }
-            >
-              <Database className="w-5 h-5 mr-3" />
-              Gestión BD
-            </NavLink>
-
           </nav>
-          
-          <div className="p-4 border-t border-gray-200">
-            <button
-              onClick={handleLogout}
-              className="flex items-center w-full px-4 py-3 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+
+          {/* Footer */}
+          <div className="p-3 border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50">
+            <a
+              href="https://vielhacomputer.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 group"
             >
-              <LogOut className="w-5 h-5 mr-3" />
-              Cerrar Sesión
-            </button>
+              <img
+                src="/vielha-computer-logo.png"
+                alt="Vielha Computer"
+                className="h-10 w-auto object-contain opacity-60 group-hover:opacity-100 transition-opacity"
+              />
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors leading-tight">
+                Desarrollado por<br />Vielha Computer
+              </span>
+            </a>
           </div>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto">
-          <Outlet />
-        </div>
-      </main>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Mobile Top Bar */}
+        <header className="lg:hidden h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-4 shrink-0">
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <img
+            src={isDark ? '/logo_fernaguez_white.png' : '/logo_fernaguez_blk.png'}
+            alt="Logística Fernaguez"
+            className="h-10 w-auto object-contain"
+          />
+          <div className="w-10"></div> {/* Spacer for symmetry */}
+        </header>
+
+        {/* Page Content */}
+        <main className="flex-1 overflow-hidden relative">
+          <div className="h-full overflow-y-auto">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #e2e8f0;
+          border-radius: 10px;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #334155;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #cbd5e1;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #475569;
+        }
+      `}</style>
     </div>
   );
 };

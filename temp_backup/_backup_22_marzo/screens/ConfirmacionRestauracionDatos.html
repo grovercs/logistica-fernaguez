@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<title>Confirmar Restauración - Gestión ERP</title>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
+<div class="relative flex min-h-screen w-full overflow-x-hidden">
+<!-- Sidebar -->
+<aside class="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col fixed h-full">
+<div class="p-6">
+<h1 class="text-primary text-lg font-bold">Gestión ERP</h1>
+<p class="text-slate-500 dark:text-slate-400 text-xs">Obras e Infraestructura</p>
+</div>
+<nav class="flex-1 px-3 space-y-1">
+<div class="flex items-center gap-3 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-sm font-medium">Tablero</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer">
+<span class="material-symbols-outlined">description</span>
+<span class="text-sm font-medium">Reportes</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer">
+<span class="material-symbols-outlined">payments</span>
+<span class="text-sm font-medium">Liquidaciones</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer">
+<span class="material-symbols-outlined">verified_user</span>
+<span class="text-sm font-medium">Aseguradoras</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer">
+<span class="material-symbols-outlined">badge</span>
+<span class="text-sm font-medium">Trabajadores</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer">
+<span class="material-symbols-outlined">group</span>
+<span class="text-sm font-medium">Usuarios</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 bg-primary/10 text-primary rounded-lg cursor-pointer">
+<span class="material-symbols-outlined fill-1">database</span>
+<span class="text-sm font-medium">Compactar BD</span>
+</div>
+<div class="pt-4 pb-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Acceso y Control</div>
+<div class="flex items-center gap-3 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer">
+<span class="material-symbols-outlined">manage_accounts</span>
+<span class="text-sm font-medium">Roles Management</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer">
+<span class="material-symbols-outlined">key</span>
+<span class="text-sm font-medium">Permissions</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer">
+<span class="material-symbols-outlined">admin_panel_settings</span>
+<span class="text-sm font-medium">RBAC Dashboard</span>
+</div>
+</nav>
+</aside>
+<!-- Main Content -->
+<main class="ml-64 flex-1 flex flex-col">
+<header class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-8 py-4 sticky top-0 z-10">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">history</span>
+<h2 class="text-lg font-bold">Histórico de Compactación</h2>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center overflow-hidden">
+<img alt="Usuario" class="h-full w-full object-cover" data-alt="User profile picture in a circle" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB_0XYvR23NXQOaAuMRPXM_wY_cTd1lY0erIsPtLO7REyvmd9kYPZ14mkrqszFurhj4MKR2xMcxkwMPbVzfYn5k0qTX7sbxFFIpDFdpFWZMwFGknBHYH4xmjkj3d6P-j_16qy7Cxr2qLHbwLmxu4l7fS-qm5aodzchGSRxh5xGp5LZ0sDvvlH0E6ZigvfIAuahvobUaTnZkxkWHKE_0NmlE_AoDhjFe_oK31h132vpW92uYiKq5VWal63vN0PlZtExRUCkrEoCTtbQ"/>
+</div>
+</div>
+</header>
+<div class="p-8">
+<div class="flex gap-2 text-sm text-slate-500 dark:text-slate-400 mb-4">
+<span>Configuración</span>
+<span>/</span>
+<span class="text-slate-900 dark:text-slate-100 font-medium">Histórico de Compactación</span>
+</div>
+<div class="mb-8">
+<h1 class="text-3xl font-bold tracking-tight">Histórico de Compactación</h1>
+<p class="text-slate-500 dark:text-slate-400 mt-1">Gestión de lotes de datos archivados y procesos de restauración.</p>
+</div>
+<!-- Table Content -->
+<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead class="bg-slate-50 dark:bg-slate-800/50">
+<tr>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">ID Lote</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Periodo</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Registros</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Estado</th>
+<th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-5 text-sm font-medium">#CP-004</td>
+<td class="px-6 py-5 text-sm text-slate-500 dark:text-slate-400">01/10/2023 - 31/12/2023</td>
+<td class="px-6 py-5 text-sm text-slate-500 dark:text-slate-400">310,000 recs</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                        Compactado
+                                    </span>
+</td>
+<td class="px-6 py-5">
+<button class="text-primary hover:underline font-bold text-sm">Restaurar</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-5 text-sm font-medium">#CP-003</td>
+<td class="px-6 py-5 text-sm text-slate-500 dark:text-slate-400">01/07/2023 - 30/09/2023</td>
+<td class="px-6 py-5 text-sm text-slate-500 dark:text-slate-400">285,500 recs</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                        Compactado
+                                    </span>
+</td>
+<td class="px-6 py-5">
+<button class="text-primary hover:underline font-bold text-sm">Restaurar</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</main>
+<!-- Modal Backdrop -->
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+<!-- Modal Container -->
+<div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+<!-- Modal Header -->
+<div class="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-amber-600 dark:text-amber-500 text-3xl">warning</span>
+</div>
+<div>
+<h3 class="text-xl font-bold">Confirmar Restauración de Datos</h3>
+<p class="text-sm text-slate-500 dark:text-slate-400">Lote de compactación seleccionado</p>
+</div>
+</div>
+<!-- Modal Content -->
+<div class="p-6 space-y-6">
+<!-- Lot Details Card -->
+<div class="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 grid grid-cols-3 gap-4 border border-slate-100 dark:border-slate-700">
+<div>
+<p class="text-xs text-slate-400 font-semibold uppercase">ID Lote</p>
+<p class="text-sm font-bold">#CP-004</p>
+</div>
+<div>
+<p class="text-xs text-slate-400 font-semibold uppercase">Periodo</p>
+<p class="text-sm font-bold">10/2023 - 12/2023</p>
+</div>
+<div>
+<p class="text-xs text-slate-400 font-semibold uppercase">Registros</p>
+<p class="text-sm font-bold">310,000</p>
+</div>
+</div>
+<!-- Warning Message -->
+<div class="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-primary p-4">
+<div class="flex gap-3">
+<span class="material-symbols-outlined text-primary text-xl">info</span>
+<p class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                                Esta acción reintegrará los registros históricos en el calendario activo y en los reportes de liquidación. <span class="font-semibold">El proceso puede tardar unos minutos dependiendo del volumen de datos.</span>
+</p>
+</div>
+</div>
+</div>
+<!-- Modal Footer -->
+<div class="p-6 bg-slate-50 dark:bg-slate-800/30 flex gap-3 justify-end">
+<button class="px-6 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                        Cancelar
+                    </button>
+<button class="px-6 py-2.5 text-sm font-bold text-white bg-primary hover:bg-blue-600 rounded-lg shadow-sm shadow-primary/20 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">settings_backup_restore</span>
+                        Confirmar Restauración
+                    </button>
+</div>
+</div>
+</div>
+</div>
+</body></html>

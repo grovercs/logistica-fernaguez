@@ -1,0 +1,1 @@
+Estábamos centrados en retocar la lógica y/o el diseño del Módulo de Órdenes: tanto la vista y exportación detallada (PrintableOrden), como su módulo de edición (EditarOrdenModal) o su listado (Ordenes.tsx). Cuando regreses, pégame este texto y sabremos al instante por dónde reanudar estas interfaces y funcionalidades de Supabase orientadas al control de órdenes y técnicos.

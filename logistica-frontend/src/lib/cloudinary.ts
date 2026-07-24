@@ -90,6 +90,43 @@ export function getOptimizedUrl(url: string, width: number = 800): string {
 }
 
 /**
+ * Deletes images from Cloudinary via Supabase Edge Function
+ * @param urls - Array of Cloudinary URLs to delete
+ * @param supabaseClient - Supabase client instance (must be authenticated)
+ * @returns Promise with result
+ */
+export async function deleteCloudinaryImages(
+  urls: string[],
+  supabaseClient: any
+): Promise<{ success: boolean; deleted?: number; error?: string }> {
+  const publicIds = urls
+    .map(getPublicIdFromUrl)
+    .filter((id): id is string => id !== null);
+
+  if (publicIds.length === 0) {
+    return { success: true, deleted: 0 };
+  }
+
+  try {
+    const { error } = await supabaseClient.functions.invoke(
+      'delete-cloudinary-images',
+      {
+        body: { public_ids: publicIds },
+      }
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    return { success: true, deleted: publicIds.length };
+  } catch (err: any) {
+    console.error('Error calling delete-cloudinary-images function:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Extracts public_id from Cloudinary URL
  */
 export function getPublicIdFromUrl(url: string): string | null {

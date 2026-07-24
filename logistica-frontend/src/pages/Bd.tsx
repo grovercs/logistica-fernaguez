@@ -9,6 +9,7 @@ interface OrdenEntry {
   aseguradora: string;
   poliza: string;
   estado: string;
+  estado_previo?: string;
   creado_en: string;
   compactado: boolean;
 }
@@ -236,25 +237,44 @@ export default function Bd() {
 
   const handleCompactar = async () => {
       if (selectedIds.size === 0) return alert('Seleccione al menos una obra para archivar.');
-      if (!window.confirm(`¿Confirmar archivado de ${selectedIds.size} obras seleccionadas?`)) return;
-      
+
+      // Verificar si hay obras no finalizadas entre las seleccionadas
+      const seleccionadas = compactables.filter(c => selectedIds.has(c.id));
+      const noFinalizadas = seleccionadas.filter(c => c.estado !== 'Finalizada');
+
+      if (noFinalizadas.length > 0) {
+          const lista = noFinalizadas.map(o => `• ${o.id_legible} — ${o.cliente || 'Sin cliente'} (${o.estado})`).join('\n');
+          const mensaje =
+            `⚠️ ADVERTENCIA\n\n` +
+            `${noFinalizadas.length} de ${seleccionadas.length} obras seleccionadas NO están finalizadas:\n\n` +
+            `${lista}\n\n` +
+            `¿Deseas archivarlas de todos modos? Se guardarán como historial pero quedará marcado que no estaban finalizadas.`;
+          if (!window.confirm(mensaje)) return;
+      } else {
+          if (!window.confirm(`¿Confirmar archivado de ${selectedIds.size} obras seleccionadas?`)) return;
+      }
+
       setCompacting(true);
-      try { 
-          const idsToArchive = Array.from(selectedIds);
-          const { error } = await supabase
-            .from('ordenes')
-            .update({ estado: 'Archivado', compactado: true })
-            .in('id', idsToArchive);
-          
-          if (error) throw error;
-          
+      try {
+          // Archivar una por una para guardar el estado_previo correcto de cada una
+          for (const orden of seleccionadas) {
+              await supabase
+                  .from('ordenes')
+                  .update({
+                      estado: 'Archivado',
+                      compactado: true,
+                      estado_previo: orden.estado
+                  })
+                  .eq('id', orden.id);
+          }
+
           setSelectedIds(new Set());
-          fetchStats(); 
-          alert(`✅ ${idsToArchive.length} obras movidas al historial.`);
+          fetchStats();
+          alert(`✅ ${seleccionadas.length} obras movidas al historial.`);
       } catch(e: any) {
           alert('Error al archivar: ' + e.message);
-      } finally { 
-          setCompacting(false); 
+      } finally {
+          setCompacting(false);
       }
   };
 
@@ -275,18 +295,22 @@ export default function Bd() {
 
   const handleRestaurar = async (id: string) => {
     if (!window.confirm('¿Desea restaurar esta obra al sistema activo? Volverá a aparecer en el Calendario y Listado de Órdenes.')) return;
-    
+
     setLoading(true);
     try {
+        // Recuperar estado previo antes de restaurar
+        const { data: orden } = await supabase.from('ordenes').select('estado_previo').eq('id', id).single();
+        const estadoRestaurado = orden?.estado_previo || 'Finalizada';
+
         const { error } = await supabase
             .from('ordenes')
-            .update({ estado: 'Finalizada', compactado: false })
+            .update({ estado: estadoRestaurado, compactado: false, estado_previo: null })
             .eq('id', id);
-        
+
         if (error) throw error;
-        
+
         alert('✅ Obra restaurada correctamente.');
-        setSelectedDetalle(null); // Close modal if open
+        setSelectedDetalle(null);
         fetchArchivados();
         fetchStats();
     } catch (e: any) {
@@ -375,33 +399,38 @@ export default function Bd() {
       )}
 
       {/* Header - Harmonized with Dashboard.tsx */}
-      <header className="h-16 shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-8 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-4">
-             <div className="size-10 bg-primary/10 rounded-lg flex items-center justify-center text-primary border border-primary/10"><span className="material-symbols-outlined text-2xl">database</span></div>
-             <h2 className="text-lg font-bold text-slate-900 dark:text-white">Gestión de Base de Datos</h2>
-        </div>
-        <div className="flex items-center gap-3">
-             <span className="px-3 py-1 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-xs font-bold border border-green-100 dark:border-green-800 rounded-lg flex items-center gap-2">
-                 <span className="size-2 bg-green-500 rounded-full animate-pulse"></span> SISTEMA ACTIVO
-             </span>
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 w-full backdrop-blur-md">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-8 h-16">
+          <div className="flex items-center gap-3">
+               <div className="size-9 bg-primary/10 rounded-xl flex items-center justify-center text-primary border border-primary/20"><span className="material-symbols-outlined text-xl">database</span></div>
+               <h2 className="text-lg font-black tracking-tight">Base de Datos</h2>
+          </div>
+          <div className="flex items-center gap-2">
+               <span className="hidden sm:flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-100 dark:border-emerald-800 rounded-full">
+                   <span className="size-1.5 bg-emerald-500 rounded-full animate-pulse"></span> SISTEMA ACTIVO
+               </span>
+               <span className="sm:hidden size-3 bg-emerald-500 rounded-full animate-pulse border-2 border-white dark:border-slate-900 shadow-sm"></span>
+          </div>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto w-full">
         {/* Navigation - Standard Tabs */}
-        <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8">
-          <nav className="flex space-x-8">
-            {[
-                {id: 'backup', label: 'Protección', icon: 'shield_lock'},
-                {id: 'restaurar', label: 'Rescate', icon: 'medical_services'},
-                {id: 'compactar', label: 'Optimizar', icon: 'cleaning_services'},
-                {id: 'archivados', label: 'Historial', icon: 'inventory_2'}
-            ].map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`py-4 border-b-2 font-medium text-sm transition-all flex items-center gap-2 ${activeTab === tab.id ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                    <span className="material-symbols-outlined text-xl">{tab.icon}</span> {tab.label}
-                </button>
-            ))}
-          </nav>
+        <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto px-4 sm:px-8">
+            <nav className="flex space-x-6 sm:space-x-8 overflow-x-auto no-scrollbar scroll-smooth">
+              {[
+                  {id: 'backup', label: 'Protección', icon: 'shield_lock'},
+                  {id: 'restaurar', label: 'Rescate', icon: 'medical_services'},
+                  {id: 'compactar', label: 'Optimizar', icon: 'cleaning_services'},
+                  {id: 'archivados', label: 'Historial', icon: 'inventory_2'}
+              ].map(tab => (
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`py-4 border-b-2 font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2 shrink-0 ${activeTab === tab.id ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                      <span className="material-symbols-outlined text-lg">{tab.icon}</span> {tab.label}
+                  </button>
+              ))}
+            </nav>
+          </div>
         </div>
 
         <div className="p-8 max-w-7xl mx-auto w-full space-y-8">
@@ -635,7 +664,16 @@ export default function Bd() {
                                     ) : archivados.filter(a => (a.id_legible?.includes(searchTerm) || a.cliente?.toLowerCase().includes(searchTerm.toLowerCase()))).map(a => (
                                         <tr key={a.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
                                             <td className="px-6 py-4 text-slate-400 text-xs">{a.creado_en?.split('T')[0]}</td>
-                                            <td className="px-6 py-4 font-bold text-slate-900 dark:text-white uppercase">{a.id_legible}</td>
+                                            <td className="px-6 py-4">
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-bold text-slate-900 dark:text-white uppercase">{a.id_legible}</span>
+                                                {a.estado_previo && a.estado_previo !== 'Finalizada' && (
+                                                  <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-wider border border-amber-200" title={`Archivada sin finalizar (estado previo: ${a.estado_previo})`}>
+                                                    Sin finalizar
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </td>
                                             <td className="px-6 py-4 text-slate-500">{a.cliente || 'Sin Cliente'}</td>
                                             <td className="px-6 py-4 text-right flex items-center justify-end gap-2 text-[10px] font-bold">
                                                 <button onClick={() => handleVerDetalle(a.id)} className="text-primary bg-primary/5 dark:bg-primary/20 hover:bg-primary/10 px-2 py-1 rounded-lg border border-primary/10 transition-all uppercase flex items-center gap-1">

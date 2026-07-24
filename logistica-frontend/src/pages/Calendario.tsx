@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import NuevoReporteModal from '../components/modals/NuevoReporteModal';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { useUserRole } from '../hooks/useUserRole';
 
 export default function Calendario() {
+  const { isEditor } = useUserRole();
   const [isNuevoReporteModalOpen, setIsNuevoReporteModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null); // Fecha preseleccionada para el modal
   // ordenes just for the list panel
@@ -12,6 +14,11 @@ export default function Calendario() {
   const [reportes, setReportes] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('');
+  const [tecnicoFilter, setTecnicoFilter] = useState('');
+  const [calendarView, setCalendarView] = useState<'month' | 'week' | '2weeks'>('month');
+  const [tecnicos, setTecnicos] = useState<any[]>([]);
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
 
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -27,25 +34,75 @@ export default function Calendario() {
 
   // Handler para abrir el modal con una fecha específica
   const handleDayClick = (date: Date) => {
+    if (!isEditor) return; // Workers can't create reports from calendar
     setSelectedDate(formatDateToISO(date));
     setIsNuevoReporteModalOpen(true);
   };
 
   useEffect(() => {
     fetchData();
+    fetchTecnicos();
   }, []);
 
+  // Auto-navegar al mes de la fecha "Desde" cuando se aplica un rango
+  useEffect(() => {
+    if (fechaDesde) {
+      const [y, m] = fechaDesde.split('-').map(Number);
+      if (y && m) {
+        setCurrentDate(new Date(y, m - 1, 1));
+      }
+    }
+  }, [fechaDesde]);
+
   const fetchData = async () => {
-    // Fetch all orders
-    const { data: ordenesData } = await supabase
+    // Obtener usuario actual
+    const { data: sessionData } = await supabase.auth.getSession();
+    const authId = sessionData?.session?.user?.id;
+
+    // Verificar el ROL del perfil primero.
+    // Un admin o editor NUNCA debe tratarse como trabajador aunque exista
+    // en la tabla trabajadores (ej. fue técnico antes de ascender a admin).
+    const { data: perfilData } = await supabase
+      .from('perfiles')
+      .select('roles(nombre)')
+      .eq('id', authId)
+      .maybeSingle();
+    const roleName = (perfilData?.roles as any)?.nombre || '';
+    const isRolWorker = roleName === 'Trabajador' || roleName === 'Técnico';
+
+    // Solo buscamos en trabajadores si el rol lo requiere
+    const { data: workerData } = isRolWorker
+      ? await supabase
+          .from('trabajadores')
+          .select('id, auth_user_id')
+          .eq('auth_user_id', authId)
+          .maybeSingle()
+      : { data: null };
+    const workerId = workerData?.id;
+    const isCurrentUserWorker = isRolWorker && !!workerData;
+
+    // Fetch all orders (or worker's orders)
+    let ordenesQuery = supabase
       .from('ordenes')
-      .select('*')
+      .select('*, orden_asignaciones(*)')
       .neq('estado', 'Archivado')
+      .neq('estado', 'Papelera')
       .order('creado_en', { ascending: false });
+    if (isCurrentUserWorker) {
+      // Solo órdenes asignadas to this worker
+      const { data: asignaciones } = await supabase
+        .from('orden_asignaciones')
+        .select('orden_id')
+        .eq('trabajador_id', workerId)
+        .neq('estado', 'cancelado');
+      const assignedIds = (asignaciones || []).map(a => a.orden_id);
+      ordenesQuery = ordenesQuery.or(`tecnico_id.eq.${authId},tecnico_id.eq.${workerId},id.in.(${assignedIds.join(',')})`);
+    }
+    const { data: ordenesData } = await ordenesQuery;
     if (ordenesData) setOrdenes(ordenesData);
 
     // Fetch all reports joined to orders (for calendar display by work date)
-    const { data: reportesData } = await supabase
+    let reportesQuery = supabase
       .from('reportes')
       .select(`
         id,
@@ -62,46 +119,147 @@ export default function Calendario() {
         )
       `)
       .neq('ordenes.estado', 'Archivado')
+      .neq('ordenes.estado', 'Papelera')
       .order('fecha_trabajo', { ascending: false });
+    if (isCurrentUserWorker && authId) {
+      reportesQuery = reportesQuery.eq('tecnico_id', authId);
+    }
+    const { data: reportesData } = await reportesQuery;
     if (reportesData) setReportes(reportesData);
+  };
+
+  const fetchTecnicos = async () => {
+    const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos');
+    if (data) setTecnicos(data);
+  };
+
+  const applyDatePreset = (preset: string) => {
+    const hoy = new Date();
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dd = String(hoy.getDate()).padStart(2, '0');
+    const toISO = (d: Date) => d.toISOString().split('T')[0];
+
+    switch (preset) {
+      case 'hoy':
+        setFechaDesde(`${yyyy}-${mm}-${dd}`);
+        setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      case 'ayer': {
+        const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
+        const a = toISO(ayer);
+        setFechaDesde(a); setFechaHasta(a);
+        break;
+      }
+      case 'semana': {
+        const inicio = new Date(hoy);
+        const dow = inicio.getDay();
+        const diff = dow === 0 ? -6 : 1 - dow;
+        inicio.setDate(hoy.getDate() + diff);
+        setFechaDesde(toISO(inicio));
+        setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      }
+      case 'semana_pasada': {
+        const fin = new Date(hoy);
+        const dow2 = fin.getDay();
+        const diff2 = dow2 === 0 ? 0 : 7 - dow2;
+        fin.setDate(hoy.getDate() - diff2 - 1);
+        const ini = new Date(fin); ini.setDate(fin.getDate() - 6);
+        setFechaDesde(toISO(ini)); setFechaHasta(toISO(fin));
+        break;
+      }
+      case 'mes': {
+        setFechaDesde(`${yyyy}-${mm}-01`);
+        setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      }
+      case 'mes_pasado': {
+        const mp = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+        const mpEnd = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+        setFechaDesde(toISO(mp)); setFechaHasta(toISO(mpEnd));
+        break;
+      }
+      case '7dias': {
+        const d7 = new Date(hoy); d7.setDate(hoy.getDate() - 6);
+        setFechaDesde(toISO(d7)); setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      }
+      case '30dias': {
+        const d30 = new Date(hoy); d30.setDate(hoy.getDate() - 29);
+        setFechaDesde(toISO(d30)); setFechaHasta(`${yyyy}-${mm}-${dd}`);
+        break;
+      }
+      default:
+        setFechaDesde(''); setFechaHasta('');
+    }
   };
 
   const getCalendarDays = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    
+
+    if (calendarView === 'week') {
+      const startOfWeek = new Date(currentDate);
+      const day = startOfWeek.getDay();
+      const diff = startOfWeek.getDate() - (day === 0 ? 6 : day - 1);
+      startOfWeek.setDate(diff);
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(startOfWeek);
+        d.setDate(startOfWeek.getDate() + i);
+        days.push({ date: d, isCurrentMonth: d.getMonth() === month });
+      }
+      return days;
+    }
+
+    if (calendarView === '2weeks') {
+      const startOfWeek = new Date(currentDate);
+      const day = startOfWeek.getDay();
+      const diff = startOfWeek.getDate() - (day === 0 ? 6 : day - 1);
+      startOfWeek.setDate(diff);
+      const days = [];
+      for (let i = 0; i < 14; i++) {
+        const d = new Date(startOfWeek);
+        d.setDate(startOfWeek.getDate() + i);
+        days.push({ date: d, isCurrentMonth: d.getMonth() === month });
+      }
+      return days;
+    }
+
+    // Month view (default)
     let firstDayOfWeek = new Date(year, month, 1).getDay();
     firstDayOfWeek = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
-    
+
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const daysInPrevMonth = new Date(year, month, 0).getDate();
-    
+
     const days = [];
-    
+
     for (let i = 0; i < firstDayOfWeek; i++) {
-       days.push({ 
-           date: new Date(year, month - 1, daysInPrevMonth - firstDayOfWeek + i + 1), 
-           isCurrentMonth: false 
+       days.push({
+           date: new Date(year, month - 1, daysInPrevMonth - firstDayOfWeek + i + 1),
+           isCurrentMonth: false
        });
     }
-    
+
     for (let i = 1; i <= daysInMonth; i++) {
         days.push({
             date: new Date(year, month, i),
             isCurrentMonth: true
         });
     }
-    
-    const totalSlots = 42; 
+
+    const totalSlots = 42;
     const slotsToFill = totalSlots - days.length;
-    
+
     for (let i = 1; i <= slotsToFill; i++) {
         days.push({
             date: new Date(year, month + 1, i),
             isCurrentMonth: false
         });
     }
-    
+
     return days;
   };
 
@@ -136,6 +294,12 @@ export default function Calendario() {
 
       const orden = r.ordenes;
       if (estadoFilter && orden?.estado !== estadoFilter) return false;
+      if (tecnicoFilter && r.tecnico_id !== tecnicoFilter && tecnicos.find(t => t.id === tecnicoFilter)?.auth_user_id !== r.tecnico_id) return false;
+      if (fechaDesde || fechaHasta) {
+        if (!r.fecha_trabajo) return false;
+        if (fechaDesde && r.fecha_trabajo < fechaDesde) return false;
+        if (fechaHasta && r.fecha_trabajo > fechaHasta) return false;
+      }
       if (searchTerm) {
         const lower = searchTerm.toLowerCase();
         if (
@@ -147,16 +311,51 @@ export default function Calendario() {
     });
   };
 
-  // Orders always appear on their creation date
+  // Orders always appear on their scheduled/creation date
   const getOrdenesForDay = (dayDate: Date) => {
     return ordenes.filter(o => {
-      const d = new Date(o.creado_en);
+      // Prioridad: 1. fecha_programada, 2. creado_en (fallback para órdenes antiguas)
+      const dateStr = o.fecha_programada || o.creado_en;
+      if (!dateStr) return false;
+
+      // Para fecha_programada (formato YYYY-MM-DD) parseamos como fecha local
+      // para evitar el desfase UTC que hace que new Date("YYYY-MM-DD") caiga
+      // en el día anterior en zonas horarias positivas (ej. España UTC+2)
+      let d: Date;
+      if (dateStr.length === 10 && dateStr.includes('-')) {
+        // Es una fecha pura YYYY-MM-DD → parsear como local
+        const [year, month, day] = dateStr.split('-').map(Number);
+        d = new Date(year, month - 1, day);
+      } else {
+        // Es un timestamp ISO completo (creado_en) → usar Date normal
+        d = new Date(dateStr);
+      }
+
       if (
         d.getDate() !== dayDate.getDate() ||
         d.getMonth() !== dayDate.getMonth() ||
         d.getFullYear() !== dayDate.getFullYear()
       ) return false;
       if (estadoFilter && o.estado !== estadoFilter) return false;
+      if (tecnicoFilter) {
+        const selectedTrabajador = tecnicos.find(t => t.id === tecnicoFilter);
+        const isAssigned = (o.orden_asignaciones || []).some((asig: any) => 
+          asig.estado !== 'cancelado' && 
+          (asig.trabajador_id === tecnicoFilter || 
+           (selectedTrabajador?.auth_user_id && asig.trabajador_id === selectedTrabajador.auth_user_id))
+        );
+        const isPrimary = o.tecnico_id === tecnicoFilter || 
+                          (selectedTrabajador?.auth_user_id && o.tecnico_id === selectedTrabajador.auth_user_id);
+        if (!isPrimary && !isAssigned) return false;
+      }
+      if (fechaDesde || fechaHasta) {
+        // Para el filtro de rango también usamos la cadena directamente
+        const dateStrRange = o.fecha_programada
+          ? o.fecha_programada  // ya es YYYY-MM-DD
+          : new Date(o.creado_en).toLocaleDateString('en-CA'); // timestamp → YYYY-MM-DD local
+        if (fechaDesde && dateStrRange < fechaDesde) return false;
+        if (fechaHasta && dateStrRange > fechaHasta) return false;
+      }
       if (searchTerm) {
         const lower = searchTerm.toLowerCase();
         if (
@@ -180,68 +379,141 @@ export default function Calendario() {
         fechaInicial={selectedDate || undefined}
       />
       {/* Header */}
-      <header className="flex flex-col border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm z-10 w-full">
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-4 flex-1">
-            <h2 className="text-xl font-bold whitespace-nowrap">Calendario de Intervenciones</h2>
-            <div className="relative max-w-md w-full ml-4">
+      <header className="flex flex-col border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm z-10 w-full sticky top-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 py-4 gap-4">
+          <div className="flex items-center gap-3 flex-1">
+            <h2 className="text-xl font-black tracking-tight whitespace-nowrap">Calendario</h2>
+            <div className="relative flex-1 max-w-md">
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                <span className="material-symbols-outlined text-xl">search</span>
+                <span className="material-symbols-outlined text-lg">search</span>
               </span>
               <input 
-                  className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg focus:ring-2 focus:ring-primary text-sm" 
-                  placeholder="Buscar por referencia o cliente..." 
+                  className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-primary/50 text-sm transition-all" 
+                  placeholder="Buscar..." 
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-px h-6 bg-slate-300 dark:bg-slate-700 mx-2"></div>
-            <button 
+          {isEditor && (
+            <button
               onClick={() => setIsNuevoReporteModalOpen(true)}
-              className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors"
+              className="w-full sm:w-auto bg-primary text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
             >
-              <span className="material-symbols-outlined">add</span>
-              Nuevo Reporte
+              <span className="material-symbols-outlined text-[18px]">add</span>
+              <span>Nuevo Reporte</span>
             </button>
-          </div>
+          )}
         </div>
         
         {/* Navigation Bar */}
-        <div className="flex items-center justify-between px-6 py-3 bg-slate-50 dark:bg-slate-800/50">
-          <div className="flex items-center gap-4">
-            <button 
-                onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
-                className="p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+        <div className="flex flex-col xs:flex-row items-center justify-between px-4 sm:px-6 py-3 bg-slate-50 dark:bg-slate-800/50 gap-4">
+          <div className="flex items-center justify-between w-full xs:w-auto gap-3">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+              <button
+                  onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                  <span className="material-symbols-outlined text-xl">chevron_left</span>
+              </button>
+              <span className="font-black text-xs uppercase tracking-widest min-w-[100px] sm:min-w-[140px] text-center px-2">
+                  {currentDate.toLocaleString('es-ES', { month: 'short', year: 'numeric' })}
+              </span>
+              <button
+                   onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
+                   className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                  <span className="material-symbols-outlined text-xl">chevron_right</span>
+              </button>
+            </div>
+            <select
+              value={currentDate.getFullYear()}
+              onChange={(e) => setCurrentDate(new Date(Number(e.target.value), currentDate.getMonth(), 1))}
+              className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-black focus:ring-2 focus:ring-primary/20 cursor-pointer shadow-sm"
             >
-                <span className="material-symbols-outlined">chevron_left</span>
-            </button>
-            <span className="font-bold text-lg min-w-[150px] text-center capitalize">
-                {currentDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
-            </span>
-            <button 
-                 onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
-                 className="p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition"
-            >
-                <span className="material-symbols-outlined">chevron_right</span>
-            </button>
-            <button 
+              {Array.from({ length: 10 }, (_, i) => today.getFullYear() - 5 + i).map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <button
                  onClick={() => setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1))}
-                 className="ml-4 px-3 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+                 className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm"
             >
                 Hoy
             </button>
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+              {[
+                { key: 'month', label: 'Mes' },
+                { key: 'week', label: 'Semana' },
+                { key: '2weeks', label: '2 Sem' }
+              ].map((v) => (
+                <button
+                  key={v.key}
+                  onClick={() => setCalendarView(v.key as any)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
+                    calendarView === v.key
+                      ? 'bg-primary text-white'
+                      : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                const el = document.documentElement;
+                if (document.fullscreenElement) {
+                  document.exitFullscreen?.();
+                } else {
+                  el.requestFullscreen?.();
+                }
+              }}
+              className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm"
+              title="Pantalla completa"
+            >
+              <span className="material-symbols-outlined text-xl">{document.fullscreenElement ? 'fullscreen_exit' : 'fullscreen'}</span>
+            </button>
           </div>
-          <div className="flex items-center gap-2">
-             <span className="text-xs font-bold text-slate-500 uppercase mr-2 hidden md:inline-block">Filtros:</span>
-             <select 
-               className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-primary px-3 py-1.5 min-w-[130px]"
+          <div className="flex flex-col xs:flex-row items-center gap-2 w-full xs:w-auto">
+            {/* Rango de fechas */}
+            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-xl p-1.5 border border-slate-200 dark:border-slate-700 shadow-sm">
+              <div className="flex items-center gap-1 px-2">
+                <span className="material-symbols-outlined text-slate-400 text-[14px]">calendar_today</span>
+                <input
+                  type="date"
+                  className="bg-transparent text-[10px] font-bold text-slate-700 dark:text-slate-200 outline-none w-24"
+                  value={fechaDesde}
+                  onChange={e => setFechaDesde(e.target.value)}
+                />
+              </div>
+              <span className="text-slate-300 text-[8px]">→</span>
+              <div className="flex items-center gap-1 px-2">
+                <input
+                  type="date"
+                  className="bg-transparent text-[10px] font-bold text-slate-700 dark:text-slate-200 outline-none w-24"
+                  value={fechaHasta}
+                  onChange={e => setFechaHasta(e.target.value)}
+                />
+              </div>
+              {(fechaDesde || fechaHasta) && (
+                <button
+                  onClick={() => { setFechaDesde(''); setFechaHasta(''); }}
+                  className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  title="Limpiar fechas"
+                >
+                  <span className="material-symbols-outlined text-[14px]">close</span>
+                </button>
+              )}
+            </div>
+
+            <select
+               className="w-full xs:w-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest focus:ring-2 focus:ring-primary/20 px-4 py-2.5 cursor-pointer shadow-sm appearance-none"
                value={estadoFilter}
                onChange={(e) => setEstadoFilter(e.target.value)}
              >
-                <option value="">Todos los Estados</option>
+                <option value="">Estados</option>
                 <option value="Urgente">🔴 Urgente</option>
                 <option value="Pendiente">🟡 Pendiente</option>
                 <option value="En Curso">🔵 En Curso</option>
@@ -250,10 +522,58 @@ export default function Calendario() {
                 <option value="Finalizada">🟢 Finalizada</option>
                 <option value="Cancelada">⚪ Cancelada</option>
              </select>
+             <select
+               className="w-full xs:w-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest focus:ring-2 focus:ring-primary/20 px-4 py-2.5 cursor-pointer shadow-sm appearance-none"
+               value={tecnicoFilter}
+               onChange={(e) => setTecnicoFilter(e.target.value)}
+             >
+                <option value="">Técnicos</option>
+                {tecnicos.map((t: any) => (
+                  <option key={t.id} value={t.id}>{t.nombre} {t.apellidos}</option>
+                ))}
+             </select>
           </div>
         </div>
       </header>
-      
+
+      {/* Presets rápidos de fechas */}
+      <div className="px-4 sm:px-6 py-2 flex flex-wrap items-center gap-1.5 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-200 dark:border-slate-800">
+        {/* Indicador de filtro activo */}
+        {(fechaDesde || fechaHasta) && (
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 dark:bg-primary/20 border border-primary/20 rounded-lg">
+            <span className="material-symbols-outlined text-primary text-[12px]">date_range</span>
+            <span className="text-[9px] font-bold text-primary">
+              {fechaDesde ? new Date(fechaDesde + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : 'Inicio'} → {fechaHasta ? new Date(fechaHasta + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : 'Hoy'}
+            </span>
+            <button
+              onClick={() => { setFechaDesde(''); setFechaHasta(''); }}
+              className="text-primary hover:text-red-500 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[12px]">close</span>
+            </button>
+          </div>
+        )}
+        {[
+          { key: 'hoy', label: 'Hoy' },
+          { key: 'ayer', label: 'Ayer' },
+          { key: '7dias', label: '7 días' },
+          { key: 'semana', label: 'Esta semana' },
+          { key: 'semana_pasada', label: 'Sem. pasada' },
+          { key: 'mes', label: 'Este mes' },
+          { key: 'mes_pasado', label: 'Mes pasado' },
+          { key: '30dias', label: '30 días' },
+        ].map((preset) => (
+          <button
+            key={preset.key}
+            type="button"
+            onClick={() => applyDatePreset(preset.key)}
+            className="px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-colors bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-primary hover:text-white hover:border-primary"
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+
       {/* Calendar Container */}
       <div className="flex-1 overflow-y-auto p-4 w-full">
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-fit min-h-full">
@@ -265,7 +585,9 @@ export default function Calendario() {
           </div>
           
           {/* Calendar Grid */}
-          <div className="grid grid-cols-7 auto-rows-[minmax(120px,auto)] flex-1">
+          <div className={`grid grid-cols-7 flex-1 ${
+            calendarView === 'month' ? 'auto-rows-[minmax(120px,auto)]' : 'auto-rows-[minmax(200px,1fr)]'
+          }`}>
              {calendarDays.map((dayObj, idx) => {
                  const isToday = today.toDateString() === dayObj.date.toDateString();
                  const dayReportes = getReportesForDay(dayObj.date);

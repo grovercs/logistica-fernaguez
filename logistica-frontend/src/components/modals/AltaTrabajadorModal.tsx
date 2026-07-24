@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 
 interface AltaTrabajadorModalProps {
@@ -8,19 +8,26 @@ interface AltaTrabajadorModalProps {
 }
 
 export default function AltaTrabajadorModal({ isOpen, onClose, onCreated }: AltaTrabajadorModalProps) {
-  const [showNewSpecInput, setShowNewSpecInput] = useState(false);
-  
   const [formData, setFormData] = useState({
       nombreCompleto: '',
       dni: '',
       especialidad: '',
-      nuevaEspecialidad: '',
       telefono: '',
+      telegram_chat_id: '',
       email: '',
       fecha_incorporacion: '',
       tarifa_hora: ''
   });
+  const [especialidades, setEspecialidades] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchEspecialidades = async () => {
+      const { data } = await supabase.from('especialidades').select('nombre').order('nombre');
+      if (data) setEspecialidades(data.map(e => e.nombre));
+    };
+    fetchEspecialidades();
+  }, []);
 
   if (!isOpen) return null;
 
@@ -32,24 +39,24 @@ export default function AltaTrabajadorModal({ isOpen, onClose, onCreated }: Alta
       const nombre = parts[0] || '';
       const apellidos = parts.slice(1).join(' ');
 
-      const specToSave = showNewSpecInput && formData.nuevaEspecialidad ? formData.nuevaEspecialidad : formData.especialidad;
-
       const { error } = await supabase.from('trabajadores').insert({
           nombre: nombre,
           apellidos: apellidos,
           dni: formData.dni,
-          especialidad: specToSave.toLowerCase(),
+          especialidad: formData.especialidad,
           telefono: formData.telefono,
+          telegram_chat_id: formData.telegram_chat_id || null,
           email: formData.email,
           fecha_incorporacion: formData.fecha_incorporacion || null,
-          estado: 'Disponible'
+          estado: 'Disponible',
+          tarifa_hora: parseFloat(formData.tarifa_hora) || 0
       });
 
       setLoading(false);
       if (!error) {
           if (onCreated) onCreated();
           onClose();
-          setFormData({ nombreCompleto: '', dni: '', especialidad: '', nuevaEspecialidad: '', telefono: '', email: '', fecha_incorporacion: '', tarifa_hora: '' });
+          setFormData({ nombreCompleto: '', dni: '', especialidad: '', telefono: '', telegram_chat_id: '', email: '', fecha_incorporacion: '', tarifa_hora: '' });
       } else {
           console.error("Error creating trabajador:", error);
           alert("Error al guardar el trabajador.");
@@ -126,58 +133,46 @@ export default function AltaTrabajadorModal({ isOpen, onClose, onCreated }: Alta
             {/* Speciality */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Especialidad *</label>
-              <div className="flex gap-2">
-                <select 
-                   className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300"
-                   value={formData.especialidad}
-                   onChange={(e) => setFormData({...formData, especialidad: e.target.value})}
-                   required={!showNewSpecInput}
-                >
-                  <option value="">Seleccione especialidad</option>
-                  <option value="fontaneria">Fontanería</option>
-                  <option value="electricidad">Electricidad</option>
-                  <option value="albanileria">Albañilería</option>
-                  <option value="pintura">Pintura</option>
-                  <option value="carpinteria">Carpintería</option>
-                  <option value="climatizacion">Climatización</option>
-                </select>
-                <button 
-                   type="button"
-                   onClick={() => setShowNewSpecInput(!showNewSpecInput)}
-                   className={`p-2.5 rounded-lg transition-colors border ${showNewSpecInput ? 'bg-primary/10 text-primary border-primary/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-primary/10 hover:text-primary'}`}
-                   title="Añadir Nueva Especialidad"
-                >
-                  <span className="material-symbols-outlined text-xl block">{showNewSpecInput ? 'remove' : 'add'}</span>
-                </button>
-              </div>
-              
-              {showNewSpecInput && (
-                <div className="mt-2 group animate-in slide-in-from-top-2 duration-200">
-                  <input 
-                     className="w-full px-4 py-2 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-800/50 focus:ring-2 focus:ring-primary/20 focus:border-primary focus:border-solid outline-none transition-all placeholder:text-slate-400 text-sm" 
-                     placeholder="O escribe una nueva especialidad..." 
-                     type="text"
-                     autoFocus
-                     required={showNewSpecInput}
-                     value={formData.nuevaEspecialidad}
-                     onChange={(e) => setFormData({...formData, nuevaEspecialidad: e.target.value})}
-                  />
-                </div>
-              )}
+              <select
+                 className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300"
+                 value={formData.especialidad}
+                 onChange={(e) => setFormData({...formData, especialidad: e.target.value})}
+                 required
+              >
+                <option value="">Seleccione especialidad</option>
+                {especialidades.map(esp => (
+                  <option key={esp} value={esp.toLowerCase()}>{esp}</option>
+                ))}
+              </select>
             </div>
             
             {/* Phone */}
             <div className="flex flex-col gap-1.5 pt-[22px]">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Teléfono de contacto</label>
-              <input 
-                 className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-400" 
-                 placeholder="+34 600 000 000" 
+              <input
+                 className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-400"
+                 placeholder="+34 600 000 000"
                  type="tel"
                  value={formData.telefono}
                  onChange={(e) => setFormData({...formData, telefono: e.target.value})}
               />
             </div>
-            
+
+            {/* Telegram Chat ID */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Chat ID de Telegram</label>
+              <input
+                 className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-400"
+                 placeholder="Ej: 8751170701"
+                 type="text"
+                 value={formData.telegram_chat_id}
+                 onChange={(e) => setFormData({...formData, telegram_chat_id: e.target.value})}
+              />
+              <p className="text-[11px] text-slate-400">
+                <span className="font-bold text-slate-500">Importante:</span> El trabajador debe buscar el bot <span className="font-mono text-sky-600 dark:text-sky-400">@logisticafernaguez_bot</span> en Telegram, pulsar <span className="font-bold">Iniciar</span> (o enviar <span className="font-mono">/start</span>). Solo después de eso se puede obtener su Chat ID.
+              </p>
+            </div>
+
             {/* Email */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Correo Electrónico</label>

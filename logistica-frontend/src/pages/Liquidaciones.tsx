@@ -71,7 +71,9 @@ export default function Liquidaciones() {
       .rpc('get_liquidaciones_reportes');
 
     if (!error && data) {
-      const merged: Reporte[] = (data as LiquidacionReporteRpcRow[]).map(row => ({
+      const merged: Reporte[] = (data as LiquidacionReporteRpcRow[])
+          .filter(row => row.estado_orden !== 'Archivado')
+          .map(row => ({
         id: row.reporte_id,
         orden_id: row.orden_id,
         tecnico_id: row.tecnico_id,

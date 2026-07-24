@@ -1,6 +1,6 @@
-
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
+import RequireRole from './components/RequireRole';
 import Dashboard from './pages/Dashboard';
 import Calendario from './pages/Calendario';
 import Ordenes from './pages/Ordenes';
@@ -10,6 +10,9 @@ import Aseguradoras from './pages/Aseguradoras';
 import Trabajadores from './pages/Trabajadores';
 import Login from './pages/Login';
 import TareasFrecuentes from './pages/TareasFrecuentes';
+import Configuracion from './pages/Configuracion';
+import Especialidades from './pages/Especialidades';
+import Ayuda from './pages/Ayuda';
 import AdminMaintenance from './pages/AdminMaintenance';
 
 function App() {
@@ -22,16 +25,22 @@ function App() {
           <Route path="calendario" element={<Calendario />} />
           <Route path="ordenes" element={<Ordenes />} />
           <Route path="ordenes/:id" element={<OrdenDetalle />} />
-          <Route path="liquidaciones" element={<Liquidaciones />} />
-          <Route path="aseguradoras" element={<Aseguradoras />} />
-          <Route path="tareas-frecuentes" element={<TareasFrecuentes />} />
-          <Route path="trabajadores" element={<Trabajadores />} />
-          <Route path="usuarios" element={<AdminMaintenance />} />
-          <Route path="bd" element={<AdminMaintenance />} />
-          <Route path="rbac" element={<AdminMaintenance />} />
-          <Route path="roles" element={<AdminMaintenance />} />
-          <Route path="permisos" element={<AdminMaintenance />} />
-          {/* Add more routes here later */}
+          <Route path="liquidaciones" element={<RequireRole allowedRoles={['Administrador', 'Editor']}><Liquidaciones /></RequireRole>} />
+
+          {/* Rutas protegidas: solo Admin y Editor */}
+          <Route path="trabajadores" element={<RequireRole allowedRoles={['Administrador', 'Editor']}><Trabajadores /></RequireRole>} />
+          <Route path="usuarios" element={<RequireRole allowedRoles={['Administrador', 'Editor']}><AdminMaintenance /></RequireRole>} />
+
+          {/* Rutas protegidas: solo Administrador */}
+          <Route path="aseguradoras" element={<RequireRole><Aseguradoras /></RequireRole>} />
+          <Route path="tareas-frecuentes" element={<RequireRole><TareasFrecuentes /></RequireRole>} />
+          <Route path="especialidades" element={<RequireRole><Especialidades /></RequireRole>} />
+          <Route path="bd" element={<RequireRole><AdminMaintenance /></RequireRole>} />
+          <Route path="rbac" element={<RequireRole><AdminMaintenance /></RequireRole>} />
+          <Route path="roles" element={<RequireRole><AdminMaintenance /></RequireRole>} />
+          <Route path="permisos" element={<RequireRole><AdminMaintenance /></RequireRole>} />
+          <Route path="configuracion" element={<RequireRole><Configuracion /></RequireRole>} />
+          <Route path="ayuda" element={<Ayuda />} />
         </Route>
       </Routes>
     </BrowserRouter>

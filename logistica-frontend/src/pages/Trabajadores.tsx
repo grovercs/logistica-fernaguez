@@ -8,6 +8,8 @@ export default function Trabajadores() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [trabajadorToEdit, setTrabajadorToEdit] = useState<any>(null);
   const [trabajadores, setTrabajadores] = useState<any[]>([]);
+  const [especialidadesList, setEspecialidadesList] = useState<string[]>([]);
+  const [filterEspecialidad, setFilterEspecialidad] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({
     enObra: 0,
@@ -18,7 +20,13 @@ export default function Trabajadores() {
 
   useEffect(() => {
      fetchTrabajadores();
+     fetchEspecialidades();
   }, []);
+
+  const fetchEspecialidades = async () => {
+      const { data } = await supabase.from('especialidades').select('nombre').order('nombre');
+      if (data) setEspecialidadesList(data.map(e => e.nombre));
+  };
 
   const fetchTrabajadores = async () => {
       setLoading(true);
@@ -27,6 +35,7 @@ export default function Trabajadores() {
       const { data: workerData, error: workerErr } = await supabase
         .from('trabajadores')
         .select('*')
+        .neq('estado', 'Baja')
         .order('creado_en', { ascending: false });
       
       // Fetch all perfiles to get tarifa_hora
@@ -38,9 +47,13 @@ export default function Trabajadores() {
           // Merge profile info (tarifa_hora) into worker data
           const enriched = workerData.map(w => {
               const profile = profileData?.find(p => p.id === w.auth_user_id);
+              // Usar tarifa de perfiles si existe; si no, usar la de trabajadores
+              const tarifa = (profile?.tarifa_hora != null && profile?.tarifa_hora !== 0)
+                  ? profile.tarifa_hora
+                  : w.tarifa_hora;
               return {
                   ...w,
-                  tarifa_hora: profile?.tarifa_hora || 0
+                  tarifa_hora: tarifa ?? 0
               };
           });
           
@@ -85,14 +98,14 @@ export default function Trabajadores() {
       }
   };
 
-  const handleDelete = async (id: string) => {
-      if (window.confirm('¿Estás seguro de que deseas borrar este trabajador? Se desvinculará de sus órdenes.')) {
-          const { error } = await supabase.from('trabajadores').delete().eq('id', id);
+  const handleArchive = async (id: string) => {
+      if (window.confirm('¿Dar de baja este trabajador? Desaparecerá de las listas activas pero se conservará su historial.')) {
+          const { error } = await supabase.from('trabajadores').update({ estado: 'Baja' }).eq('id', id);
           if (!error) {
               fetchTrabajadores();
           } else {
-              console.error('Error deleting:', error);
-              alert('Error al borrar el trabajador.');
+              console.error('Error archivando:', error);
+              alert('Error al dar de baja el trabajador.');
           }
       }
   };
@@ -100,21 +113,21 @@ export default function Trabajadores() {
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 h-full">
       {/* Header */}
-      <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 shrink-0 sticky top-0 z-10 w-full">
-        <div className="flex items-center gap-4">
-          <h2 className="text-xl font-bold">Gestión de Trabajadores</h2>
-        </div>
-        <div className="flex items-center gap-4">
-          <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
-            <span className="material-symbols-outlined">notifications</span>
-          </button>
-          <button 
-             onClick={() => setIsAddModalOpen(true)}
-             className="bg-primary text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-primary/90 transition-all shadow-sm"
-          >
-            <span className="material-symbols-outlined">person_add</span>
-            Añadir Trabajador
-          </button>
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 w-full backdrop-blur-md">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between px-4 sm:px-8 py-4 gap-4">
+          <h2 className="text-xl font-black tracking-tight">Trabajadores</h2>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button 
+               onClick={() => setIsAddModalOpen(true)}
+               className="flex-1 sm:flex-none bg-primary text-white px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+            >
+              <span className="material-symbols-outlined text-[18px]">person_add</span>
+              Añadir Trabajador
+            </button>
+            <button className="p-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
+              <span className="material-symbols-outlined">notifications</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -132,8 +145,15 @@ export default function Trabajadores() {
             />
           </div>
           <div className="flex items-center gap-3">
-             <select className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-medium">
-               <option>Todas las Especialidades</option>
+             <select
+               className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-medium"
+               value={filterEspecialidad}
+               onChange={(e) => setFilterEspecialidad(e.target.value)}
+             >
+               <option value="">Todas las Especialidades</option>
+               {especialidadesList.map(esp => (
+                 <option key={esp} value={esp.toLowerCase()}>{esp}</option>
+               ))}
              </select>
              <select className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-medium">
                <option>Todos los Estados</option>
@@ -144,25 +164,28 @@ export default function Trabajadores() {
         </div>
 
         {/* Workers Table */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm w-full">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm w-full">
           <div className="overflow-x-auto">
-             <table className="w-full text-left border-collapse min-w-[900px]">
+             <table className="w-full text-left border-collapse min-w-full">
                <thead>
                  <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
-                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Trabajador</th>
-                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Especialidad</th>
-                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
-                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Rendimiento</th>
-                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
+                   <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Trabajador</th>
+                   <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Especialidad</th>
+                   <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center hidden sm:table-cell">Estado</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center hidden lg:table-cell">Telegram</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center hidden md:table-cell">Rendimiento</th>
+                   <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {loading ? (
-                     <tr><td colSpan={5} className="text-center py-8">Cargando trabajadores...</td></tr>
+                     <tr><td colSpan={6} className="text-center py-8">Cargando trabajadores...</td></tr>
                   ) : trabajadores.length === 0 ? (
-                     <tr><td colSpan={5} className="text-center py-8">No hay trabajadores registrados.</td></tr>
+                     <tr><td colSpan={6} className="text-center py-8">No hay trabajadores registrados.</td></tr>
                   ) : (
-                     trabajadores.map(trabajador => (
+                     trabajadores
+                        .filter(t => !filterEspecialidad || t.especialidad?.toLowerCase() === filterEspecialidad)
+                        .map(trabajador => (
                         <tr key={trabajador.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                            <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
@@ -179,13 +202,20 @@ export default function Trabajadores() {
                                  <span className="text-sm font-medium">{trabajador.estado}</span>
                               </div>
                            </td>
+                           <td className="px-6 py-4 text-center hidden lg:table-cell">
+                              {trabajador.telegram_chat_id ? (
+                                <span className="px-2 py-1 bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 text-xs font-bold rounded-full border border-sky-200">✅ Activo</span>
+                              ) : (
+                                <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-400 text-xs font-bold rounded-full border border-slate-200">❌ Sin ID</span>
+                              )}
+                           </td>
                            <td className="px-6 py-4 text-center">
                               <span className="text-amber-500 font-bold text-sm">5.0 ⭐</span>
                            </td>
                            <td className="px-6 py-4 text-right">
                               <div className="flex justify-end gap-2">
                                 <button onClick={() => { setTrabajadorToEdit(trabajador); setIsEditModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-sky-500" title="Editar"><span className="material-symbols-outlined text-[18px]">edit</span></button>
-                                <button onClick={() => handleDelete(trabajador.id)} className="p-1.5 text-slate-400 hover:text-red-500" title="Borrar"><span className="material-symbols-outlined text-[18px]">delete</span></button>
+                                <button onClick={() => handleArchive(trabajador.id)} className="p-1.5 text-slate-400 hover:text-amber-500" title="Dar de baja"><span className="material-symbols-outlined text-[18px]">person_off</span></button>
                               </div>
                            </td>
                         </tr>
