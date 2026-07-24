@@ -16,6 +16,13 @@ interface Asignacion {
   creado_en: string;
 }
 
+interface Trabajador {
+  id: string;
+  auth_user_id: string | null;
+  nombre: string;
+  apellidos: string;
+}
+
 interface Props {
   ordenId: string;
   onUpdate?: () => void;
@@ -23,7 +30,7 @@ interface Props {
 
 export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
   const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
-  const [trabajadores, setTrabajadores] = useState<any[]>([]);
+  const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -62,13 +69,13 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
       if (trabajadorIds.length > 0) {
         const { data: trabajadoresData } = await supabase
           .from('trabajadores')
-          .select('auth_user_id, nombre, apellidos')
-          .in('auth_user_id', trabajadorIds);
+          .select('id, auth_user_id, nombre, apellidos')
+          .in('id', trabajadorIds);
 
         if (trabajadoresData) {
           const merged = data.map(a => ({
             ...a,
-            trabajador: trabajadoresData.find(t => t.auth_user_id === a.trabajador_id)
+            trabajador: trabajadoresData.find(t => t.id === a.trabajador_id)
           }));
           setAsignaciones(merged);
         }
@@ -82,7 +89,7 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
   const fetchTrabajadores = async () => {
     const { data } = await supabase
       .from('trabajadores')
-      .select('auth_user_id, nombre, apellidos')
+      .select('id, auth_user_id, nombre, apellidos')
       .eq('estado', 'Disponible');
     if (data) setTrabajadores(data);
   };
@@ -187,7 +194,7 @@ export default function AsignacionesSection({ ordenId, onUpdate }: Props) {
               >
                 <option value="">Seleccionar...</option>
                 {trabajadores.map(t => (
-                  <option key={t.auth_user_id} value={t.auth_user_id}>
+                  <option key={t.id} value={t.id}>
                     {t.nombre} {t.apellidos}
                   </option>
                 ))}
