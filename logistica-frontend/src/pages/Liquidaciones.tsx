@@ -14,6 +14,21 @@ interface Reporte {
   perfiles: { nombre_completo: string; tarifa_hora: number } | null;
 }
 
+interface LiquidacionReporteRpcRow {
+  reporte_id: string;
+  orden_id: string;
+  tecnico_id: string;
+  horas_trabajadas: number | null;
+  creado_en: string;
+  fecha_trabajo: string | null;
+  estado_liquidacion: string | null;
+  id_legible: string | null;
+  cliente: string | null;
+  estado_orden: string | null;
+  nombre_completo: string;
+  tarifa_hora: number;
+}
+
 type TabType = 'obra' | 'trabajador' | 'global';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -52,30 +67,29 @@ export default function Liquidaciones() {
   const fetchData = async () => {
     setLoading(true);
 
-    const { data: reportesData, error: repErr } = await supabase
-      .from('reportes')
-      .select('id, orden_id, tecnico_id, horas_trabajadas, creado_en, estado_liquidacion, ordenes!inner(id_legible, cliente, estado)')
-      .order('creado_en', { ascending: false });
+    const { data, error } = await supabase
+      .rpc('get_liquidaciones_reportes');
 
-    // Fetch all perfiles separately (Supabase doesn't recognize tecnico_id FK to perfiles)
-    const { data: perfilesData } = await supabase
-      .from('perfiles')
-      .select('id, nombre_completo, tarifa_hora');
-
-    if (!repErr && reportesData && perfilesData) {
-      // Build perfiles lookup map by id
-      const perfilesLookup: Record<string, { nombre_completo: string; tarifa_hora: number }> = {};
-      perfilesData.forEach((p: any) => {
-        perfilesLookup[p.id] = { nombre_completo: p.nombre_completo, tarifa_hora: p.tarifa_hora || 0 };
-      });
-
-      // Merge perfiles into reportes
-      const merged = (reportesData as any[]).map((r: any) => ({
-        ...r,
-        perfiles: perfilesLookup[r.tecnico_id] || null,
+    if (!error && data) {
+      const merged: Reporte[] = (data as LiquidacionReporteRpcRow[]).map(row => ({
+        id: row.reporte_id,
+        orden_id: row.orden_id,
+        tecnico_id: row.tecnico_id,
+        horas_trabajadas: row.horas_trabajadas ?? 0,
+        creado_en: row.creado_en,
+        estado_liquidacion: row.estado_liquidacion ?? 'Pendiente',
+        ordenes: {
+          id_legible: row.id_legible ?? '',
+          cliente: row.cliente ?? '',
+          estado: row.estado_orden ?? '',
+        },
+        perfiles: {
+          nombre_completo: row.nombre_completo || 'Desconocido',
+          tarifa_hora: row.tarifa_hora ?? 0,
+        },
       }));
 
-      setReportes(merged as Reporte[]);
+      setReportes(merged);
 
       // Build worker filter dropdown map
       const map: Record<string, { nombre: string; tarifa: number }> = {};
@@ -85,6 +99,8 @@ export default function Liquidaciones() {
         }
       });
       setPerfilesMap(map);
+    } else if (error) {
+      console.error('Error loading liquidation reports:', error.message);
     }
 
     setLoading(false);
