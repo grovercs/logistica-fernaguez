@@ -1,7 +1,7 @@
 import type { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
 
 // Esta función corre en el servidor de Netlify (nunca expuesta al navegador).
-// Lee el token del bot desde Supabase y envía el mensaje por Telegram.
+// Lee el token del bot desde una variable de entorno y envía el mensaje por Telegram.
 
 interface TelegramPayload {
   chat_id: string;
@@ -9,22 +9,47 @@ interface TelegramPayload {
   parse_mode?: string;
 }
 
-const FALLBACK_BOT_TOKEN = '8966002039:AAEm3NQZVRYtobSZ5q1c7CWBJaaTbxnJhI4';
+const allowedProductionOrigins = new Set([
+  'https://admin.appvielha.com',
+  'https://app.appvielha.com',
+]);
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+const deployPreviewOriginPattern =
+  /^https:\/\/deploy-preview-\d+--logistica-fernaguez-(?:admin|mobile)\.netlify\.app$/;
+
+const isAllowedOrigin = (origin: string | undefined): origin is string =>
+  !!origin && (
+    allowedProductionOrigins.has(origin)
+    || deployPreviewOriginPattern.test(origin)
+  );
+
+const corsHeaders = (origin: string) => ({
+  'Access-Control-Allow-Origin': origin,
   'Access-Control-Allow-Headers': 'Content-Type',
-};
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Vary': 'Origin',
+});
 
 export const handler: Handler = async (event: HandlerEvent, _context: HandlerContext) => {
+  const origin = event.headers.origin;
+
+  if (!isAllowedOrigin(origin)) {
+    return {
+      statusCode: 403,
+      body: JSON.stringify({ error: 'Origin not allowed' }),
+    };
+  }
+
+  const responseHeaders = corsHeaders(origin);
+
   // Manejar preflight OPTIONS
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers: corsHeaders, body: '' };
+    return { statusCode: 204, headers: responseHeaders, body: '' };
   }
 
   // Solo permitir POST
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method not allowed' }) };
+    return { statusCode: 405, headers: responseHeaders, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
   try {
@@ -32,53 +57,17 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
     const { chat_id, text, parse_mode = 'Markdown' } = payload;
 
     if (!chat_id || !text) {
-      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Missing chat_id or text' }) };
+      return { statusCode: 400, headers: responseHeaders, body: JSON.stringify({ error: 'Missing chat_id or text' }) };
     }
 
-    // Leer token desde Supabase (variable de entorno del servidor)
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '';
-
-    console.log('Netlify env check:', {
-      hasSupabaseUrl: !!supabaseUrl,
-      hasServiceKey: !!supabaseServiceKey,
-      keyLength: supabaseServiceKey ? supabaseServiceKey.length : 0,
-    });
-
-    let botToken: string | null = null;
-
-    if (supabaseUrl && supabaseServiceKey) {
-      try {
-        const configRes = await fetch(
-          `${supabaseUrl}/rest/v1/configuracion_sistema?clave=eq.telegram_bot_token&select=valor`,
-          {
-            method: 'GET',
-            headers: {
-              'apikey': supabaseServiceKey,
-              'Authorization': `Bearer ${supabaseServiceKey}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        if (configRes.ok) {
-          const configData = await configRes.json();
-          botToken = configData?.[0]?.valor || null;
-          console.log('Bot token fetched from Supabase:', !!botToken);
-        } else {
-          console.warn('Supabase config fetch failed:', await configRes.text());
-        }
-      } catch (supaErr) {
-        console.warn('Error fetching from Supabase:', supaErr);
-      }
-    } else {
-      console.warn('Supabase credentials not configured in Netlify env vars');
-    }
-
-    // Fallback al token hardcodeado si no se pudo leer de Supabase
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
     if (!botToken) {
-      console.log('Using fallback bot token');
-      botToken = FALLBACK_BOT_TOKEN;
+      console.error('Telegram integration is not configured');
+      return {
+        statusCode: 500,
+        headers: responseHeaders,
+        body: JSON.stringify({ error: 'Internal server error' }),
+      };
     }
 
     // Enviar mensaje vía Telegram Bot API
@@ -98,14 +87,14 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       console.error('Telegram API error:', telegramData);
       return {
         statusCode: 502,
-        headers: corsHeaders,
+        headers: responseHeaders,
         body: JSON.stringify({ error: 'Telegram API error', details: telegramData }),
       };
     }
 
     return {
       statusCode: 200,
-      headers: corsHeaders,
+      headers: responseHeaders,
       body: JSON.stringify({ success: true, message_id: telegramData.result?.message_id }),
     };
 
@@ -113,7 +102,7 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
     console.error('Netlify Function error:', err);
     return {
       statusCode: 500,
-      headers: corsHeaders,
+      headers: responseHeaders,
       body: JSON.stringify({ error: 'Internal server error', details: err.message }),
     };
   }
