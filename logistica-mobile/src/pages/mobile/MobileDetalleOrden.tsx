@@ -69,6 +69,9 @@ const MobileDetalleOrden = () => {
     const asignacionesActivas = misAsignaciones.filter(
         a => a.estado === 'pendiente' || a.estado === 'en_progreso'
     );
+    const asignacionesCompletadas = misAsignaciones.filter(
+        a => a.estado === 'completado'
+    );
     const selectedAsignacion = misAsignaciones.find(
         a => a.id === selectedAsignacionId
     );
@@ -633,6 +636,13 @@ const MobileDetalleOrden = () => {
                 facturas_urls: facturasFinales.length > 0 ? facturasFinales : null,
                 fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
             });
+            if (completarAsignacion && selectedAsignacionId) {
+                setMisAsignaciones(prev => prev.map(asignacion =>
+                    asignacion.id === selectedAsignacionId
+                        ? { ...asignacion, estado: 'completado' }
+                        : asignacion
+                ));
+            }
             setOrden((prev: any) => prev ? { ...prev, estado: rpcResult.order_status } : prev);
         } else if (currentUserRole === 'Administrador' || currentUserRole === 'Editor') {
             const saveReport = async (data: any) => {
@@ -692,7 +702,7 @@ const MobileDetalleOrden = () => {
         setSubmitting(false);
         alert("¡Reporte guardado correctamente!");
         setShowForm(false); // Close Modal on success
-        fetchOrden(); // Refresh list
+        await fetchOrden(); // Wait for refreshed reports and assignment state before leaving.
         localStorage.setItem('last_active_order', id || '');
         navigate('/m/ordenes');
     };
@@ -750,6 +760,17 @@ const MobileDetalleOrden = () => {
                  </div>
 
                  {/* Contacto y Teléfono */}
+                 {currentUserRole === 'Trabajador' && misAsignaciones.length > 0 && (
+                     <div className="flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-3 py-2 dark:border-green-800 dark:bg-green-900/20">
+                         <span className="text-xs font-black text-green-800 dark:text-green-200">Mi asignación</span>
+                         <span className="text-xs font-bold text-green-700 dark:text-green-300">
+                             {misAsignaciones.length === 1
+                                 ? (asignacionesCompletadas.length === 1 ? 'Completada' : 'Activa')
+                                 : `${asignacionesActivas.length} activas · ${asignacionesCompletadas.length} completadas`}
+                         </span>
+                     </div>
+                 )}
+
                  {(orden?.asegurado || orden?.telefono_asegurado) && (
                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2">
                          <div>
@@ -843,6 +864,9 @@ const MobileDetalleOrden = () => {
                             {reportes.map((rep, idx) => {
                                 const canEdit = currentUserRole === 'Administrador' || currentUserRole === 'Editor' || rep.tecnico_id === currentUserId;
                                 const canDelete = currentUserRole === 'Administrador';
+                                const reportAsignacion = rep.asignacion_id
+                                    ? misAsignaciones.find(asignacion => asignacion.id === rep.asignacion_id)
+                                    : null;
                                 // Get technician info from the map, fallback to 'Técnico'
                                 const tecnicoInfo = trabajadoresMap.get(rep.tecnico_id);
                                 const tecnicoName = tecnicoInfo?.nombre || 'Técnico';
@@ -877,6 +901,11 @@ const MobileDetalleOrden = () => {
                                         <div className="mt-1">
                                             <p className="text-xs font-bold text-slate-800 dark:text-slate-100 line-clamp-2">
                                                 {(rep.notas || '').split(/[ \t\n]*(?:MATERIALES:?)[ \t\n]*/i)[0] || <span className="italic text-slate-400 dark:text-slate-500 font-normal">(Sin descripción)</span>}
+                                            </p>
+                                            <p className="mt-2 text-[10px] font-bold text-green-700 dark:text-green-300 whitespace-pre-wrap">
+                                                {rep.asignacion_id && reportAsignacion
+                                                    ? `Asignación: ${reportAsignacion.notas?.trim() || reportAsignacion.id}`
+                                                    : 'Intervención histórica sin asignación'}
                                             </p>
                                             <div className="mt-2 flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
@@ -1057,17 +1086,22 @@ const MobileDetalleOrden = () => {
                                 && selectedAsignacion
                                 && (selectedAsignacion.estado === 'pendiente' || selectedAsignacion.estado === 'en_progreso')
                                 && (
-                                    <label className="flex items-center gap-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl p-4">
-                                        <input
-                                            type="checkbox"
-                                            checked={completarAsignacion}
-                                            onChange={event => setCompletarAsignacion(event.target.checked)}
-                                            className="w-5 h-5 rounded border-green-300 text-green-600 focus:ring-green-500"
-                                        />
-                                        <span className="text-sm font-bold text-green-800 dark:text-green-200">
-                                            Marcar mi asignación como completada
-                                        </span>
-                                    </label>
+                                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl p-4">
+                                        <label className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={completarAsignacion}
+                                                onChange={event => setCompletarAsignacion(event.target.checked)}
+                                                className="w-5 h-5 rounded border-green-300 text-green-600 focus:ring-green-500"
+                                            />
+                                            <span className="text-sm font-bold text-green-800 dark:text-green-200">
+                                                He terminado esta tarea asignada
+                                            </span>
+                                        </label>
+                                        <p className="mt-2 pl-8 text-xs text-green-700 dark:text-green-300">
+                                            Esto completa sólo tu tarea asignada. La orden puede seguir abierta para otros técnicos.
+                                        </p>
+                                    </div>
                                 )}
 
                 <div className="space-y-4 pt-4">
@@ -1259,33 +1293,35 @@ const MobileDetalleOrden = () => {
                     </div>
                 </div>
 
-                {/* ESTADO FINAL DE LA VISITA */}
-                <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800 mt-4">
-                    <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Estado tras esta visita</h2>
-                    <div className="flex gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setIsFinished(false)}
-                            className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${!isFinished ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 shadow-md' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 opacity-60'}`}
-                        >
-                            <span className="material-symbols-outlined text-2xl">pending_actions</span>
-                            <span className="text-[11px] font-black uppercase">Sigue en Curso</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setIsFinished(true)}
-                            className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${isFinished ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 shadow-md' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 opacity-60'}`}
-                        >
-                            <span className="material-symbols-outlined text-2xl">task_alt</span>
-                            <span className="text-[11px] font-black uppercase">Trabajo Terminado</span>
-                        </button>
+                {/* ESTADO FINAL DE LA VISITA: sólo flujo administrativo */}
+                {(currentUserRole === 'Administrador' || currentUserRole === 'Editor') && (
+                    <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800 mt-4">
+                        <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Estado tras esta visita</h2>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setIsFinished(false)}
+                                className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${!isFinished ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 shadow-md' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 opacity-60'}`}
+                            >
+                                <span className="material-symbols-outlined text-2xl">pending_actions</span>
+                                <span className="text-[11px] font-black uppercase">Sigue en Curso</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsFinished(true)}
+                                className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${isFinished ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 shadow-md' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 opacity-60'}`}
+                            >
+                                <span className="material-symbols-outlined text-2xl">task_alt</span>
+                                <span className="text-[11px] font-black uppercase">Enviar orden a revisión</span>
+                            </button>
+                        </div>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 italic text-center px-4">
+                            {isFinished
+                                ? "La orden pasará a 'En revisión' para que el administrador la finalice."
+                                : "La orden seguirá activa como 'En Curso' para futuras visitas."}
+                        </p>
                     </div>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 italic text-center px-4">
-                        {isFinished
-                            ? "La orden pasará a 'En revisión' para que el administrador la finalice."
-                            : "La orden seguirá activa como 'En Curso' para futuras visitas."}
-                    </p>
-                </div>
+                )}
 
                 {/* MAIN ACTIONS */}
                 <div className="space-y-4 pt-8">
