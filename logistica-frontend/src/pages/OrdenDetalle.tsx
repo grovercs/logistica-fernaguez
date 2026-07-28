@@ -9,6 +9,15 @@ import { PrintableOrden } from '../components/PrintableOrden';
 import { createPortal } from 'react-dom';
 import { useUserRole } from '../hooks/useUserRole';
 
+interface TrabajadorDirectoryRow {
+  trabajador_id: string;
+  auth_user_id: string | null;
+  nombre: string;
+  apellidos: string;
+  especialidad: string;
+  estado: string;
+}
+
 export default function OrdenDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -39,7 +48,7 @@ export default function OrdenDetalle() {
     const [ordenReq, reportesReq, trabReq] = await Promise.all([
       supabase.from('ordenes').select('*').eq('id', orderId).single(),
       supabase.from('reportes').select('*').eq('orden_id', orderId),
-      supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, especialidad')
+      supabase.rpc('get_trabajadores_directory')
     ]);
 
     if (!ordenReq.error && ordenReq.data) {
@@ -81,7 +90,10 @@ export default function OrdenDetalle() {
       setReportes(reportesReq.data);
     }
     if (!trabReq.error && trabReq.data) {
-      setTrabajadores(trabReq.data);
+      setTrabajadores(trabReq.data.map((t: TrabajadorDirectoryRow) => ({
+        ...t,
+        id: t.trabajador_id
+      })));
     }
     setLoading(false);
   };

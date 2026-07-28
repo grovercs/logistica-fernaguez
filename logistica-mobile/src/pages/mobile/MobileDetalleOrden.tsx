@@ -5,6 +5,15 @@ import { compressImage } from '../../lib/compressImage';
 import { uploadToCloudinary, deleteCloudinaryImages } from '../../lib/cloudinary';
 // Cloudinary integration for image uploads
 
+interface TrabajadorDirectoryRow {
+    trabajador_id: string;
+    auth_user_id: string | null;
+    nombre: string;
+    apellidos: string;
+    especialidad: string;
+    estado: string;
+}
+
 const MobileDetalleOrden = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -150,7 +159,7 @@ const MobileDetalleOrden = () => {
         // 2. Fetch reports and workers using the REAL ID
         const [reportesReq, trabajadoresReq, asignacionesReq] = await Promise.all([
             supabase.from('reportes').select('*').eq('orden_id', realId).order('creado_en', { ascending: false }),
-            supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, especialidad'),
+            supabase.rpc('get_trabajadores_directory'),
             supabase.from('orden_asignaciones').select('*').eq('orden_id', realId)
         ]);
 
@@ -161,7 +170,8 @@ const MobileDetalleOrden = () => {
         // Create map of technician IDs to names and specialties
         if (!trabajadoresReq.error && trabajadoresReq.data) {
             const map = new Map<string, { nombre: string; especialidad: string }>();
-            trabajadoresReq.data.forEach((t: any) => {
+            trabajadoresReq.data.forEach((row: TrabajadorDirectoryRow) => {
+                const t = { ...row, id: row.trabajador_id };
                 const info = {
                     nombre: `${t.nombre} ${t.apellidos || ''}`.trim(),
                     especialidad: t.especialidad || ''

@@ -2,6 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
+interface TrabajadorDirectoryRow {
+    trabajador_id: string;
+    auth_user_id: string | null;
+    nombre: string;
+    apellidos: string;
+    especialidad: string;
+    estado: string;
+}
+
 const MobileOrdenes = () => {
     const navigate = useNavigate();
     const [ordenes, setOrdenes] = useState<any[]>([]);
@@ -52,11 +61,15 @@ const MobileOrdenes = () => {
             await fetchOrdenes(userId, roleName);
 
             // Fetch workers to map them
-            const { data: workers } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, especialidad');
+            const { data: directoryRows } = await supabase.rpc('get_trabajadores_directory');
+            const workers = directoryRows?.map((w: TrabajadorDirectoryRow) => ({
+                ...w,
+                id: w.trabajador_id
+            }));
             if (workers) {
                 setWorkersList(workers);
                 const map = new Map();
-                workers.forEach(w => {
+                workers.forEach((w: TrabajadorDirectoryRow & { id: string }) => {
                     const info = {
                         nombre: `${w.nombre} ${w.apellidos || ''}`.trim(),
                         especialidad: w.especialidad || ''
