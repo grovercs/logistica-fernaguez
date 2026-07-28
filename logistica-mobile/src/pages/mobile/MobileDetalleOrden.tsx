@@ -22,6 +22,8 @@ const MobileDetalleOrden = () => {
     const [reportes, setReportes] = useState<any[]>([]); // List of all reports
     const [reporte, setReporte] = useState<any>(null); // Current report being edited
     const [misAsignaciones, setMisAsignaciones] = useState<any[]>([]); // Assignments specific to the current worker
+    const [selectedAsignacionId, setSelectedAsignacionId] = useState('');
+    const [completarAsignacion, setCompletarAsignacion] = useState(false);
     const [loading, setLoading] = useState(true);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [currentUserName, setCurrentUserName] = useState<string>('');
@@ -64,6 +66,12 @@ const MobileDetalleOrden = () => {
     const [canSign, setCanSign] = useState(false); // Enable signature pad
     const [isFinished, setIsFinished] = useState(false); // Explicit status feedback
     const [viewingReport, setViewingReport] = useState<any>(null); // Report being viewed (read-only)
+    const asignacionesActivas = misAsignaciones.filter(
+        a => a.estado === 'pendiente' || a.estado === 'en_progreso'
+    );
+    const selectedAsignacion = misAsignaciones.find(
+        a => a.id === selectedAsignacionId
+    );
 
     useEffect(() => {
         if (showForm) {
@@ -263,6 +271,10 @@ const MobileDetalleOrden = () => {
         setSelectedHora(0);
         setSelectedMinuto(0);
         setFecha(new Date().toISOString().split('T')[0]);
+        setSelectedAsignacionId(
+            asignacionesActivas.length === 1 ? asignacionesActivas[0].id : ''
+        );
+        setCompletarAsignacion(false);
 
         // Clear signature canvas
         const ctx = canvasRef.current?.getContext('2d');
@@ -277,6 +289,8 @@ const MobileDetalleOrden = () => {
 
     const loadReportData = (rep: any) => {
         setReporte(rep);
+        setSelectedAsignacionId(rep.asignacion_id || '');
+        setCompletarAsignacion(false);
 
         // Al editar un reporte existente, por defecto seguimos en curso
         setIsFinished(false);
@@ -494,6 +508,16 @@ const MobileDetalleOrden = () => {
     const handleComplete = async () => {
         setSubmitting(true);
 
+        if (
+            currentUserRole === 'Trabajador'
+            && !reporte?.id
+            && !selectedAsignacionId
+        ) {
+            alert('Selecciona una asignación de trabajo.');
+            setSubmitting(false);
+            return;
+        }
+
         let signatureUrl = reporte?.firma_url;
 
         // If the signature pad is empty/cleared, we MUST set signatureUrl to null
@@ -570,6 +594,8 @@ const MobileDetalleOrden = () => {
                 p_material_utilizado: materialUtilizado,
                 p_facturas_urls: facturasFinales.length > 0 ? facturasFinales : null,
                 p_fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
+                p_asignacion_id: reporte?.asignacion_id || selectedAsignacionId || null,
+                p_completar_asignacion: completarAsignacion,
             });
 
             if (rpcError) {
@@ -591,6 +617,7 @@ const MobileDetalleOrden = () => {
                 ...(reporte || {}),
                 id: rpcResult.report_id,
                 orden_id: realOrderId,
+                asignacion_id: reporte?.asignacion_id || selectedAsignacionId || null,
                 // Identity is reflected locally; the RPC sets tecnico_id from auth.uid().
                 tecnico_id: currentUserId,
                 notas: reportData.notas,
@@ -603,9 +630,6 @@ const MobileDetalleOrden = () => {
                 fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
             });
             setOrden((prev: any) => prev ? { ...prev, estado: rpcResult.order_status } : prev);
-
-            // Pending: assignment-state synchronization for workers needs a reviewed RPC.
-            // Do not write orden_asignaciones directly from the worker client.
         } else if (currentUserRole === 'Administrador' || currentUserRole === 'Editor') {
             const saveReport = async (data: any) => {
                 if (reporte?.id) {
@@ -968,6 +992,66 @@ const MobileDetalleOrden = () => {
                                     </div>
                                 )}
                             </div>
+
+                            {currentUserRole === 'Trabajador' && !reporte?.id && (
+                                <div className="space-y-2">
+                                    <label className="block text-xs font-bold text-slate-800 dark:text-slate-100">
+                                        Asignación de trabajo
+                                    </label>
+                                    <select
+                                        value={selectedAsignacionId}
+                                        onChange={(event) => {
+                                            setSelectedAsignacionId(event.target.value);
+                                            if (!event.target.value) setCompletarAsignacion(false);
+                                        }}
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
+                                    >
+                                        <option value="">Selecciona una asignación</option>
+                                        {asignacionesActivas.map(asignacion => (
+                                            <option key={asignacion.id} value={asignacion.id}>
+                                                {asignacion.notas?.trim() || `Asignación ${asignacion.id}`}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {asignacionesActivas.length === 0 && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                                            No tienes asignaciones activas disponibles.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {currentUserRole === 'Trabajador' && reporte?.id && (
+                                <div className="space-y-2">
+                                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                                        Asignación asociada
+                                    </p>
+                                    <p className="text-xs text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 whitespace-pre-wrap">
+                                        {reporte.asignacion_id
+                                            ? (selectedAsignacion?.notas?.trim() || reporte.asignacion_id)
+                                            : 'Intervención histórica sin asignación'}
+                                    </p>
+                                </div>
+                            )}
+
+                            {currentUserRole === 'Trabajador'
+                                && selectedAsignacionId
+                                && selectedAsignacion
+                                && (selectedAsignacion.estado === 'pendiente' || selectedAsignacion.estado === 'en_progreso')
+                                && (
+                                    <label className="flex items-center gap-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl p-4">
+                                        <input
+                                            type="checkbox"
+                                            checked={completarAsignacion}
+                                            onChange={event => setCompletarAsignacion(event.target.checked)}
+                                            className="w-5 h-5 rounded border-green-300 text-green-600 focus:ring-green-500"
+                                        />
+                                        <span className="text-sm font-bold text-green-800 dark:text-green-200">
+                                            Marcar mi asignación como completada
+                                        </span>
+                                    </label>
+                                )}
+
                 <div className="space-y-4 pt-4">
                     <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Información de esta Intervención</h2>
 
