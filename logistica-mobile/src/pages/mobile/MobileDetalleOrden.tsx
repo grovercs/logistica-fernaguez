@@ -194,8 +194,8 @@ const MobileDetalleOrden = () => {
         }
 
         if (asignacionesReq.data && userId) {
-            const myAssigs = asignacionesReq.data.filter(a =>
-                a.trabajador_id === userId || a.trabajador_id === currentWorkerDbId
+            const myAssigs = asignacionesReq.data.filter(
+                a => a.trabajador_id === currentWorkerDbId
             );
             console.log('[Mobile] Total asignaciones:', asignacionesReq.data.length, 'Mis asignaciones:', myAssigs.length);
             setMisAsignaciones(myAssigs);
@@ -513,7 +513,11 @@ const MobileDetalleOrden = () => {
             && !reporte?.id
             && !selectedAsignacionId
         ) {
-            alert('Selecciona una asignación de trabajo.');
+            alert(
+                asignacionesActivas.length === 0
+                    ? 'No tienes ninguna asignación activa para crear una intervención.'
+                    : 'Selecciona una asignación de trabajo.'
+            );
             setSubmitting(false);
             return;
         }
@@ -995,28 +999,42 @@ const MobileDetalleOrden = () => {
 
                             {currentUserRole === 'Trabajador' && !reporte?.id && (
                                 <div className="space-y-2">
-                                    <label className="block text-xs font-bold text-slate-800 dark:text-slate-100">
-                                        Asignación de trabajo
-                                    </label>
-                                    <select
-                                        value={selectedAsignacionId}
-                                        onChange={(event) => {
-                                            setSelectedAsignacionId(event.target.value);
-                                            if (!event.target.value) setCompletarAsignacion(false);
-                                        }}
-                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
-                                    >
-                                        <option value="">Selecciona una asignación</option>
-                                        {asignacionesActivas.map(asignacion => (
-                                            <option key={asignacion.id} value={asignacion.id}>
-                                                {asignacion.notas?.trim() || `Asignación ${asignacion.id}`}
-                                            </option>
-                                        ))}
-                                    </select>
                                     {asignacionesActivas.length === 0 && (
-                                        <p className="text-xs text-amber-600 dark:text-amber-400">
-                                            No tienes asignaciones activas disponibles.
-                                        </p>
+                                        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                                            No tienes ninguna asignación activa para crear una intervención.
+                                        </div>
+                                    )}
+                                    {asignacionesActivas.length === 1 && (
+                                        <div className="rounded-2xl border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
+                                            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-green-700 dark:text-green-300">
+                                                Instrucciones de mi asignación
+                                            </p>
+                                            <p className="whitespace-pre-wrap text-sm text-green-900 dark:text-green-100">
+                                                {asignacionesActivas[0].notas?.trim() || 'Sin instrucciones específicas.'}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {asignacionesActivas.length >= 2 && (
+                                        <>
+                                            <label className="block text-xs font-bold text-slate-800 dark:text-slate-100">
+                                                Asignación de trabajo
+                                            </label>
+                                            <select
+                                                value={selectedAsignacionId}
+                                                onChange={(event) => {
+                                                    setSelectedAsignacionId(event.target.value);
+                                                    if (!event.target.value) setCompletarAsignacion(false);
+                                                }}
+                                                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
+                                            >
+                                                <option value="">Selecciona una asignación</option>
+                                                {asignacionesActivas.map(asignacion => (
+                                                    <option key={asignacion.id} value={asignacion.id}>
+                                                        {asignacion.notas?.trim() || `Asignación ${asignacion.id}`}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -1298,7 +1316,15 @@ const MobileDetalleOrden = () => {
 
                     <button
                         onClick={handleComplete}
-                        disabled={submitting || uploadingFoto}
+                        disabled={
+                            submitting
+                            || uploadingFoto
+                            || (
+                                currentUserRole === 'Trabajador'
+                                && !reporte?.id
+                                && asignacionesActivas.length === 0
+                            )
+                        }
                         className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl active:scale-95 transition-all flex justify-center items-center gap-3 text-lg"
                     >
                         <span className="material-symbols-outlined">
