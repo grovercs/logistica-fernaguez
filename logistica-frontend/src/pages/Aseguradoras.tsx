@@ -58,12 +58,11 @@ export default function Aseguradoras() {
   };
 
   const handleDelete = async (id: string, nombre: string) => {
-      // Los datos históricos relacionan órdenes y clientes por nombre. Sólo
-      // permitimos eliminar el duplicado sin CIF cuando otro homónimo con CIF
-      // permanece como referencia para esas órdenes.
+      // Los datos históricos relacionan órdenes y clientes por nombre.
+      // Si permanece otro registro homónimo, sólo se elimina el id seleccionado.
       const { data: clienteSeleccionado, error: errCliente } = await supabase
           .from('aseguradoras')
-          .select('id, nombre, cif')
+          .select('id, nombre')
           .eq('id', id)
           .single();
 
@@ -75,7 +74,7 @@ export default function Aseguradoras() {
 
       const { data: clientesHomónimos, error: errHomónimos } = await supabase
           .from('aseguradoras')
-          .select('id, cif')
+          .select('id')
           .eq('nombre', clienteSeleccionado.nombre)
           .neq('id', id);
 
@@ -85,34 +84,10 @@ export default function Aseguradoras() {
           return;
       }
 
-      const seleccionadoSinCif = !clienteSeleccionado.cif?.trim();
-      const existeHomónimoConCif = clientesHomónimos?.some(cliente => Boolean(cliente.cif?.trim())) ?? false;
-
-      if (seleccionadoSinCif && existeHomónimoConCif) {
-          const estadosCerrados = new Set(['Finalizada', 'Finalizado', 'Archivado']);
-          const { data: ordenesConMismoNombre, error: errOrdenesAbiertas } = await supabase
-              .from('ordenes')
-              .select('id, estado')
-              .or(`cliente.eq.${nombre},aseguradora.eq.${nombre}`);
-
-          if (errOrdenesAbiertas) {
-              console.error('Error comprobando órdenes abiertas:', errOrdenesAbiertas);
-              alert('No se han podido comprobar las órdenes abiertas antes de borrar el cliente.');
-              return;
-          }
-
-          const existenOrdenesAbiertas = ordenesConMismoNombre?.some(
-              orden => !estadosCerrados.has(orden.estado)
-          ) ?? false;
-
-          if (existenOrdenesAbiertas) {
-              alert('No se puede borrar este cliente porque existen órdenes abiertas asociadas a este nombre.');
-              return;
-          }
-
+      if (clientesHomónimos && clientesHomónimos.length > 0) {
           const confirmarDuplicado = window.confirm(
-              'Este cliente no tiene CIF/NIF y existe otro cliente con el mismo nombre que sí lo tiene. ' +
-              '¿Quieres eliminar permanentemente únicamente este registro duplicado sin CIF/NIF?'
+              'Existe otro cliente con el mismo nombre. Se eliminará únicamente este ' +
+              'registro y las órdenes seguirán asociadas al nombre restante.'
           );
 
           if (!confirmarDuplicado) return;
