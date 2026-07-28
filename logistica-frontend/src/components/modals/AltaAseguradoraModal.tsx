@@ -65,7 +65,43 @@ export default function AltaAseguradoraModal({ isOpen, onClose, onCreated }: Alt
 
   const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
+
+      const cifNormalizado = formData.cif
+        .trim()
+        .toUpperCase()
+        .replace(/[\s-]/g, '');
+
+      if (!cifNormalizado) {
+        alert('El CIF/NIF es obligatorio');
+        return;
+      }
+
       setLoading(true);
+
+      const { data: clientesConCif, error: errorComprobandoCif } = await supabase
+        .from('aseguradoras')
+        .select('id, cif')
+        .not('cif', 'is', null);
+
+      if (errorComprobandoCif) {
+        console.error('Error checking CIF/NIF:', errorComprobandoCif);
+        alert('No se ha podido comprobar el CIF/NIF');
+        setLoading(false);
+        return;
+      }
+
+      const cifDuplicado = clientesConCif?.some(cliente =>
+        String(cliente.cif || '')
+          .trim()
+          .toUpperCase()
+          .replace(/[\s-]/g, '') === cifNormalizado
+      );
+
+      if (cifDuplicado) {
+        alert('Ya existe un cliente con este CIF/NIF');
+        setLoading(false);
+        return;
+      }
 
       let logoUrl: string | null = null;
       if (logoFile) {
@@ -78,7 +114,7 @@ export default function AltaAseguradoraModal({ isOpen, onClose, onCreated }: Alt
           telefono: formData.telefono,
           email: formData.email,
           estado: formData.estado,
-          cif: formData.cif,
+          cif: cifNormalizado,
           web: formData.web,
           direccion: formData.direccion,
           logo_url: logoUrl
@@ -133,11 +169,12 @@ export default function AltaAseguradoraModal({ isOpen, onClose, onCreated }: Alt
               />
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">ID / CIF</label>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">CIF/NIF *</label>
               <input 
                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" 
                  placeholder="B12345678" 
                  type="text"
+                 required
                  value={formData.cif}
                  onChange={(e) => setFormData({...formData, cif: e.target.value})}
               />

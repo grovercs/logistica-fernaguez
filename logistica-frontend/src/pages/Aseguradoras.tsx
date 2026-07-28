@@ -58,6 +58,50 @@ export default function Aseguradoras() {
   };
 
   const handleDelete = async (id: string, nombre: string) => {
+      // Los datos históricos relacionan órdenes y clientes por nombre.
+      // Si permanece otro registro homónimo, sólo se elimina el id seleccionado.
+      const { data: clienteSeleccionado, error: errCliente } = await supabase
+          .from('aseguradoras')
+          .select('id, nombre')
+          .eq('id', id)
+          .single();
+
+      if (errCliente || !clienteSeleccionado) {
+          console.error('Error comprobando el cliente:', errCliente);
+          alert('No se ha podido comprobar el cliente antes de borrarlo.');
+          return;
+      }
+
+      const { data: clientesHomónimos, error: errHomónimos } = await supabase
+          .from('aseguradoras')
+          .select('id')
+          .eq('nombre', clienteSeleccionado.nombre)
+          .neq('id', id);
+
+      if (errHomónimos) {
+          console.error('Error comprobando clientes duplicados:', errHomónimos);
+          alert('No se ha podido comprobar si existen clientes duplicados.');
+          return;
+      }
+
+      if (clientesHomónimos && clientesHomónimos.length > 0) {
+          const confirmarDuplicado = window.confirm(
+              'Existe otro cliente con el mismo nombre. Se eliminará únicamente este ' +
+              'registro y las órdenes seguirán asociadas al nombre restante.'
+          );
+
+          if (!confirmarDuplicado) return;
+
+          const { error } = await supabase.from('aseguradoras').delete().eq('id', id);
+          if (!error) {
+              fetchAseguradoras();
+          } else {
+              console.error('Error deleting duplicate:', error);
+              alert('Error al borrar el cliente duplicado.');
+          }
+          return;
+      }
+
       // Verificar si hay órdenes asociadas a este cliente
       const { data: ordenesAsociadas, error: errCount } = await supabase
           .from('ordenes')
