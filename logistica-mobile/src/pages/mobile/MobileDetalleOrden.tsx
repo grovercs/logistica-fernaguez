@@ -24,6 +24,7 @@ const MobileDetalleOrden = () => {
     const [misAsignaciones, setMisAsignaciones] = useState<any[]>([]); // Assignments specific to the current worker
     const [selectedAsignacionId, setSelectedAsignacionId] = useState('');
     const [completarAsignacion, setCompletarAsignacion] = useState(false);
+    const [finalizarOrden, setFinalizarOrden] = useState(false);
     const [loading, setLoading] = useState(true);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [currentUserName, setCurrentUserName] = useState<string>('');
@@ -278,6 +279,7 @@ const MobileDetalleOrden = () => {
             asignacionesActivas.length === 1 ? asignacionesActivas[0].id : ''
         );
         setCompletarAsignacion(false);
+        setFinalizarOrden(false);
 
         // Clear signature canvas
         const ctx = canvasRef.current?.getContext('2d');
@@ -294,6 +296,7 @@ const MobileDetalleOrden = () => {
         setReporte(rep);
         setSelectedAsignacionId(rep.asignacion_id || '');
         setCompletarAsignacion(false);
+        setFinalizarOrden(false);
 
         // Al editar un reporte existente, por defecto seguimos en curso
         setIsFinished(false);
@@ -525,6 +528,16 @@ const MobileDetalleOrden = () => {
             return;
         }
 
+        if (
+            currentUserRole === 'Trabajador'
+            && finalizarOrden
+            && !hasSignature
+        ) {
+            alert('La firma del cliente es obligatoria para finalizar la orden.');
+            setSubmitting(false);
+            return;
+        }
+
         let signatureUrl = reporte?.firma_url;
 
         // If the signature pad is empty/cleared, we MUST set signatureUrl to null
@@ -602,7 +615,7 @@ const MobileDetalleOrden = () => {
                 p_facturas_urls: facturasFinales.length > 0 ? facturasFinales : null,
                 p_fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
                 p_asignacion_id: reporte?.asignacion_id || selectedAsignacionId || null,
-                p_completar_asignacion: completarAsignacion,
+                p_completar_asignacion: completarAsignacion || finalizarOrden,
             });
 
             if (rpcError) {
@@ -636,7 +649,7 @@ const MobileDetalleOrden = () => {
                 facturas_urls: facturasFinales.length > 0 ? facturasFinales : null,
                 fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
             });
-            if (completarAsignacion && selectedAsignacionId) {
+            if ((completarAsignacion || finalizarOrden) && selectedAsignacionId) {
                 setMisAsignaciones(prev => prev.map(asignacion =>
                     asignacion.id === selectedAsignacionId
                         ? { ...asignacion, estado: 'completado' }
@@ -1052,7 +1065,10 @@ const MobileDetalleOrden = () => {
                                                 value={selectedAsignacionId}
                                                 onChange={(event) => {
                                                     setSelectedAsignacionId(event.target.value);
-                                                    if (!event.target.value) setCompletarAsignacion(false);
+                                                    if (!event.target.value) {
+                                                        setCompletarAsignacion(false);
+                                                        setFinalizarOrden(false);
+                                                    }
                                                 }}
                                                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
                                             >
@@ -1086,21 +1102,48 @@ const MobileDetalleOrden = () => {
                                 && selectedAsignacion
                                 && (selectedAsignacion.estado === 'pendiente' || selectedAsignacion.estado === 'en_progreso')
                                 && (
-                                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl p-4">
-                                        <label className="flex items-center gap-3">
-                                            <input
-                                                type="checkbox"
-                                                checked={completarAsignacion}
-                                                onChange={event => setCompletarAsignacion(event.target.checked)}
-                                                className="w-5 h-5 rounded border-green-300 text-green-600 focus:ring-green-500"
-                                            />
-                                            <span className="text-sm font-bold text-green-800 dark:text-green-200">
-                                                He terminado esta tarea asignada
-                                            </span>
-                                        </label>
-                                        <p className="mt-2 pl-8 text-xs text-green-700 dark:text-green-300">
-                                            Esto completa sólo tu tarea asignada. La orden puede seguir abierta para otros técnicos.
-                                        </p>
+                                    <div className="space-y-4">
+                                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl p-4">
+                                            <label className="flex items-center gap-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={completarAsignacion}
+                                                    disabled={finalizarOrden}
+                                                    onChange={event => setCompletarAsignacion(event.target.checked)}
+                                                    className="w-5 h-5 rounded border-green-300 text-green-600 focus:ring-green-500 disabled:opacity-60"
+                                                />
+                                                <span className="text-sm font-bold text-green-800 dark:text-green-200">
+                                                    He terminado esta tarea asignada
+                                                </span>
+                                            </label>
+                                            <p className="mt-2 pl-8 text-xs text-green-700 dark:text-green-300">
+                                                Completa únicamente tu tarea. La orden puede continuar abierta para otros técnicos.
+                                            </p>
+                                        </div>
+
+                                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4">
+                                            <label className="flex items-center gap-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={finalizarOrden}
+                                                    onChange={event => {
+                                                        const enabled = event.target.checked;
+                                                        setFinalizarOrden(enabled);
+                                                        if (enabled) {
+                                                            setCompletarAsignacion(true);
+                                                            setCanSign(true);
+                                                        }
+                                                    }}
+                                                    className="w-5 h-5 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                <span className="text-sm font-bold text-blue-800 dark:text-blue-200">
+                                                    Finalizar la orden y recoger firma
+                                                </span>
+                                            </label>
+                                            <p className="mt-2 pl-8 text-xs text-blue-700 dark:text-blue-300">
+                                                Utiliza esta opción sólo cuando el trabajo completo esté terminado y el cliente vaya a firmar su conformidad.
+                                            </p>
+                                        </div>
                                     </div>
                                 )}
 
@@ -1238,60 +1281,62 @@ const MobileDetalleOrden = () => {
                 </div>
 
                 {/* FIRMA DEL CLIENTE */}
-                <div className="space-y-4 pt-2">
-                    <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Conformidad (Firma)</h2>
-                    <div className="bg-white dark:bg-slate-900 border-2 border-dashed border-slate-300 rounded-xl overflow-hidden touch-none relative h-[180px]">
-                        {reporte?.firma_url ? (
-                            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800">
-                                <img src={reporte.firma_url} alt="Firma Guardada" className="h-full object-contain" />
+                {(currentUserRole !== 'Trabajador' || finalizarOrden || !!reporte?.firma_url) && (
+                    <div className="space-y-4 pt-2">
+                        <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Conformidad (Firma)</h2>
+                        <div className="bg-white dark:bg-slate-900 border-2 border-dashed border-slate-300 rounded-xl overflow-hidden touch-none relative h-[180px]">
+                            {reporte?.firma_url ? (
+                                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800">
+                                    <img src={reporte.firma_url} alt="Firma Guardada" className="h-full object-contain" />
+                                </div>
+                            ) : (
+                                <>
+                                    {!hasSignature && (
+                                        <span className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-300 font-sans text-sm select-none">
+                                            Firmar aquí
+                                        </span>
+                                    )}
+                                    <canvas
+                                        ref={canvasRef}
+                                        className={`w-full h-full relative z-10 cursor-crosshair transition-all ${!canSign ? 'pointer-events-none grayscale opacity-30' : ''}`}
+                                        onMouseDown={startDrawing}
+                                        onMouseUp={stopDrawing}
+                                        onMouseOut={stopDrawing}
+                                        onMouseMove={draw}
+                                        onTouchStart={startDrawing}
+                                        onTouchEnd={stopDrawing}
+                                        onTouchCancel={stopDrawing}
+                                        onTouchMove={draw}
+                                        width={600}
+                                        height={300}
+                                        style={{ width: '100%', height: '100%' }}
+                                    />
+                                </>
+                            )}
+                        </div>
+                        <div className="flex justify-between items-center px-1">
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 italic">Obligatorio para cerrar el parte</p>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setCanSign(!canSign)}
+                                    className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all shadow-sm ${canSign ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'}`}
+                                >
+                                    <span className="material-symbols-outlined text-[16px]">{canSign ? 'lock_open' : 'edit_square'}</span>
+                                    {canSign ? 'BLOQUEAR' : 'FIRMAR'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={clearSignature}
+                                    className="text-xs font-bold text-red-500 flex items-center gap-1 bg-red-50 dark:bg-red-900/20 border border-red-100 px-3 py-1.5 rounded-lg transition-all"
+                                >
+                                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                                    LIMPIAR
+                                </button>
                             </div>
-                        ) : (
-                            <>
-                                {!hasSignature && (
-                                    <span className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-300 font-sans text-sm select-none">
-                                        Firmar aquí
-                                    </span>
-                                )}
-                                <canvas
-                                    ref={canvasRef}
-                                    className={`w-full h-full relative z-10 cursor-crosshair transition-all ${!canSign ? 'pointer-events-none grayscale opacity-30' : ''}`}
-                                    onMouseDown={startDrawing}
-                                    onMouseUp={stopDrawing}
-                                    onMouseOut={stopDrawing}
-                                    onMouseMove={draw}
-                                    onTouchStart={startDrawing}
-                                    onTouchEnd={stopDrawing}
-                                    onTouchCancel={stopDrawing}
-                                    onTouchMove={draw}
-                                    width={600}
-                                    height={300}
-                                    style={{ width: '100%', height: '100%' }}
-                                />
-                            </>
-                        )}
-                    </div>
-                    <div className="flex justify-between items-center px-1">
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 italic">Obligatorio para cerrar el parte</p>
-                        <div className="flex gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setCanSign(!canSign)}
-                                className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all shadow-sm ${canSign ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'}`}
-                            >
-                                <span className="material-symbols-outlined text-[16px]">{canSign ? 'lock_open' : 'edit_square'}</span>
-                                {canSign ? 'BLOQUEAR' : 'FIRMAR'}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={clearSignature}
-                                className="text-xs font-bold text-red-500 flex items-center gap-1 bg-red-50 dark:bg-red-900/20 border border-red-100 px-3 py-1.5 rounded-lg transition-all"
-                            >
-                                <span className="material-symbols-outlined text-[16px]">delete</span>
-                                LIMPIAR
-                            </button>
                         </div>
                     </div>
-                </div>
+                )}
 
                 {/* ESTADO FINAL DE LA VISITA: sólo flujo administrativo */}
                 {(currentUserRole === 'Administrador' || currentUserRole === 'Editor') && (
@@ -1366,7 +1411,11 @@ const MobileDetalleOrden = () => {
                         <span className="material-symbols-outlined">
                             {submitting ? 'sync' : (reporte?.id ? 'save' : 'done_all')}
                         </span>
-                        {submitting ? 'GUARDANDO...' : (reporte?.id ? 'GUARDAR CAMBIOS' : 'AÑADIR INTERVENCIÓN')}
+                        {submitting
+                            ? 'GUARDANDO...'
+                            : currentUserRole === 'Trabajador'
+                                ? (finalizarOrden ? 'GUARDAR, FIRMAR Y ENVIAR A REVISIÓN' : 'GUARDAR INTERVENCIÓN')
+                                : (reporte?.id ? 'GUARDAR CAMBIOS' : 'AÑADIR INTERVENCIÓN')}
                     </button>
                     </div>
                 </div>
