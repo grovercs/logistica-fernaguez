@@ -942,7 +942,7 @@ const MobileDetalleOrden = () => {
                             {/* Instrucciones de la orden (para referencia) */}
                             <div className="pt-2">
                                 <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-tight flex justify-between items-center mb-2">
-                                    {misAsignaciones.length > 0 ? 'Tus Instrucciones' : 'Motivo de la Orden'}
+                                    Motivo de la Orden
                                     <span className={`text-[9px] px-2 py-0.5 rounded font-black ${
                                         orden?.estado === 'Urgente' ? 'bg-red-100 text-red-700' :
                                         orden?.estado === 'En Curso' ? 'bg-blue-100 text-blue-700' :
@@ -952,10 +952,21 @@ const MobileDetalleOrden = () => {
                                     }`}>{orden?.estado || 'Pendiente'}</span>
                                 </p>
                                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-white shadow-inner italic whitespace-pre-wrap">
-                                    {misAsignaciones.length > 0
-                                        ? misAsignaciones.map(a => a.notas).filter(Boolean).join('\n\n---\n\n')
-                                        : (orden?.descripcion || 'Sin descripción detallada')}
+                                    {orden?.descripcion || 'Sin descripción detallada'}
                                 </p>
+                                {misAsignaciones.some(a => a.notas?.trim()) && (
+                                    <div className="mt-4">
+                                        <p className="text-[10px] font-bold text-green-700 uppercase tracking-widest leading-tight mb-2">
+                                            Instrucciones específicas
+                                        </p>
+                                        <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed bg-green-50 dark:bg-green-900/20 p-4 rounded-2xl border border-green-200 dark:border-green-800 shadow-inner whitespace-pre-wrap">
+                                            {misAsignaciones
+                                                .map(a => a.notas?.trim())
+                                                .filter(Boolean)
+                                                .join('\n\n---\n\n')}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                 <div className="space-y-4 pt-4">
                     <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Información de esta Intervención</h2>
