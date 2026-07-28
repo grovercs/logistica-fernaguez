@@ -31,7 +31,7 @@ export function useUserRole() {
   const isTecnico = role === 'Técnico';
   const isVisualizador = role === 'Visualizador';
   const isTrabajador = role === 'Trabajador';
-  const isWorker = isTecnico || isVisualizador || isTrabajador;
+  const isWorker = isTrabajador;
 
   return { role, loading, isAdmin, isEditor, isTecnico, isVisualizador, isTrabajador, isWorker };
 }

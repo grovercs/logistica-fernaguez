@@ -21,7 +21,7 @@ interface TrabajadorDirectoryRow {
 export default function OrdenDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isEditor, isWorker } = useUserRole();
+  const { isEditor, isTrabajador } = useUserRole();
   const [orden, setOrden] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -55,7 +55,7 @@ export default function OrdenDetalle() {
       const ordenData = ordenReq.data;
 
       // Si es trabajador, verificar que tenga acceso a esta orden
-      if (isWorker) {
+      if (isTrabajador) {
         const { data: sessionData } = await supabase.auth.getSession();
         const authId = sessionData?.session?.user?.id || null;
         const { data: worker } = await supabase

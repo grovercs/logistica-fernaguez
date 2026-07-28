@@ -97,31 +97,33 @@ const MobileDetalleOrden = () => {
             return;
         }
 
-        // Resolve current worker's internal DB id to match orden_asignaciones
-        let currentWorkerDbId: string | null = null;
-        const { data: currentWorkerData } = await supabase
-            .from('trabajadores')
-            .select('id')
-            .eq('auth_user_id', userId)
-            .maybeSingle();
-        if (currentWorkerData) {
-            currentWorkerDbId = currentWorkerData.id;
-        }
-        console.log('[Mobile] Auth ID:', userId, 'Worker DB ID:', currentWorkerDbId);
-
-        setLoading(true);
-        console.log("Buscando orden con ID:", cleanId);
-
-        // Get User Profile and Role
+        // Resolve the application role before depending on a worker row.
         const { data: profile } = await supabase
             .from('perfiles')
             .select('nombre_completo, roles(nombre)')
             .eq('id', userId)
             .maybeSingle();
 
-        const roleName = (profile?.roles as any)?.nombre || 'Trabajador';
+        const roleName = (profile?.roles as any)?.nombre || 'Sin rol';
         setCurrentUserRole(roleName);
-        setCurrentUserName(profile?.nombre_completo || userData?.user?.email?.split('@')[0] || 'Trabajador');
+        setCurrentUserName(profile?.nombre_completo || userData?.user?.email?.split('@')[0] || 'Usuario');
+
+        // Only an actual Trabajador depends on trabajadores.id for assignments.
+        let currentWorkerDbId: string | null = null;
+        if (roleName === 'Trabajador') {
+            const { data: currentWorkerData } = await supabase
+                .from('trabajadores')
+                .select('id')
+                .eq('auth_user_id', userId)
+                .maybeSingle();
+            currentWorkerDbId = currentWorkerData?.id || null;
+        }
+        console.log('[Mobile] Role:', roleName, 'Auth ID:', userId, 'Worker DB ID:', currentWorkerDbId);
+
+        setLoading(true);
+        console.log("Buscando orden con ID:", cleanId);
+
+
 
         // 1. Try to find the order by UUID or Legible ID
         let currentOrden = null;

@@ -42,19 +42,21 @@ const MobileOrdenes = () => {
                 .eq('id', userId)
                 .maybeSingle();
 
-            const roleName = (profile?.roles as any)?.nombre || 'Trabajador';
+            const roleName = (profile?.roles as any)?.nombre || 'Sin rol';
             setCurrentUserRole(roleName);
             setCurrentUserName(profile?.nombre_completo || userData?.user?.email?.split('@')[0] || 'Usuario');
 
-            // Fetch User's specialty from trabajadores
-            const { data: trabajador } = await supabase
-                .from('trabajadores')
-                .select('especialidad')
-                .eq('auth_user_id', userId)
-                .maybeSingle();
+            // Only an actual Trabajador depends on a private worker row.
+            if (roleName === 'Trabajador') {
+                const { data: trabajador } = await supabase
+                    .from('trabajadores')
+                    .select('especialidad')
+                    .eq('auth_user_id', userId)
+                    .maybeSingle();
 
-            if (trabajador?.especialidad) {
-                setCurrentUserEspecialidad(trabajador.especialidad);
+                if (trabajador?.especialidad) {
+                    setCurrentUserEspecialidad(trabajador.especialidad);
+                }
             }
 
             // Fetch all relevant orders based on role

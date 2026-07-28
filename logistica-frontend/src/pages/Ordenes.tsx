@@ -23,7 +23,7 @@ interface Tecnico extends TrabajadorDirectoryRow {
 }
 
 export default function Ordenes() {
-  const { isEditor, isWorker } = useUserRole();
+  const { isEditor, isTrabajador } = useUserRole();
   const [ordenes, setOrdenes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,7 +44,7 @@ export default function Ordenes() {
   useEffect(() => {
     fetchOrdenes();
     fetchTecnicos();
-  }, [activeTab, isWorker, isEditor]);
+  }, [activeTab, isTrabajador, isEditor]);
 
   const fetchOrdenes = async () => {
     setLoading(true);
@@ -52,7 +52,7 @@ export default function Ordenes() {
     // Si es trabajador, obtenemos su ID para filtrar
     let workerDbId: string | null = null;
     let authUserId: string | null = null;
-    if (isWorker) {
+    if (isTrabajador) {
       const { data: sessionData } = await supabase.auth.getSession();
       authUserId = sessionData?.session?.user?.id || null;
       if (authUserId) {
@@ -89,7 +89,7 @@ export default function Ordenes() {
       let visibleOrdenes = rawOrdenes;
 
       // Si es trabajador, filtrar solo sus órdenes
-      if (isWorker && (workerDbId || authUserId)) {
+      if (isTrabajador && (workerDbId || authUserId)) {
         // Obtener IDs de órdenes asignadas a este trabajador
         const { data: asignaciones } = await supabase
           .from('orden_asignaciones')

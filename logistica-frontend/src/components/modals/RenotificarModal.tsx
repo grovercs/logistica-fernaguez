@@ -1,6 +1,22 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { notifyNewOrder } from '../../lib/notifications';
+import { useUserRole } from '../../hooks/useUserRole';
+
+interface TrabajadorDirectoryRow {
+  trabajador_id: string;
+  auth_user_id: string | null;
+  nombre: string;
+  apellidos: string;
+  especialidad: string;
+  estado: string;
+}
+
+interface Trabajador extends TrabajadorDirectoryRow {
+  id: string;
+  telefono?: string | null;
+  telegram_chat_id?: string | null;
+}
 
 interface Asignacion {
   id: string;
@@ -9,13 +25,7 @@ interface Asignacion {
   hora_programada: string;
   estado: string;
   notas: string;
-  trabajador?: {
-    id: string;
-    nombre: string;
-    apellidos: string;
-    telefono?: string;
-    telegram_chat_id?: string;
-  };
+  trabajador?: Trabajador;
 }
 
 interface Props {
@@ -25,6 +35,7 @@ interface Props {
 }
 
 export default function RenotificarModal({ isOpen, onClose, orden }: Props) {
+  const { isEditor } = useUserRole();
   const [asignaciones, setAsignaciones] = useState<Asignacion[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [mensaje, setMensaje] = useState('');
@@ -53,10 +64,33 @@ export default function RenotificarModal({ isOpen, onClose, orden }: Props) {
       .order('creado_en', { ascending: false });
 
     if (data && data.length > 0) {
-      const { data: workers } = await supabase
-        .from('trabajadores')
-        .select('id, nombre, apellidos, telefono, telegram_chat_id')
-        .in('id', data.map(a => a.trabajador_id));
+      const assignedWorkerIds = new Set(data.map(asignacion => asignacion.trabajador_id));
+      const { data: directoryRows, error: directoryError } = await supabase
+        .rpc('get_trabajadores_directory');
+
+      if (directoryError) {
+        console.error('Error cargando el directorio de trabajadores:', directoryError);
+      }
+
+      let workers: Trabajador[] = (directoryRows || [])
+        .filter((row: TrabajadorDirectoryRow) => assignedWorkerIds.has(row.trabajador_id))
+        .map((row: TrabajadorDirectoryRow) => ({ ...row, id: row.trabajador_id }));
+
+      if (isEditor && workers.length > 0) {
+        const { data: contactos, error: contactosError } = await supabase
+          .from('trabajadores')
+          .select('id, auth_user_id, telefono, telegram_chat_id')
+          .in('id', workers.map(worker => worker.id));
+
+        if (contactosError) {
+          console.error('Error cargando contactos privados de trabajadores:', contactosError);
+        } else {
+          workers = workers.map(worker => {
+            const contacto = contactos?.find(item => item.id === worker.id);
+            return contacto ? { ...worker, ...contacto } : worker;
+          });
+        }
+      }
 
       const merged = data.map(asig => {
         const t = workers?.find(w => w.id === asig.trabajador_id);

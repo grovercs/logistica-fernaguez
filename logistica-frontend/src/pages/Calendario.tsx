@@ -77,7 +77,7 @@ export default function Calendario() {
       .eq('id', authId)
       .maybeSingle();
     const roleName = (perfilData?.roles as any)?.nombre || '';
-    const isRolWorker = roleName === 'Trabajador' || roleName === 'Técnico';
+    const isRolWorker = roleName === 'Trabajador';
 
     // Solo buscamos en trabajadores si el rol lo requiere
     const { data: workerData } = isRolWorker
