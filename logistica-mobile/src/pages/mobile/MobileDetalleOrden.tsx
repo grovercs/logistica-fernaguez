@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { compressImage } from '../../lib/compressImage';
@@ -786,23 +787,29 @@ const MobileDetalleOrden = () => {
         await fetchOrden(); // Wait for refreshed reports and assignment state before leaving.
         localStorage.setItem('last_active_order', id || '');
         if (shouldCompleteSelectedAssignment) {
-            await new Promise<void>(resolve => window.setTimeout(resolve, 1200));
+            await new Promise<void>(resolve => window.setTimeout(resolve, 2000));
         }
         navigate('/m/ordenes');
     };
 
-    const statusToastContent = statusToast && (
-        <div className="fixed inset-x-4 top-4 z-[200] mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900" role="status">
-            <div className="flex items-start justify-between gap-3">
-                <div>
-                    <p className={`font-black ${statusToast.variant === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>{statusToast.title}</p>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{statusToast.message}</p>
+    const statusToastContent = statusToast && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+                className="fixed inset-x-4 top-4 z-[200] mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                role={statusToast.variant === 'error' ? 'alert' : 'status'}
+            >
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <p className={`font-black ${statusToast.variant === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>{statusToast.title}</p>
+                        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{statusToast.message}</p>
+                    </div>
+                    <button type="button" onClick={() => setStatusToast(null)} className="text-slate-400" aria-label="Cerrar aviso">&times;</button>
                 </div>
-                <button type="button" onClick={() => setStatusToast(null)} className="text-slate-400" aria-label="Cerrar aviso">&times;</button>
-            </div>
-            {statusToast.onRetry && <button type="button" onClick={() => statusToast.onRetry?.()} className="mt-3 rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-900">Reintentar</button>}
-        </div>
-    );
+                {statusToast.onRetry && <button type="button" onClick={() => statusToast.onRetry?.()} className="mt-3 rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-900">Reintentar</button>}
+            </div>,
+            document.body
+        )
+        : null;
 
     if (loading) return (
         <>
