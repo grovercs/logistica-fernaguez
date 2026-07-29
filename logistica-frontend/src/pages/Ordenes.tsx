@@ -7,8 +7,23 @@ import RenotificarModal from '../components/modals/RenotificarModal';
 import { useUserRole } from '../hooks/useUserRole';
 import { deleteCloudinaryImages } from '../lib/cloudinary';
 
+interface TrabajadorDirectoryRow {
+  trabajador_id: string;
+  auth_user_id: string | null;
+  nombre: string;
+  apellidos: string;
+  especialidad: string;
+  estado: string;
+}
+
+interface Tecnico extends TrabajadorDirectoryRow {
+  id: string;
+  telefono?: string | null;
+  telegram_chat_id?: string | null;
+}
+
 export default function Ordenes() {
-  const { isEditor, isWorker } = useUserRole();
+  const { isEditor, isTrabajador } = useUserRole();
   const [ordenes, setOrdenes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,7 +44,7 @@ export default function Ordenes() {
   useEffect(() => {
     fetchOrdenes();
     fetchTecnicos();
-  }, [activeTab, isWorker]);
+  }, [activeTab, isTrabajador, isEditor]);
 
   const fetchOrdenes = async () => {
     setLoading(true);
@@ -37,7 +52,7 @@ export default function Ordenes() {
     // Si es trabajador, obtenemos su ID para filtrar
     let workerDbId: string | null = null;
     let authUserId: string | null = null;
-    if (isWorker) {
+    if (isTrabajador) {
       const { data: sessionData } = await supabase.auth.getSession();
       authUserId = sessionData?.session?.user?.id || null;
       if (authUserId) {
@@ -66,16 +81,15 @@ export default function Ordenes() {
 
     const { data: rawOrdenes, error } = await query;
 
-    // 2. Cargamos los técnicos para poder cruzar los datos
-    const { data: rawTecnicos } = await supabase
-      .from('trabajadores')
-      .select('id, auth_user_id, nombre, apellidos, telefono, telegram_chat_id');
+    // 2. Cargamos el directorio limitado. Los contactos privados sólo se
+    // consultan para Administrador o Editor.
+    const rawTecnicos = await fetchDirectorioTecnicos();
 
     if (!error && rawOrdenes) {
       let visibleOrdenes = rawOrdenes;
 
       // Si es trabajador, filtrar solo sus órdenes
-      if (isWorker && (workerDbId || authUserId)) {
+      if (isTrabajador && (workerDbId || authUserId)) {
         // Obtener IDs de órdenes asignadas a este trabajador
         const { data: asignaciones } = await supabase
           .from('orden_asignaciones')
@@ -118,9 +132,42 @@ export default function Ordenes() {
     setLoading(false);
   };
 
+  const fetchDirectorioTecnicos = async (): Promise<Tecnico[]> => {
+    const { data: directoryRows, error: directoryError } = await supabase
+      .rpc('get_trabajadores_directory');
+
+    if (directoryError) {
+      console.error('Error cargando el directorio de trabajadores:', directoryError);
+      return [];
+    }
+
+    const directorio: Tecnico[] = (directoryRows || []).map((row: TrabajadorDirectoryRow) => ({
+      ...row,
+      id: row.trabajador_id
+    }));
+
+    if (!isEditor || directorio.length === 0) return directorio;
+
+    const { data: contactos, error: contactosError } = await supabase
+      .from('trabajadores')
+      .select('id, auth_user_id, telefono, telegram_chat_id');
+
+    if (contactosError) {
+      console.error('Error cargando contactos privados de trabajadores:', contactosError);
+      return directorio;
+    }
+
+    return directorio.map(trabajador => {
+      const contacto = contactos?.find(item =>
+        item.id === trabajador.id ||
+        (item.auth_user_id && item.auth_user_id === trabajador.auth_user_id)
+      );
+      return contacto ? { ...trabajador, ...contacto } : trabajador;
+    });
+  };
+
   const fetchTecnicos = async () => {
-    const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, telefono, telegram_chat_id');
-    setTecnicos(data || []);
+    setTecnicos(await fetchDirectorioTecnicos());
   };
 
   const statusPriority: Record<string, number> = {

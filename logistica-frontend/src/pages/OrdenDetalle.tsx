@@ -9,10 +9,19 @@ import { PrintableOrden } from '../components/PrintableOrden';
 import { createPortal } from 'react-dom';
 import { useUserRole } from '../hooks/useUserRole';
 
+interface TrabajadorDirectoryRow {
+  trabajador_id: string;
+  auth_user_id: string | null;
+  nombre: string;
+  apellidos: string;
+  especialidad: string;
+  estado: string;
+}
+
 export default function OrdenDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isEditor, isWorker } = useUserRole();
+  const { isEditor, isTrabajador } = useUserRole();
   const [orden, setOrden] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -39,14 +48,14 @@ export default function OrdenDetalle() {
     const [ordenReq, reportesReq, trabReq] = await Promise.all([
       supabase.from('ordenes').select('*').eq('id', orderId).single(),
       supabase.from('reportes').select('*').eq('orden_id', orderId),
-      supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, especialidad')
+      supabase.rpc('get_trabajadores_directory')
     ]);
 
     if (!ordenReq.error && ordenReq.data) {
       const ordenData = ordenReq.data;
 
       // Si es trabajador, verificar que tenga acceso a esta orden
-      if (isWorker) {
+      if (isTrabajador) {
         const { data: sessionData } = await supabase.auth.getSession();
         const authId = sessionData?.session?.user?.id || null;
         const { data: worker } = await supabase
@@ -81,7 +90,10 @@ export default function OrdenDetalle() {
       setReportes(reportesReq.data);
     }
     if (!trabReq.error && trabReq.data) {
-      setTrabajadores(trabReq.data);
+      setTrabajadores(trabReq.data.map((t: TrabajadorDirectoryRow) => ({
+        ...t,
+        id: t.trabajador_id
+      })));
     }
     setLoading(false);
   };

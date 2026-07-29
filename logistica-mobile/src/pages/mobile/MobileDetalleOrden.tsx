@@ -5,6 +5,15 @@ import { compressImage } from '../../lib/compressImage';
 import { uploadToCloudinary, deleteCloudinaryImages } from '../../lib/cloudinary';
 // Cloudinary integration for image uploads
 
+interface TrabajadorDirectoryRow {
+    trabajador_id: string;
+    auth_user_id: string | null;
+    nombre: string;
+    apellidos: string;
+    especialidad: string;
+    estado: string;
+}
+
 const MobileDetalleOrden = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -13,6 +22,9 @@ const MobileDetalleOrden = () => {
     const [reportes, setReportes] = useState<any[]>([]); // List of all reports
     const [reporte, setReporte] = useState<any>(null); // Current report being edited
     const [misAsignaciones, setMisAsignaciones] = useState<any[]>([]); // Assignments specific to the current worker
+    const [selectedAsignacionId, setSelectedAsignacionId] = useState('');
+    const [completarAsignacion, setCompletarAsignacion] = useState(false);
+    const [finalizarOrden, setFinalizarOrden] = useState(false);
     const [loading, setLoading] = useState(true);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [currentUserName, setCurrentUserName] = useState<string>('');
@@ -55,6 +67,15 @@ const MobileDetalleOrden = () => {
     const [canSign, setCanSign] = useState(false); // Enable signature pad
     const [isFinished, setIsFinished] = useState(false); // Explicit status feedback
     const [viewingReport, setViewingReport] = useState<any>(null); // Report being viewed (read-only)
+    const asignacionesActivas = misAsignaciones.filter(
+        a => a.estado === 'pendiente' || a.estado === 'en_progreso'
+    );
+    const asignacionesCompletadas = misAsignaciones.filter(
+        a => a.estado === 'completado'
+    );
+    const selectedAsignacion = misAsignaciones.find(
+        a => a.id === selectedAsignacionId
+    );
 
     useEffect(() => {
         if (showForm) {
@@ -88,31 +109,33 @@ const MobileDetalleOrden = () => {
             return;
         }
 
-        // Resolve current worker's internal DB id to match orden_asignaciones
-        let currentWorkerDbId: string | null = null;
-        const { data: currentWorkerData } = await supabase
-            .from('trabajadores')
-            .select('id')
-            .eq('auth_user_id', userId)
-            .maybeSingle();
-        if (currentWorkerData) {
-            currentWorkerDbId = currentWorkerData.id;
-        }
-        console.log('[Mobile] Auth ID:', userId, 'Worker DB ID:', currentWorkerDbId);
-
-        setLoading(true);
-        console.log("Buscando orden con ID:", cleanId);
-
-        // Get User Profile and Role
+        // Resolve the application role before depending on a worker row.
         const { data: profile } = await supabase
             .from('perfiles')
             .select('nombre_completo, roles(nombre)')
             .eq('id', userId)
             .maybeSingle();
 
-        const roleName = (profile?.roles as any)?.nombre || 'Trabajador';
+        const roleName = (profile?.roles as any)?.nombre || 'Sin rol';
         setCurrentUserRole(roleName);
-        setCurrentUserName(profile?.nombre_completo || userData?.user?.email?.split('@')[0] || 'Trabajador');
+        setCurrentUserName(profile?.nombre_completo || userData?.user?.email?.split('@')[0] || 'Usuario');
+
+        // Only an actual Trabajador depends on trabajadores.id for assignments.
+        let currentWorkerDbId: string | null = null;
+        if (roleName === 'Trabajador') {
+            const { data: currentWorkerData } = await supabase
+                .from('trabajadores')
+                .select('id')
+                .eq('auth_user_id', userId)
+                .maybeSingle();
+            currentWorkerDbId = currentWorkerData?.id || null;
+        }
+        console.log('[Mobile] Role:', roleName, 'Auth ID:', userId, 'Worker DB ID:', currentWorkerDbId);
+
+        setLoading(true);
+        console.log("Buscando orden con ID:", cleanId);
+
+
 
         // 1. Try to find the order by UUID or Legible ID
         let currentOrden = null;
@@ -150,7 +173,7 @@ const MobileDetalleOrden = () => {
         // 2. Fetch reports and workers using the REAL ID
         const [reportesReq, trabajadoresReq, asignacionesReq] = await Promise.all([
             supabase.from('reportes').select('*').eq('orden_id', realId).order('creado_en', { ascending: false }),
-            supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos, especialidad'),
+            supabase.rpc('get_trabajadores_directory'),
             supabase.from('orden_asignaciones').select('*').eq('orden_id', realId)
         ]);
 
@@ -161,7 +184,8 @@ const MobileDetalleOrden = () => {
         // Create map of technician IDs to names and specialties
         if (!trabajadoresReq.error && trabajadoresReq.data) {
             const map = new Map<string, { nombre: string; especialidad: string }>();
-            trabajadoresReq.data.forEach((t: any) => {
+            trabajadoresReq.data.forEach((row: TrabajadorDirectoryRow) => {
+                const t = { ...row, id: row.trabajador_id };
                 const info = {
                     nombre: `${t.nombre} ${t.apellidos || ''}`.trim(),
                     especialidad: t.especialidad || ''
@@ -174,8 +198,8 @@ const MobileDetalleOrden = () => {
         }
 
         if (asignacionesReq.data && userId) {
-            const myAssigs = asignacionesReq.data.filter(a =>
-                a.trabajador_id === userId || a.trabajador_id === currentWorkerDbId
+            const myAssigs = asignacionesReq.data.filter(
+                a => a.trabajador_id === currentWorkerDbId
             );
             console.log('[Mobile] Total asignaciones:', asignacionesReq.data.length, 'Mis asignaciones:', myAssigs.length);
             setMisAsignaciones(myAssigs);
@@ -251,6 +275,12 @@ const MobileDetalleOrden = () => {
         setSelectedHora(0);
         setSelectedMinuto(0);
         setFecha(new Date().toISOString().split('T')[0]);
+        setSelectedAsignacionId(
+            asignacionesActivas.length === 1 ? asignacionesActivas[0].id : ''
+        );
+        setCompletarAsignacion(false);
+        setFinalizarOrden(false);
+        setCanSign(false);
 
         // Clear signature canvas
         const ctx = canvasRef.current?.getContext('2d');
@@ -265,6 +295,10 @@ const MobileDetalleOrden = () => {
 
     const loadReportData = (rep: any) => {
         setReporte(rep);
+        setSelectedAsignacionId(rep.asignacion_id || '');
+        setCompletarAsignacion(false);
+        setFinalizarOrden(false);
+        setCanSign(false);
 
         // Al editar un reporte existente, por defecto seguimos en curso
         setIsFinished(false);
@@ -424,7 +458,7 @@ const MobileDetalleOrden = () => {
 
     // --- Sign Pad Logic ---
     const startDrawing = (e: any) => {
-        if (reporte?.firma_url) return; // Don't draw if already has a saved signature image
+        if (!canSign || reporte?.firma_url) return; // Don't draw while locked or if a saved signature exists
         setIsDrawing(true);
         draw(e);
     };
@@ -438,7 +472,7 @@ const MobileDetalleOrden = () => {
     };
 
     const draw = (e: any) => {
-        if (!isDrawing || !canvasRef.current) return;
+        if (!canSign || !isDrawing || !canvasRef.current) return;
         setHasSignature(true); // Only set to true when actual drawing/movement occurs
 
         const canvas = canvasRef.current;
@@ -481,6 +515,30 @@ const MobileDetalleOrden = () => {
     // --- Submit Logic ---
     const handleComplete = async () => {
         setSubmitting(true);
+
+        if (
+            currentUserRole === 'Trabajador'
+            && !reporte?.id
+            && !selectedAsignacionId
+        ) {
+            alert(
+                asignacionesActivas.length === 0
+                    ? 'No tienes ninguna asignación activa para crear una intervención.'
+                    : 'Selecciona una asignación de trabajo.'
+            );
+            setSubmitting(false);
+            return;
+        }
+
+        if (
+            currentUserRole === 'Trabajador'
+            && finalizarOrden
+            && !hasSignature
+        ) {
+            alert('La firma del cliente es obligatoria para finalizar la orden.');
+            setSubmitting(false);
+            return;
+        }
 
         let signatureUrl = reporte?.firma_url;
 
@@ -558,6 +616,8 @@ const MobileDetalleOrden = () => {
                 p_material_utilizado: materialUtilizado,
                 p_facturas_urls: facturasFinales.length > 0 ? facturasFinales : null,
                 p_fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
+                p_asignacion_id: reporte?.asignacion_id || selectedAsignacionId || null,
+                p_completar_asignacion: completarAsignacion || finalizarOrden,
             });
 
             if (rpcError) {
@@ -579,6 +639,7 @@ const MobileDetalleOrden = () => {
                 ...(reporte || {}),
                 id: rpcResult.report_id,
                 orden_id: realOrderId,
+                asignacion_id: reporte?.asignacion_id || selectedAsignacionId || null,
                 // Identity is reflected locally; the RPC sets tecnico_id from auth.uid().
                 tecnico_id: currentUserId,
                 notas: reportData.notas,
@@ -590,10 +651,14 @@ const MobileDetalleOrden = () => {
                 facturas_urls: facturasFinales.length > 0 ? facturasFinales : null,
                 fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
             });
+            if ((completarAsignacion || finalizarOrden) && selectedAsignacionId) {
+                setMisAsignaciones(prev => prev.map(asignacion =>
+                    asignacion.id === selectedAsignacionId
+                        ? { ...asignacion, estado: 'completado' }
+                        : asignacion
+                ));
+            }
             setOrden((prev: any) => prev ? { ...prev, estado: rpcResult.order_status } : prev);
-
-            // Pending: assignment-state synchronization for workers needs a reviewed RPC.
-            // Do not write orden_asignaciones directly from the worker client.
         } else if (currentUserRole === 'Administrador' || currentUserRole === 'Editor') {
             const saveReport = async (data: any) => {
                 if (reporte?.id) {
@@ -652,7 +717,7 @@ const MobileDetalleOrden = () => {
         setSubmitting(false);
         alert("¡Reporte guardado correctamente!");
         setShowForm(false); // Close Modal on success
-        fetchOrden(); // Refresh list
+        await fetchOrden(); // Wait for refreshed reports and assignment state before leaving.
         localStorage.setItem('last_active_order', id || '');
         navigate('/m/ordenes');
     };
@@ -710,6 +775,17 @@ const MobileDetalleOrden = () => {
                  </div>
 
                  {/* Contacto y Teléfono */}
+                 {currentUserRole === 'Trabajador' && misAsignaciones.length > 0 && (
+                     <div className="flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-3 py-2 dark:border-green-800 dark:bg-green-900/20">
+                         <span className="text-xs font-black text-green-800 dark:text-green-200">Mi asignación</span>
+                         <span className="text-xs font-bold text-green-700 dark:text-green-300">
+                             {misAsignaciones.length === 1
+                                 ? (asignacionesCompletadas.length === 1 ? 'Completada' : 'Activa')
+                                 : `${asignacionesActivas.length} activas · ${asignacionesCompletadas.length} completadas`}
+                         </span>
+                     </div>
+                 )}
+
                  {(orden?.asegurado || orden?.telefono_asegurado) && (
                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2">
                          <div>
@@ -803,6 +879,9 @@ const MobileDetalleOrden = () => {
                             {reportes.map((rep, idx) => {
                                 const canEdit = currentUserRole === 'Administrador' || currentUserRole === 'Editor' || rep.tecnico_id === currentUserId;
                                 const canDelete = currentUserRole === 'Administrador';
+                                const reportAsignacion = rep.asignacion_id
+                                    ? misAsignaciones.find(asignacion => asignacion.id === rep.asignacion_id)
+                                    : null;
                                 // Get technician info from the map, fallback to 'Técnico'
                                 const tecnicoInfo = trabajadoresMap.get(rep.tecnico_id);
                                 const tecnicoName = tecnicoInfo?.nombre || 'Técnico';
@@ -837,6 +916,11 @@ const MobileDetalleOrden = () => {
                                         <div className="mt-1">
                                             <p className="text-xs font-bold text-slate-800 dark:text-slate-100 line-clamp-2">
                                                 {(rep.notas || '').split(/[ \t\n]*(?:MATERIALES:?)[ \t\n]*/i)[0] || <span className="italic text-slate-400 dark:text-slate-500 font-normal">(Sin descripción)</span>}
+                                            </p>
+                                            <p className="mt-2 text-[10px] font-bold text-green-700 dark:text-green-300 whitespace-pre-wrap">
+                                                {rep.asignacion_id && reportAsignacion
+                                                    ? `Asignación: ${reportAsignacion.notas?.trim() || reportAsignacion.id}`
+                                                    : 'Intervención histórica sin asignación'}
                                             </p>
                                             <div className="mt-2 flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
@@ -930,7 +1014,7 @@ const MobileDetalleOrden = () => {
                             {/* Instrucciones de la orden (para referencia) */}
                             <div className="pt-2">
                                 <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-tight flex justify-between items-center mb-2">
-                                    {misAsignaciones.length > 0 ? 'Tus Instrucciones' : 'Motivo de la Orden'}
+                                    Motivo de la Orden
                                     <span className={`text-[9px] px-2 py-0.5 rounded font-black ${
                                         orden?.estado === 'Urgente' ? 'bg-red-100 text-red-700' :
                                         orden?.estado === 'En Curso' ? 'bg-blue-100 text-blue-700' :
@@ -940,11 +1024,168 @@ const MobileDetalleOrden = () => {
                                     }`}>{orden?.estado || 'Pendiente'}</span>
                                 </p>
                                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-white shadow-inner italic whitespace-pre-wrap">
-                                    {misAsignaciones.length > 0
-                                        ? misAsignaciones.map(a => a.notas).filter(Boolean).join('\n\n---\n\n')
-                                        : (orden?.descripcion || 'Sin descripción detallada')}
+                                    {orden?.descripcion || 'Sin descripción detallada'}
                                 </p>
+                                {misAsignaciones.some(a => a.notas?.trim()) && (
+                                    <div className="mt-4">
+                                        <p className="text-[10px] font-bold text-green-700 uppercase tracking-widest leading-tight mb-2">
+                                            Instrucciones específicas
+                                        </p>
+                                        <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed bg-green-50 dark:bg-green-900/20 p-4 rounded-2xl border border-green-200 dark:border-green-800 shadow-inner whitespace-pre-wrap">
+                                            {misAsignaciones
+                                                .map(a => a.notas?.trim())
+                                                .filter(Boolean)
+                                                .join('\n\n---\n\n')}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
+
+                            {currentUserRole === 'Trabajador' && !reporte?.id && (
+                                <div className="space-y-2">
+                                    {asignacionesActivas.length === 0 && (
+                                        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                                            No tienes ninguna asignación activa para crear una intervención.
+                                        </div>
+                                    )}
+                                    {asignacionesActivas.length === 1 && (
+                                        <div className="rounded-2xl border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
+                                            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-green-700 dark:text-green-300">
+                                                Instrucciones de mi asignación
+                                            </p>
+                                            <p className="whitespace-pre-wrap text-sm text-green-900 dark:text-green-100">
+                                                {asignacionesActivas[0].notas?.trim() || 'Sin instrucciones específicas.'}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {asignacionesActivas.length >= 2 && (
+                                        <>
+                                            <label className="block text-xs font-bold text-slate-800 dark:text-slate-100">
+                                                Asignación de trabajo
+                                            </label>
+                                            <select
+                                                value={selectedAsignacionId}
+                                                onChange={(event) => {
+                                                    setSelectedAsignacionId(event.target.value);
+                                                    if (!event.target.value) {
+                                                        setCompletarAsignacion(false);
+                                                        setFinalizarOrden(false);
+                                                    }
+                                                }}
+                                                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
+                                            >
+                                                <option value="">Selecciona una asignación</option>
+                                                {asignacionesActivas.map(asignacion => (
+                                                    <option key={asignacion.id} value={asignacion.id}>
+                                                        {asignacion.notas?.trim() || `Asignación ${asignacion.id}`}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            {currentUserRole === 'Trabajador' && reporte?.id && (
+                                <div className="space-y-2">
+                                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                                        Asignación asociada
+                                    </p>
+                                    <p className="text-xs text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 whitespace-pre-wrap">
+                                        {reporte.asignacion_id
+                                            ? (selectedAsignacion?.notas?.trim() || reporte.asignacion_id)
+                                            : 'Intervención histórica sin asignación'}
+                                    </p>
+                                </div>
+                            )}
+
+                            {currentUserRole === 'Trabajador'
+                                && selectedAsignacionId
+                                && selectedAsignacion
+                                && (selectedAsignacion.estado === 'pendiente' || selectedAsignacion.estado === 'en_progreso')
+                                && (
+                                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl p-4">
+                                        <label className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={completarAsignacion}
+                                                disabled={finalizarOrden}
+                                                onChange={event => setCompletarAsignacion(event.target.checked)}
+                                                className="w-5 h-5 rounded border-green-300 text-green-600 focus:ring-green-500 disabled:opacity-60"
+                                            />
+                                            <span className="text-sm font-bold text-green-800 dark:text-green-200">
+                                                He terminado esta tarea asignada
+                                            </span>
+                                        </label>
+                                        <p className="mt-2 pl-8 text-xs text-green-700 dark:text-green-300">
+                                            Completa únicamente tu tarea. La orden puede continuar abierta para otros técnicos.
+                                        </p>
+                                    </div>
+                                )}
+
+                            {currentUserRole === 'Trabajador' && (
+                                <div className="space-y-3">
+                                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                                        Estado del trabajo
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setFinalizarOrden(false);
+                                                setCanSign(false);
+                                            }}
+                                            className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                                                !finalizarOrden
+                                                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 shadow-md'
+                                                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500'
+                                            }`}
+                                        >
+                                            <span className="block text-sm font-black">Continuar trabajo</span>
+                                            <span className="block mt-1 text-xs font-normal">
+                                                Guarda la intervención y mantiene la orden en curso.
+                                            </span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-disabled={
+                                                !selectedAsignacionId
+                                                || !selectedAsignacion
+                                                || (selectedAsignacion.estado !== 'pendiente' && selectedAsignacion.estado !== 'en_progreso')
+                                            }
+                                            onClick={() => {
+                                                const hasActiveAssignment = !!selectedAsignacionId
+                                                    && !!selectedAsignacion
+                                                    && (selectedAsignacion.estado === 'pendiente' || selectedAsignacion.estado === 'en_progreso');
+
+                                                if (!hasActiveAssignment) {
+                                                    alert('Necesitas una asignación activa para finalizar la orden.');
+                                                    return;
+                                                }
+
+                                                setFinalizarOrden(true);
+                                                setCompletarAsignacion(true);
+                                                setCanSign(false);
+                                            }}
+                                            className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                                                finalizarOrden
+                                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 shadow-md'
+                                                    : (!selectedAsignacionId
+                                                        || !selectedAsignacion
+                                                        || (selectedAsignacion.estado !== 'pendiente' && selectedAsignacion.estado !== 'en_progreso'))
+                                                        ? 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-400 opacity-60 cursor-not-allowed'
+                                                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500'
+                                            }`}
+                                        >
+                                            <span className="block text-sm font-black">Finalizar la orden y recoger firma</span>
+                                            <span className="block mt-1 text-xs font-normal">
+                                                Utiliza esta opción sólo cuando el trabajo completo esté terminado y el cliente vaya a firmar su conformidad.
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                 <div className="space-y-4 pt-4">
                     <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Información de esta Intervención</h2>
 
@@ -1079,88 +1320,100 @@ const MobileDetalleOrden = () => {
                 </div>
 
                 {/* FIRMA DEL CLIENTE */}
-                <div className="space-y-4 pt-2">
-                    <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Conformidad (Firma)</h2>
-                    <div className="bg-white dark:bg-slate-900 border-2 border-dashed border-slate-300 rounded-xl overflow-hidden touch-none relative h-[180px]">
-                        {reporte?.firma_url ? (
-                            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800">
-                                <img src={reporte.firma_url} alt="Firma Guardada" className="h-full object-contain" />
+                {(currentUserRole !== 'Trabajador' || finalizarOrden || !!reporte?.firma_url) && (
+                    <div className="space-y-4 pt-2">
+                        <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Conformidad (Firma)</h2>
+                        <div className={`bg-white dark:bg-slate-900 border-2 border-dashed border-slate-300 rounded-xl overflow-hidden relative h-[180px] ${canSign ? 'touch-none' : 'touch-pan-y'}`} >
+                            {reporte?.firma_url ? (
+                                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800">
+                                    <img src={reporte.firma_url} alt="Firma Guardada" className="h-full object-contain" />
+                                </div>
+                            ) : (
+                                <>
+                                    {!hasSignature && (
+                                        <span className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-300 font-sans text-sm select-none">
+                                            Firmar aquí
+                                        </span>
+                                    )}
+                                    <canvas
+                                        ref={canvasRef}
+                                        className={`w-full h-full relative z-10 cursor-crosshair transition-all ${!canSign ? 'pointer-events-none grayscale opacity-30' : ''}`}
+                                        onMouseDown={startDrawing}
+                                        onMouseUp={stopDrawing}
+                                        onMouseOut={stopDrawing}
+                                        onMouseMove={draw}
+                                        onTouchStart={startDrawing}
+                                        onTouchEnd={stopDrawing}
+                                        onTouchCancel={stopDrawing}
+                                        onTouchMove={draw}
+                                        width={600}
+                                        height={300}
+                                        style={{ width: '100%', height: '100%' }}
+                                    />
+                                </>
+                            )}
+                        </div>
+                        <div className="flex justify-between items-center px-1">
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 italic">Obligatorio para cerrar el parte</p>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const unlock = !canSign;
+                                        setCanSign(unlock);
+                                        if (unlock) {
+                                            alert('La firma está desbloqueada. Entrega el dispositivo al cliente.');
+                                        } else {
+                                            setIsDrawing(false);
+                                        }
+                                    }}
+                                    className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all shadow-sm ${canSign ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'}`}
+                                >
+                                    <span className="material-symbols-outlined text-[16px]">{canSign ? 'lock_open' : 'edit_square'}</span>
+                                    {canSign ? 'Bloquear firma' : 'Desbloquear firma'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={clearSignature}
+                                    className="text-xs font-bold text-red-500 flex items-center gap-1 bg-red-50 dark:bg-red-900/20 border border-red-100 px-3 py-1.5 rounded-lg transition-all"
+                                >
+                                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                                    Borrar firma
+                                </button>
                             </div>
-                        ) : (
-                            <>
-                                {!hasSignature && (
-                                    <span className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-300 font-sans text-sm select-none">
-                                        Firmar aquí
-                                    </span>
-                                )}
-                                <canvas
-                                    ref={canvasRef}
-                                    className={`w-full h-full relative z-10 cursor-crosshair transition-all ${!canSign ? 'pointer-events-none grayscale opacity-30' : ''}`}
-                                    onMouseDown={startDrawing}
-                                    onMouseUp={stopDrawing}
-                                    onMouseOut={stopDrawing}
-                                    onMouseMove={draw}
-                                    onTouchStart={startDrawing}
-                                    onTouchEnd={stopDrawing}
-                                    onTouchCancel={stopDrawing}
-                                    onTouchMove={draw}
-                                    width={600}
-                                    height={300}
-                                    style={{ width: '100%', height: '100%' }}
-                                />
-                            </>
-                        )}
+                        </div>
                     </div>
-                    <div className="flex justify-between items-center px-1">
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 italic">Obligatorio para cerrar el parte</p>
+                )}
+
+                {/* ESTADO FINAL DE LA VISITA: sólo flujo administrativo */}
+                {(currentUserRole === 'Administrador' || currentUserRole === 'Editor') && (
+                    <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800 mt-4">
+                        <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Estado tras esta visita</h2>
                         <div className="flex gap-2">
                             <button
                                 type="button"
-                                onClick={() => setCanSign(!canSign)}
-                                className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all shadow-sm ${canSign ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'}`}
+                                onClick={() => setIsFinished(false)}
+                                className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${!isFinished ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 shadow-md' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 opacity-60'}`}
                             >
-                                <span className="material-symbols-outlined text-[16px]">{canSign ? 'lock_open' : 'edit_square'}</span>
-                                {canSign ? 'BLOQUEAR' : 'FIRMAR'}
+                                <span className="material-symbols-outlined text-2xl">pending_actions</span>
+                                <span className="text-[11px] font-black uppercase">Sigue en Curso</span>
                             </button>
                             <button
                                 type="button"
-                                onClick={clearSignature}
-                                className="text-xs font-bold text-red-500 flex items-center gap-1 bg-red-50 dark:bg-red-900/20 border border-red-100 px-3 py-1.5 rounded-lg transition-all"
+                                onClick={() => setIsFinished(true)}
+                                className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${isFinished ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 shadow-md' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 opacity-60'}`}
                             >
-                                <span className="material-symbols-outlined text-[16px]">delete</span>
-                                LIMPIAR
+                                <span className="material-symbols-outlined text-2xl">task_alt</span>
+                                <span className="text-[11px] font-black uppercase">Enviar orden a revisión</span>
                             </button>
                         </div>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 italic text-center px-4">
+                            {isFinished
+                                ? "La orden pasará a 'En revisión' para que el administrador la finalice."
+                                : "La orden seguirá activa como 'En Curso' para futuras visitas."}
+                        </p>
                     </div>
-                </div>
-
-                {/* ESTADO FINAL DE LA VISITA */}
-                <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800 mt-4">
-                    <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Estado tras esta visita</h2>
-                    <div className="flex gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setIsFinished(false)}
-                            className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${!isFinished ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 shadow-md' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 opacity-60'}`}
-                        >
-                            <span className="material-symbols-outlined text-2xl">pending_actions</span>
-                            <span className="text-[11px] font-black uppercase">Sigue en Curso</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setIsFinished(true)}
-                            className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${isFinished ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 shadow-md' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 opacity-60'}`}
-                        >
-                            <span className="material-symbols-outlined text-2xl">task_alt</span>
-                            <span className="text-[11px] font-black uppercase">Trabajo Terminado</span>
-                        </button>
-                    </div>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 italic text-center px-4">
-                        {isFinished
-                            ? "La orden pasará a 'En revisión' para que el administrador la finalice."
-                            : "La orden seguirá activa como 'En Curso' para futuras visitas."}
-                    </p>
-                </div>
+                )}
 
                 {/* MAIN ACTIONS */}
                 <div className="space-y-4 pt-8">
@@ -1191,13 +1444,25 @@ const MobileDetalleOrden = () => {
 
                     <button
                         onClick={handleComplete}
-                        disabled={submitting || uploadingFoto}
+                        disabled={
+                            submitting
+                            || uploadingFoto
+                            || (
+                                currentUserRole === 'Trabajador'
+                                && !reporte?.id
+                                && asignacionesActivas.length === 0
+                            )
+                        }
                         className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl active:scale-95 transition-all flex justify-center items-center gap-3 text-lg"
                     >
                         <span className="material-symbols-outlined">
                             {submitting ? 'sync' : (reporte?.id ? 'save' : 'done_all')}
                         </span>
-                        {submitting ? 'GUARDANDO...' : (reporte?.id ? 'GUARDAR CAMBIOS' : 'AÑADIR INTERVENCIÓN')}
+                        {submitting
+                            ? 'GUARDANDO...'
+                            : currentUserRole === 'Trabajador'
+                                ? (finalizarOrden ? 'GUARDAR, FIRMAR Y ENVIAR A REVISIÓN' : 'GUARDAR INTERVENCIÓN')
+                                : (reporte?.id ? 'GUARDAR CAMBIOS' : 'AÑADIR INTERVENCIÓN')}
                     </button>
                     </div>
                 </div>

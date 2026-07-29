@@ -4,6 +4,15 @@ import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '../hooks/useUserRole';
 
+interface TrabajadorDirectoryRow {
+  trabajador_id: string;
+  auth_user_id: string | null;
+  nombre: string;
+  apellidos: string;
+  especialidad: string;
+  estado: string;
+}
+
 export default function Calendario() {
   const { isEditor } = useUserRole();
   const [isNuevoReporteModalOpen, setIsNuevoReporteModalOpen] = useState(false);
@@ -68,7 +77,7 @@ export default function Calendario() {
       .eq('id', authId)
       .maybeSingle();
     const roleName = (perfilData?.roles as any)?.nombre || '';
-    const isRolWorker = roleName === 'Trabajador' || roleName === 'Técnico';
+    const isRolWorker = roleName === 'Trabajador';
 
     // Solo buscamos en trabajadores si el rol lo requiere
     const { data: workerData } = isRolWorker
@@ -129,8 +138,13 @@ export default function Calendario() {
   };
 
   const fetchTecnicos = async () => {
-    const { data } = await supabase.from('trabajadores').select('id, auth_user_id, nombre, apellidos');
-    if (data) setTecnicos(data);
+    const { data } = await supabase.rpc('get_trabajadores_directory');
+    if (data) {
+      setTecnicos(data.map((t: TrabajadorDirectoryRow) => ({
+        ...t,
+        id: t.trabajador_id
+      })));
+    }
   };
 
   const applyDatePreset = (preset: string) => {

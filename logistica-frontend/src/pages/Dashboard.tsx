@@ -4,6 +4,15 @@ import { supabase } from '../lib/supabase';
 import NuevoReporteModal from '../components/modals/NuevoReporteModal';
 import { useUserRole } from '../hooks/useUserRole';
 
+interface TrabajadorDirectoryRow {
+  trabajador_id: string;
+  auth_user_id: string | null;
+  nombre: string;
+  apellidos: string;
+  especialidad: string;
+  estado: string;
+}
+
 export default function Dashboard() {
   const { isEditor } = useUserRole();
   const [ordenes, setOrdenes] = useState<any[]>([]);
@@ -97,13 +106,13 @@ export default function Dashboard() {
       
       if (tecnicoIds.length > 0) {
         const { data: trabData } = await supabase
-          .from('trabajadores')
-          .select('id, nombre, apellidos')
-          .in('id', tecnicoIds);
+          .rpc('get_trabajadores_directory');
         
         if (trabData) {
-          trabData.forEach(t => {
-            tecnicosMap[t.id] = `${t.nombre} ${t.apellidos}`;
+          trabData.forEach((t: TrabajadorDirectoryRow) => {
+            const nombreCompleto = `${t.nombre} ${t.apellidos || ''}`.trim();
+            tecnicosMap[t.trabajador_id] = nombreCompleto;
+            if (t.auth_user_id) tecnicosMap[t.auth_user_id] = nombreCompleto;
           });
         }
       }

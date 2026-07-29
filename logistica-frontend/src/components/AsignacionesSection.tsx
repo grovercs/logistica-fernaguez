@@ -7,16 +7,21 @@ interface Asignacion {
   id: string;
   orden_id: string;
   trabajador_id: string;
-  trabajador?: {
-    nombre: string;
-    apellidos: string;
-    telefono?: string;
-  };
+  trabajador?: Trabajador;
   fecha_asignacion: string;
   hora_programada: string;
   estado: string;
   notas: string;
   creado_en: string;
+}
+
+interface TrabajadorDirectoryRow {
+  trabajador_id: string;
+  auth_user_id: string | null;
+  nombre: string;
+  apellidos: string;
+  especialidad: string;
+  estado: string;
 }
 
 interface Trabajador {
@@ -26,6 +31,8 @@ interface Trabajador {
     apellidos: string;
     telefono?: string | null;
     telegram_chat_id?: string | null;
+    especialidad: string;
+    estado: string;
 }
 
 interface Props {
@@ -58,7 +65,41 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       fetchAsignaciones(true);
     }, 10000);
     return () => clearInterval(interval);
-  }, [ordenId]);
+  }, [ordenId, isEditor]);
+
+  const fetchDirectorioTrabajadores = async (): Promise<Trabajador[]> => {
+    const { data: directoryRows, error: directoryError } = await supabase
+      .rpc('get_trabajadores_directory');
+
+    if (directoryError) {
+      console.error('Error cargando el directorio de trabajadores:', directoryError);
+      return [];
+    }
+
+    const directorio: Trabajador[] = (directoryRows || []).map((row: TrabajadorDirectoryRow) => ({
+      ...row,
+      id: row.trabajador_id
+    }));
+
+    if (!isEditor || directorio.length === 0) return directorio;
+
+    const { data: contactos, error: contactosError } = await supabase
+      .from('trabajadores')
+      .select('id, auth_user_id, telefono, telegram_chat_id');
+
+    if (contactosError) {
+      console.error('Error cargando contactos privados de trabajadores:', contactosError);
+      return directorio;
+    }
+
+    return directorio.map(trabajador => {
+      const contacto = contactos?.find(item =>
+        item.id === trabajador.id ||
+        (item.auth_user_id && item.auth_user_id === trabajador.auth_user_id)
+      );
+      return contacto ? { ...trabajador, ...contacto } : trabajador;
+    });
+  };
 
   const fetchAsignaciones = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -79,9 +120,7 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
 
     if (!error && data) {
       // 2. Cargamos todos los trabajadores para poder cruzar los datos
-      const { data: rawTrab } = await supabase
-        .from('trabajadores')
-        .select('id, auth_user_id, nombre, apellidos, telegram_chat_id, telefono');
+      const rawTrab = await fetchDirectorioTrabajadores();
 
       // 3. Cruzamos los datos manualmente (mucho más fiable)
       const mergedAsignaciones = (data || []).map(asig => {
@@ -100,11 +139,8 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
   };
 
   const fetchTrabajadores = async () => {
-    const { data } = await supabase
-      .from('trabajadores')
-      .select('id, auth_user_id, nombre, apellidos, telefono, telegram_chat_id')
-      .eq('estado', 'Disponible');
-    if (data) setTrabajadores(data);
+    const data = await fetchDirectorioTrabajadores();
+    setTrabajadores(data.filter(trabajador => trabajador.estado === 'Disponible'));
   };
 
   const handleAddAsignacion = async (e: React.FormEvent) => {

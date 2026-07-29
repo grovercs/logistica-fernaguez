@@ -1,6 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { notifyNewOrder } from '../../lib/notifications';
+import { useUserRole } from '../../hooks/useUserRole';
+
+interface TrabajadorDirectoryRow {
+  trabajador_id: string;
+  auth_user_id: string | null;
+  nombre: string;
+  apellidos: string;
+  especialidad: string;
+  estado: string;
+}
+
+interface Tecnico extends TrabajadorDirectoryRow {
+  id: string;
+  telefono?: string | null;
+  telegram_chat_id?: string | null;
+}
 
 interface Props {
   isOpen: boolean;
@@ -10,6 +26,7 @@ interface Props {
 }
 
 export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData }: Props) {
+  const { isEditor } = useUserRole();
   const [formData, setFormData] = useState({
     referencia: '',
     cliente: '',
@@ -29,7 +46,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
     estado: ''
   });
 
-  const [tecnicos, setTecnicos] = useState<any[]>([]);
+  const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [aseguradoras, setAseguradoras] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -83,12 +100,35 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
   }, [tecnicos, isOpen, ordenData, formData.tecnico]);
 
   const fetchTecnicos = async () => {
-    // Traer todos los técnicos que no estén de baja para poder asignarles órdenes incluso si están "En Obra"
-    const { data } = await supabase
-      .from('trabajadores')
-      .select('id, auth_user_id, nombre, apellidos, telefono, telegram_chat_id, estado')
-      .neq('estado', 'Baja');
-    if (data) setTecnicos(data);
+    const { data: directoryRows, error: directoryError } = await supabase
+      .rpc('get_trabajadores_directory');
+
+    if (directoryError) {
+      console.error('Error cargando el directorio de trabajadores:', directoryError);
+      setTecnicos([]);
+      return;
+    }
+
+    let directory: Tecnico[] = (directoryRows || [])
+      .filter((row: TrabajadorDirectoryRow) => row.estado !== 'Baja')
+      .map((row: TrabajadorDirectoryRow) => ({ ...row, id: row.trabajador_id }));
+
+    if (isEditor && directory.length > 0) {
+      const { data: contactos, error: contactosError } = await supabase
+        .from('trabajadores')
+        .select('id, auth_user_id, telefono, telegram_chat_id');
+
+      if (contactosError) {
+        console.error('Error cargando contactos privados de trabajadores:', contactosError);
+      } else {
+        directory = directory.map(worker => {
+          const contacto = contactos?.find(item => item.id === worker.id);
+          return contacto ? { ...worker, ...contacto } : worker;
+        });
+      }
+    }
+
+    setTecnicos(directory);
   };
 
   const fetchAseguradoras = async () => {
