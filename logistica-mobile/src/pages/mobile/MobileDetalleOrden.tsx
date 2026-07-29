@@ -67,6 +67,7 @@ const MobileDetalleOrden = () => {
     const [canSign, setCanSign] = useState(false); // Enable signature pad
     const [isFinished, setIsFinished] = useState(false); // Explicit status feedback
     const [viewingReport, setViewingReport] = useState<any>(null); // Report being viewed (read-only)
+    const startingAssignmentIdsRef = useRef<Set<string>>(new Set());
     const asignacionesActivas = misAsignaciones.filter(
         a => a.estado === 'pendiente' || a.estado === 'en_progreso'
     );
@@ -93,6 +94,31 @@ const MobileDetalleOrden = () => {
             localStorage.setItem('last_active_order', id);
         }
     }, [id]);
+
+    const startAssignment = async (assignmentId: string, assignments?: any[]) => {
+        const assignment = (assignments || misAsignaciones).find(item => item.id === assignmentId);
+        if (!assignment || assignment.estado !== 'pendiente' || startingAssignmentIdsRef.current.has(assignmentId)) {
+            return assignments || misAsignaciones;
+        }
+
+        startingAssignmentIdsRef.current.add(assignmentId);
+        const { error } = await supabase.rpc('worker_start_assignment', {
+            p_asignacion_id: assignmentId,
+        });
+        startingAssignmentIdsRef.current.delete(assignmentId);
+
+        if (error) {
+            console.error('No se pudo iniciar la asignaci?n:', error);
+            return assignments || misAsignaciones;
+        }
+
+        const updateAssignment = (items: any[]) => items.map(item =>
+            item.id === assignmentId ? { ...item, estado: 'en_progreso' } : item
+        );
+        const updatedAssignments = updateAssignment(assignments || misAsignaciones);
+        setMisAsignaciones(previous => updateAssignment(previous));
+        return updatedAssignments;
+    };
 
     const fetchOrden = async () => {
         if (!id) return;
@@ -202,7 +228,11 @@ const MobileDetalleOrden = () => {
                 a => a.trabajador_id === currentWorkerDbId
             );
             console.log('[Mobile] Total asignaciones:', asignacionesReq.data.length, 'Mis asignaciones:', myAssigs.length);
-            setMisAsignaciones(myAssigs);
+            const pendingAssignments = myAssigs.filter(a => a.estado === 'pendiente');
+            const resolvedAssignments = roleName === 'Trabajador' && pendingAssignments.length === 1
+                ? await startAssignment(pendingAssignments[0].id, myAssigs)
+                : myAssigs;
+            setMisAsignaciones(resolvedAssignments);
         }
 
         setOrden(currentOrden);
@@ -603,6 +633,9 @@ const MobileDetalleOrden = () => {
             facturas_urls: facturasFinales.length > 0 ? facturasFinales : null,
             fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
         };
+        const shouldCompleteSelectedAssignment = currentUserRole === 'Trabajador'
+            && (completarAsignacion || finalizarOrden)
+            && Boolean(selectedAsignacionId);
 
         if (currentUserRole === 'Trabajador') {
             const { data: rpcData, error: rpcError } = await supabase.rpc('worker_save_report', {
@@ -651,10 +684,16 @@ const MobileDetalleOrden = () => {
                 facturas_urls: facturasFinales.length > 0 ? facturasFinales : null,
                 fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
             });
-            if ((completarAsignacion || finalizarOrden) && selectedAsignacionId) {
+            if (shouldCompleteSelectedAssignment && selectedAsignacionId) {
                 setMisAsignaciones(prev => prev.map(asignacion =>
                     asignacion.id === selectedAsignacionId
                         ? { ...asignacion, estado: 'completado' }
+                        : asignacion
+                ));
+            } else if (selectedAsignacionId && selectedAsignacion?.estado === 'pendiente') {
+                setMisAsignaciones(prev => prev.map(asignacion =>
+                    asignacion.id === selectedAsignacionId
+                        ? { ...asignacion, estado: 'en_progreso' }
                         : asignacion
                 ));
             }
@@ -715,7 +754,9 @@ const MobileDetalleOrden = () => {
             return;
         }
         setSubmitting(false);
-        alert("¡Reporte guardado correctamente!");
+        if (currentUserRole !== 'Trabajador') {
+            alert("\u00a1Reporte guardado correctamente!");
+        }
         setShowForm(false); // Close Modal on success
         await fetchOrden(); // Wait for refreshed reports and assignment state before leaving.
         localStorage.setItem('last_active_order', id || '');
@@ -1066,10 +1107,17 @@ const MobileDetalleOrden = () => {
                                             <select
                                                 value={selectedAsignacionId}
                                                 onChange={(event) => {
-                                                    setSelectedAsignacionId(event.target.value);
-                                                    if (!event.target.value) {
+                                                    const assignmentId = event.target.value;
+                                                    setSelectedAsignacionId(assignmentId);
+                                                    if (!assignmentId) {
                                                         setCompletarAsignacion(false);
                                                         setFinalizarOrden(false);
+                                                        return;
+                                                    }
+
+                                                    const assignment = asignacionesActivas.find(item => item.id === assignmentId);
+                                                    if (assignment?.estado === 'pendiente') {
+                                                        void startAssignment(assignmentId);
                                                     }
                                                 }}
                                                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
