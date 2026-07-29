@@ -14,6 +14,13 @@ interface TrabajadorDirectoryRow {
     estado: string;
 }
 
+interface StatusToast {
+    title: string;
+    message: string;
+    variant: 'success' | 'error';
+    onRetry?: () => void;
+}
+
 const MobileDetalleOrden = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -67,6 +74,8 @@ const MobileDetalleOrden = () => {
     const [canSign, setCanSign] = useState(false); // Enable signature pad
     const [isFinished, setIsFinished] = useState(false); // Explicit status feedback
     const [viewingReport, setViewingReport] = useState<any>(null); // Report being viewed (read-only)
+    const [statusToast, setStatusToast] = useState<StatusToast | null>(null);
+    const startingAssignmentIdsRef = useRef<Set<string>>(new Set());
     const asignacionesActivas = misAsignaciones.filter(
         a => a.estado === 'pendiente' || a.estado === 'en_progreso'
     );
@@ -93,6 +102,46 @@ const MobileDetalleOrden = () => {
             localStorage.setItem('last_active_order', id);
         }
     }, [id]);
+
+    useEffect(() => {
+        if (!statusToast || statusToast.variant === 'error') return;
+        const timeout = window.setTimeout(() => setStatusToast(null), 4500);
+        return () => window.clearTimeout(timeout);
+    }, [statusToast]);
+
+    const showStatusToast = (toast: StatusToast) => setStatusToast(toast);
+
+    const startAssignment = async (assignmentId: string, assignments?: any[]) => {
+        const assignment = (assignments || misAsignaciones).find(item => item.id === assignmentId);
+        if (!assignment || assignment.estado !== 'pendiente' || startingAssignmentIdsRef.current.has(assignmentId)) {
+            return assignments || misAsignaciones;
+        }
+
+        startingAssignmentIdsRef.current.add(assignmentId);
+        const { error } = await supabase.rpc('worker_start_assignment', {
+            p_asignacion_id: assignmentId,
+        });
+        startingAssignmentIdsRef.current.delete(assignmentId);
+
+        if (error) {
+            console.error('No se pudo iniciar la asignaci?n:', error);
+            showStatusToast({
+                title: 'No se pudo actualizar el estado',
+                message: 'Puedes seguir trabajando y volver a intentarlo.',
+                variant: 'error',
+                onRetry: () => { void startAssignment(assignmentId); },
+            });
+            return assignments || misAsignaciones;
+        }
+
+        const updateAssignment = (items: any[]) => items.map(item =>
+            item.id === assignmentId ? { ...item, estado: 'en_progreso' } : item
+        );
+        const updatedAssignments = updateAssignment(assignments || misAsignaciones);
+        setMisAsignaciones(previous => updateAssignment(previous));
+        showStatusToast({ title: 'Asignaci\u00f3n iniciada', message: 'La tarea ya aparece como En curso.', variant: 'success' });
+        return updatedAssignments;
+    };
 
     const fetchOrden = async () => {
         if (!id) return;
@@ -202,7 +251,11 @@ const MobileDetalleOrden = () => {
                 a => a.trabajador_id === currentWorkerDbId
             );
             console.log('[Mobile] Total asignaciones:', asignacionesReq.data.length, 'Mis asignaciones:', myAssigs.length);
-            setMisAsignaciones(myAssigs);
+            const pendingAssignments = myAssigs.filter(a => a.estado === 'pendiente');
+            const resolvedAssignments = roleName === 'Trabajador' && pendingAssignments.length === 1
+                ? await startAssignment(pendingAssignments[0].id, myAssigs)
+                : myAssigs;
+            setMisAsignaciones(resolvedAssignments);
         }
 
         setOrden(currentOrden);
@@ -657,6 +710,14 @@ const MobileDetalleOrden = () => {
                         ? { ...asignacion, estado: 'completado' }
                         : asignacion
                 ));
+                showStatusToast({ title: 'Asignaci\u00f3n completada', message: 'Tu tarea se ha marcado como completada.', variant: 'success' });
+            } else if (selectedAsignacionId && selectedAsignacion?.estado === 'pendiente') {
+                setMisAsignaciones(prev => prev.map(asignacion =>
+                    asignacion.id === selectedAsignacionId
+                        ? { ...asignacion, estado: 'en_progreso' }
+                        : asignacion
+                ));
+                showStatusToast({ title: 'Asignaci\u00f3n iniciada', message: 'La tarea ya aparece como En curso.', variant: 'success' });
             }
             setOrden((prev: any) => prev ? { ...prev, estado: rpcResult.order_status } : prev);
         } else if (currentUserRole === 'Administrador' || currentUserRole === 'Editor') {
@@ -715,7 +776,9 @@ const MobileDetalleOrden = () => {
             return;
         }
         setSubmitting(false);
-        alert("¡Reporte guardado correctamente!");
+        if (currentUserRole !== 'Trabajador') {
+            alert("\u00a1Reporte guardado correctamente!");
+        }
         setShowForm(false); // Close Modal on success
         await fetchOrden(); // Wait for refreshed reports and assignment state before leaving.
         localStorage.setItem('last_active_order', id || '');
@@ -749,6 +812,18 @@ const MobileDetalleOrden = () => {
 
     return (
         <div className="bg-[#f0f2f5] dark:bg-slate-950 min-h-[100dvh] font-sans pb-10">
+            {statusToast && (
+                <div className="fixed inset-x-4 top-4 z-[200] mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900" role="status">
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <p className={`font-black ${statusToast.variant === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>{statusToast.title}</p>
+                            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{statusToast.message}</p>
+                        </div>
+                        <button type="button" onClick={() => setStatusToast(null)} className="text-slate-400" aria-label="Cerrar aviso">&times;</button>
+                    </div>
+                    {statusToast.onRetry && <button type="button" onClick={() => statusToast.onRetry?.()} className="mt-3 rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-900">Reintentar</button>}
+                </div>
+            )}
             {/* Top Bar matching the design */}
             <div className="bg-white dark:bg-slate-900 px-4 py-4 flex items-center justify-between shadow-sm sticky top-0 z-20">
                 <div className="flex items-center gap-4">
@@ -1066,10 +1141,17 @@ const MobileDetalleOrden = () => {
                                             <select
                                                 value={selectedAsignacionId}
                                                 onChange={(event) => {
-                                                    setSelectedAsignacionId(event.target.value);
-                                                    if (!event.target.value) {
+                                                    const assignmentId = event.target.value;
+                                                    setSelectedAsignacionId(assignmentId);
+                                                    if (!assignmentId) {
                                                         setCompletarAsignacion(false);
                                                         setFinalizarOrden(false);
+                                                        return;
+                                                    }
+
+                                                    const assignment = asignacionesActivas.find(item => item.id === assignmentId);
+                                                    if (assignment?.estado === 'pendiente') {
+                                                        void startAssignment(assignmentId);
                                                     }
                                                 }}
                                                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
