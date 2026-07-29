@@ -1102,50 +1102,87 @@ const MobileDetalleOrden = () => {
                                 && selectedAsignacion
                                 && (selectedAsignacion.estado === 'pendiente' || selectedAsignacion.estado === 'en_progreso')
                                 && (
-                                    <div className="space-y-4">
-                                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl p-4">
-                                            <label className="flex items-center gap-3">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={completarAsignacion}
-                                                    disabled={finalizarOrden}
-                                                    onChange={event => setCompletarAsignacion(event.target.checked)}
-                                                    className="w-5 h-5 rounded border-green-300 text-green-600 focus:ring-green-500 disabled:opacity-60"
-                                                />
-                                                <span className="text-sm font-bold text-green-800 dark:text-green-200">
-                                                    He terminado esta tarea asignada
-                                                </span>
-                                            </label>
-                                            <p className="mt-2 pl-8 text-xs text-green-700 dark:text-green-300">
-                                                Completa únicamente tu tarea. La orden puede continuar abierta para otros técnicos.
-                                            </p>
-                                        </div>
-
-                                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4">
-                                            <label className="flex items-center gap-3">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={finalizarOrden}
-                                                    onChange={event => {
-                                                        const enabled = event.target.checked;
-                                                        setFinalizarOrden(enabled);
-                                                        if (enabled) {
-                                                            setCompletarAsignacion(true);
-                                                            setCanSign(true);
-                                                        }
-                                                    }}
-                                                    className="w-5 h-5 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
-                                                />
-                                                <span className="text-sm font-bold text-blue-800 dark:text-blue-200">
-                                                    Finalizar la orden y recoger firma
-                                                </span>
-                                            </label>
-                                            <p className="mt-2 pl-8 text-xs text-blue-700 dark:text-blue-300">
-                                                Utiliza esta opción sólo cuando el trabajo completo esté terminado y el cliente vaya a firmar su conformidad.
-                                            </p>
-                                        </div>
+                                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl p-4">
+                                        <label className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={completarAsignacion}
+                                                disabled={finalizarOrden}
+                                                onChange={event => setCompletarAsignacion(event.target.checked)}
+                                                className="w-5 h-5 rounded border-green-300 text-green-600 focus:ring-green-500 disabled:opacity-60"
+                                            />
+                                            <span className="text-sm font-bold text-green-800 dark:text-green-200">
+                                                He terminado esta tarea asignada
+                                            </span>
+                                        </label>
+                                        <p className="mt-2 pl-8 text-xs text-green-700 dark:text-green-300">
+                                            Completa únicamente tu tarea. La orden puede continuar abierta para otros técnicos.
+                                        </p>
                                     </div>
                                 )}
+
+                            {currentUserRole === 'Trabajador' && (
+                                <div className="space-y-3">
+                                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                                        Estado del trabajo
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setFinalizarOrden(false);
+                                                setCanSign(!!reporte?.firma_url);
+                                            }}
+                                            className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                                                !finalizarOrden
+                                                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 shadow-md'
+                                                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500'
+                                            }`}
+                                        >
+                                            <span className="block text-sm font-black">Continuar trabajo</span>
+                                            <span className="block mt-1 text-xs font-normal">
+                                                Guarda la intervención y mantiene la orden en curso.
+                                            </span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-disabled={
+                                                !selectedAsignacionId
+                                                || !selectedAsignacion
+                                                || (selectedAsignacion.estado !== 'pendiente' && selectedAsignacion.estado !== 'en_progreso')
+                                            }
+                                            onClick={() => {
+                                                const hasActiveAssignment = !!selectedAsignacionId
+                                                    && !!selectedAsignacion
+                                                    && (selectedAsignacion.estado === 'pendiente' || selectedAsignacion.estado === 'en_progreso');
+
+                                                if (!hasActiveAssignment) {
+                                                    alert('Necesitas una asignación activa para finalizar la orden.');
+                                                    return;
+                                                }
+
+                                                setFinalizarOrden(true);
+                                                setCompletarAsignacion(true);
+                                                setCanSign(true);
+                                            }}
+                                            className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                                                finalizarOrden
+                                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 shadow-md'
+                                                    : (!selectedAsignacionId
+                                                        || !selectedAsignacion
+                                                        || (selectedAsignacion.estado !== 'pendiente' && selectedAsignacion.estado !== 'en_progreso'))
+                                                        ? 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-400 opacity-60 cursor-not-allowed'
+                                                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500'
+                                            }`}
+                                        >
+                                            <span className="block text-sm font-black">Finalizar la orden y recoger firma</span>
+                                            <span className="block mt-1 text-xs font-normal">
+                                                Utiliza esta opción sólo cuando el trabajo completo esté terminado y el cliente vaya a firmar su conformidad.
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                 <div className="space-y-4 pt-4">
                     <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Información de esta Intervención</h2>
