@@ -656,6 +656,9 @@ const MobileDetalleOrden = () => {
             facturas_urls: facturasFinales.length > 0 ? facturasFinales : null,
             fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
         };
+        const shouldCompleteSelectedAssignment = currentUserRole === 'Trabajador'
+            && (completarAsignacion || finalizarOrden)
+            && Boolean(selectedAsignacionId);
 
         if (currentUserRole === 'Trabajador') {
             const { data: rpcData, error: rpcError } = await supabase.rpc('worker_save_report', {
@@ -704,7 +707,7 @@ const MobileDetalleOrden = () => {
                 facturas_urls: facturasFinales.length > 0 ? facturasFinales : null,
                 fecha_trabajo: fecha || new Date().toISOString().split('T')[0],
             });
-            if ((completarAsignacion || finalizarOrden) && selectedAsignacionId) {
+            if (shouldCompleteSelectedAssignment && selectedAsignacionId) {
                 setMisAsignaciones(prev => prev.map(asignacion =>
                     asignacion.id === selectedAsignacionId
                         ? { ...asignacion, estado: 'completado' }
@@ -782,10 +785,31 @@ const MobileDetalleOrden = () => {
         setShowForm(false); // Close Modal on success
         await fetchOrden(); // Wait for refreshed reports and assignment state before leaving.
         localStorage.setItem('last_active_order', id || '');
+        if (shouldCompleteSelectedAssignment) {
+            await new Promise<void>(resolve => window.setTimeout(resolve, 1200));
+        }
         navigate('/m/ordenes');
     };
 
-    if (loading) return <div className="p-8 text-center text-slate-500 dark:text-slate-400 font-bold mt-20">Cargando...</div>;
+    const statusToastContent = statusToast && (
+        <div className="fixed inset-x-4 top-4 z-[200] mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900" role="status">
+            <div className="flex items-start justify-between gap-3">
+                <div>
+                    <p className={`font-black ${statusToast.variant === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>{statusToast.title}</p>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{statusToast.message}</p>
+                </div>
+                <button type="button" onClick={() => setStatusToast(null)} className="text-slate-400" aria-label="Cerrar aviso">&times;</button>
+            </div>
+            {statusToast.onRetry && <button type="button" onClick={() => statusToast.onRetry?.()} className="mt-3 rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-900">Reintentar</button>}
+        </div>
+    );
+
+    if (loading) return (
+        <>
+            {statusToastContent}
+            <div className="p-8 text-center text-slate-500 dark:text-slate-400 font-bold mt-20">Cargando...</div>
+        </>
+    );
 
     if (!orden) {
         return (
@@ -812,18 +836,7 @@ const MobileDetalleOrden = () => {
 
     return (
         <div className="bg-[#f0f2f5] dark:bg-slate-950 min-h-[100dvh] font-sans pb-10">
-            {statusToast && (
-                <div className="fixed inset-x-4 top-4 z-[200] mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900" role="status">
-                    <div className="flex items-start justify-between gap-3">
-                        <div>
-                            <p className={`font-black ${statusToast.variant === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>{statusToast.title}</p>
-                            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{statusToast.message}</p>
-                        </div>
-                        <button type="button" onClick={() => setStatusToast(null)} className="text-slate-400" aria-label="Cerrar aviso">&times;</button>
-                    </div>
-                    {statusToast.onRetry && <button type="button" onClick={() => statusToast.onRetry?.()} className="mt-3 rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-900">Reintentar</button>}
-                </div>
-            )}
+            {statusToastContent}
             {/* Top Bar matching the design */}
             <div className="bg-white dark:bg-slate-900 px-4 py-4 flex items-center justify-between shadow-sm sticky top-0 z-20">
                 <div className="flex items-center gap-4">
