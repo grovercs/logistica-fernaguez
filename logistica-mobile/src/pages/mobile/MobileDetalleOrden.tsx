@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { compressImage } from '../../lib/compressImage';
@@ -13,13 +12,6 @@ interface TrabajadorDirectoryRow {
     apellidos: string;
     especialidad: string;
     estado: string;
-}
-
-interface StatusToast {
-    title: string;
-    message: string;
-    variant: 'success' | 'error';
-    onRetry?: () => void;
 }
 
 const MobileDetalleOrden = () => {
@@ -75,7 +67,6 @@ const MobileDetalleOrden = () => {
     const [canSign, setCanSign] = useState(false); // Enable signature pad
     const [isFinished, setIsFinished] = useState(false); // Explicit status feedback
     const [viewingReport, setViewingReport] = useState<any>(null); // Report being viewed (read-only)
-    const [statusToast, setStatusToast] = useState<StatusToast | null>(null);
     const startingAssignmentIdsRef = useRef<Set<string>>(new Set());
     const asignacionesActivas = misAsignaciones.filter(
         a => a.estado === 'pendiente' || a.estado === 'en_progreso'
@@ -104,14 +95,6 @@ const MobileDetalleOrden = () => {
         }
     }, [id]);
 
-    useEffect(() => {
-        if (!statusToast || statusToast.variant === 'error') return;
-        const timeout = window.setTimeout(() => setStatusToast(null), 4500);
-        return () => window.clearTimeout(timeout);
-    }, [statusToast]);
-
-    const showStatusToast = (toast: StatusToast) => setStatusToast(toast);
-
     const startAssignment = async (assignmentId: string, assignments?: any[]) => {
         const assignment = (assignments || misAsignaciones).find(item => item.id === assignmentId);
         if (!assignment || assignment.estado !== 'pendiente' || startingAssignmentIdsRef.current.has(assignmentId)) {
@@ -126,12 +109,6 @@ const MobileDetalleOrden = () => {
 
         if (error) {
             console.error('No se pudo iniciar la asignaci?n:', error);
-            showStatusToast({
-                title: 'No se pudo actualizar el estado',
-                message: 'Puedes seguir trabajando y volver a intentarlo.',
-                variant: 'error',
-                onRetry: () => { void startAssignment(assignmentId); },
-            });
             return assignments || misAsignaciones;
         }
 
@@ -140,7 +117,6 @@ const MobileDetalleOrden = () => {
         );
         const updatedAssignments = updateAssignment(assignments || misAsignaciones);
         setMisAsignaciones(previous => updateAssignment(previous));
-        showStatusToast({ title: 'Asignaci\u00f3n iniciada', message: 'La tarea ya aparece como En curso.', variant: 'success' });
         return updatedAssignments;
     };
 
@@ -714,14 +690,12 @@ const MobileDetalleOrden = () => {
                         ? { ...asignacion, estado: 'completado' }
                         : asignacion
                 ));
-                showStatusToast({ title: 'Asignaci\u00f3n completada', message: 'Tu tarea se ha marcado como completada.', variant: 'success' });
             } else if (selectedAsignacionId && selectedAsignacion?.estado === 'pendiente') {
                 setMisAsignaciones(prev => prev.map(asignacion =>
                     asignacion.id === selectedAsignacionId
                         ? { ...asignacion, estado: 'en_progreso' }
                         : asignacion
                 ));
-                showStatusToast({ title: 'Asignaci\u00f3n iniciada', message: 'La tarea ya aparece como En curso.', variant: 'success' });
             }
             setOrden((prev: any) => prev ? { ...prev, estado: rpcResult.order_status } : prev);
         } else if (currentUserRole === 'Administrador' || currentUserRole === 'Editor') {
@@ -786,37 +760,10 @@ const MobileDetalleOrden = () => {
         setShowForm(false); // Close Modal on success
         await fetchOrden(); // Wait for refreshed reports and assignment state before leaving.
         localStorage.setItem('last_active_order', id || '');
-        if (shouldCompleteSelectedAssignment) {
-            await new Promise<void>(resolve => window.setTimeout(resolve, 2000));
-        }
         navigate('/m/ordenes');
     };
 
-    const statusToastContent = statusToast && typeof document !== 'undefined'
-        ? createPortal(
-            <div
-                className="fixed inset-x-4 top-4 z-[200] mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900"
-                role={statusToast.variant === 'error' ? 'alert' : 'status'}
-            >
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <p className={`font-black ${statusToast.variant === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>{statusToast.title}</p>
-                        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{statusToast.message}</p>
-                    </div>
-                    <button type="button" onClick={() => setStatusToast(null)} className="text-slate-400" aria-label="Cerrar aviso">&times;</button>
-                </div>
-                {statusToast.onRetry && <button type="button" onClick={() => statusToast.onRetry?.()} className="mt-3 rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-900">Reintentar</button>}
-            </div>,
-            document.body
-        )
-        : null;
-
-    if (loading) return (
-        <>
-            {statusToastContent}
-            <div className="p-8 text-center text-slate-500 dark:text-slate-400 font-bold mt-20">Cargando...</div>
-        </>
-    );
+    if (loading) return <div className="p-8 text-center text-slate-500 dark:text-slate-400 font-bold mt-20">Cargando...</div>;
 
     if (!orden) {
         return (
@@ -843,7 +790,6 @@ const MobileDetalleOrden = () => {
 
     return (
         <div className="bg-[#f0f2f5] dark:bg-slate-950 min-h-[100dvh] font-sans pb-10">
-            {statusToastContent}
             {/* Top Bar matching the design */}
             <div className="bg-white dark:bg-slate-900 px-4 py-4 flex items-center justify-between shadow-sm sticky top-0 z-20">
                 <div className="flex items-center gap-4">
