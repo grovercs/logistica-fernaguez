@@ -280,6 +280,7 @@ const MobileDetalleOrden = () => {
         );
         setCompletarAsignacion(false);
         setFinalizarOrden(false);
+        setCanSign(false);
 
         // Clear signature canvas
         const ctx = canvasRef.current?.getContext('2d');
@@ -297,6 +298,7 @@ const MobileDetalleOrden = () => {
         setSelectedAsignacionId(rep.asignacion_id || '');
         setCompletarAsignacion(false);
         setFinalizarOrden(false);
+        setCanSign(false);
 
         // Al editar un reporte existente, por defecto seguimos en curso
         setIsFinished(false);
@@ -456,7 +458,7 @@ const MobileDetalleOrden = () => {
 
     // --- Sign Pad Logic ---
     const startDrawing = (e: any) => {
-        if (reporte?.firma_url) return; // Don't draw if already has a saved signature image
+        if (!canSign || reporte?.firma_url) return; // Don't draw while locked or if a saved signature exists
         setIsDrawing(true);
         draw(e);
     };
@@ -470,7 +472,7 @@ const MobileDetalleOrden = () => {
     };
 
     const draw = (e: any) => {
-        if (!isDrawing || !canvasRef.current) return;
+        if (!canSign || !isDrawing || !canvasRef.current) return;
         setHasSignature(true); // Only set to true when actual drawing/movement occurs
 
         const canvas = canvasRef.current;
@@ -1131,7 +1133,7 @@ const MobileDetalleOrden = () => {
                                             type="button"
                                             onClick={() => {
                                                 setFinalizarOrden(false);
-                                                setCanSign(!!reporte?.firma_url);
+                                                setCanSign(false);
                                             }}
                                             className={`p-4 rounded-2xl border-2 text-left transition-all ${
                                                 !finalizarOrden
@@ -1163,7 +1165,7 @@ const MobileDetalleOrden = () => {
 
                                                 setFinalizarOrden(true);
                                                 setCompletarAsignacion(true);
-                                                setCanSign(true);
+                                                setCanSign(false);
                                             }}
                                             className={`p-4 rounded-2xl border-2 text-left transition-all ${
                                                 finalizarOrden
@@ -1321,7 +1323,7 @@ const MobileDetalleOrden = () => {
                 {(currentUserRole !== 'Trabajador' || finalizarOrden || !!reporte?.firma_url) && (
                     <div className="space-y-4 pt-2">
                         <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Conformidad (Firma)</h2>
-                        <div className="bg-white dark:bg-slate-900 border-2 border-dashed border-slate-300 rounded-xl overflow-hidden touch-none relative h-[180px]">
+                        <div className={`bg-white dark:bg-slate-900 border-2 border-dashed border-slate-300 rounded-xl overflow-hidden relative h-[180px] ${canSign ? 'touch-none' : 'touch-pan-y'}`} >
                             {reporte?.firma_url ? (
                                 <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800">
                                     <img src={reporte.firma_url} alt="Firma Guardada" className="h-full object-contain" />
@@ -1356,11 +1358,19 @@ const MobileDetalleOrden = () => {
                             <div className="flex gap-2">
                                 <button
                                     type="button"
-                                    onClick={() => setCanSign(!canSign)}
+                                    onClick={() => {
+                                        const unlock = !canSign;
+                                        setCanSign(unlock);
+                                        if (unlock) {
+                                            alert('La firma está desbloqueada. Entrega el dispositivo al cliente.');
+                                        } else {
+                                            setIsDrawing(false);
+                                        }
+                                    }}
                                     className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all shadow-sm ${canSign ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'}`}
                                 >
                                     <span className="material-symbols-outlined text-[16px]">{canSign ? 'lock_open' : 'edit_square'}</span>
-                                    {canSign ? 'BLOQUEAR' : 'FIRMAR'}
+                                    {canSign ? 'Bloquear firma' : 'Desbloquear firma'}
                                 </button>
                                 <button
                                     type="button"
@@ -1368,7 +1378,7 @@ const MobileDetalleOrden = () => {
                                     className="text-xs font-bold text-red-500 flex items-center gap-1 bg-red-50 dark:bg-red-900/20 border border-red-100 px-3 py-1.5 rounded-lg transition-all"
                                 >
                                     <span className="material-symbols-outlined text-[16px]">delete</span>
-                                    LIMPIAR
+                                    Borrar firma
                                 </button>
                             </div>
                         </div>
