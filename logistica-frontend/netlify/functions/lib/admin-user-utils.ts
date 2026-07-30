@@ -6,6 +6,39 @@ const allowedProductionOrigins = new Set([
   'https://deploy-preview-6--logistica-fernaguez-admin.netlify.app',
 ]);
 
+const allowedProductionHosts = new Set([
+  'admin.appvielha.com',
+  'deploy-preview-6--logistica-fernaguez-admin.netlify.app',
+]);
+
+const isDevelopmentHost = (hostname: string) => hostname === 'localhost' || hostname === '127.0.0.1';
+
+const headerValue = (headers: HandlerEvent['headers'], name: string): string | undefined =>
+  headers[name] || headers[name.toLowerCase()] || headers[name.toUpperCase()];
+
+const hostnameFromUrl = (rawUrl: string | undefined): string | undefined => {
+  if (!rawUrl) return undefined;
+  try {
+    const url = new URL(rawUrl);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.hostname : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const hostnameFromHeader = (value: string | undefined): string | undefined => {
+  if (!value || value.includes(',')) return undefined;
+  try {
+    const url = new URL(`http://${value}`);
+    return url.hostname;
+  } catch {
+    return undefined;
+  }
+};
+
+const allowedRequestHost = (hostname: string | undefined): boolean =>
+  Boolean(hostname && (allowedProductionHosts.has(hostname) || isDevelopmentHost(hostname)));
+
 export interface AdminContext {
   actorUserId: string;
   admin: SupabaseClient;
@@ -19,10 +52,23 @@ export const allowedOrigin = (origin: string | undefined): origin is string => {
   if (allowedProductionOrigins.has(origin)) return true;
   try {
     const url = new URL(origin);
-    return url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1');
+    return url.protocol === 'http:' && isDevelopmentHost(url.hostname);
   } catch {
     return false;
   }
+};
+
+export const isAllowedFunctionRequest = (event: Pick<HandlerEvent, 'headers' | 'rawUrl'>): boolean => {
+  const origin = headerValue(event.headers, 'origin');
+  if (origin !== undefined) return allowedOrigin(origin);
+
+  const fetchSite = headerValue(event.headers, 'sec-fetch-site')?.toLowerCase();
+  if (fetchSite && fetchSite !== 'same-origin' && fetchSite !== 'none') return false;
+
+  const hostname = hostnameFromUrl(event.rawUrl)
+    || hostnameFromHeader(headerValue(event.headers, 'x-forwarded-host'))
+    || hostnameFromHeader(headerValue(event.headers, 'host'));
+  return allowedRequestHost(hostname);
 };
 
 export const MAX_JSON_BODY_BYTES = 16 * 1024;

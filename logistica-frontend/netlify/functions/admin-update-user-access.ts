@@ -1,9 +1,9 @@
 import type { Handler } from '@netlify/functions';
-import { allowedOrigin, HttpInputError, isUuid, parseJsonBody, requireActiveAdministrator, response, writeAudit } from './lib/admin-user-utils';
+import { isAllowedFunctionRequest, HttpInputError, isUuid, parseJsonBody, requireActiveAdministrator, response, writeAudit } from './lib/admin-user-utils';
 
 export const handler: Handler = async (event) => {
-  const origin = event.headers.origin;
-  if (!allowedOrigin(origin)) return response(403, { error: 'Origin not allowed' });
+  const origin = event.headers.origin || event.headers.Origin;
+  if (!isAllowedFunctionRequest(event)) return response(403, { error: 'Origin not allowed' });
   if (event.httpMethod === 'OPTIONS') return response(204, {}, origin);
   if (event.httpMethod !== 'POST') return response(405, { error: 'Method not allowed' }, origin);
 

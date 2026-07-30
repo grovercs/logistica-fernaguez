@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 import type { Handler } from '@netlify/functions';
-import { allowedOrigin, requireActiveAdministrator, response } from './lib/admin-user-utils';
+import { isAllowedFunctionRequest, requireActiveAdministrator, response } from './lib/admin-user-utils';
 
 const usersPerPage = 200;
 const maxPages = 10_000;
@@ -23,8 +23,8 @@ async function listAllAuthUsers(admin: Awaited<ReturnType<typeof requireActiveAd
 }
 
 export const handler: Handler = async (event) => {
-  const origin = event.headers.origin;
-  if (!allowedOrigin(origin)) return response(403, { error: 'Origin not allowed' });
+  const origin = event.headers.origin || event.headers.Origin;
+  if (!isAllowedFunctionRequest(event)) return response(403, { error: 'Origin not allowed' });
   if (event.httpMethod === 'OPTIONS') return response(204, {}, origin);
   if (event.httpMethod !== 'GET') return response(405, { error: 'Method not allowed' }, origin);
   try {
