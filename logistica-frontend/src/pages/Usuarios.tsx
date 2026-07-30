@@ -39,6 +39,12 @@ interface PendingLinkOperation {
   activeAssignments: number;
 }
 
+interface PendingProfileOperation {
+  user: ManagedUser;
+  rolId: string;
+  activo: boolean;
+}
+
 const ROLE_COLORS: Record<string, string> = {
   Administrador: 'bg-primary/10 text-primary border-primary/20',
   Editor: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 border-blue-200 dark:border-blue-500/30',
@@ -75,6 +81,7 @@ export default function Usuarios() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [linkingUserId, setLinkingUserId] = useState<string | null>(null);
   const [pendingLinkOperation, setPendingLinkOperation] = useState<PendingLinkOperation | null>(null);
+  const [pendingProfileOperation, setPendingProfileOperation] = useState<PendingProfileOperation | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -163,6 +170,41 @@ export default function Usuarios() {
     await linkWorker(pendingLinkOperation.user, pendingLinkOperation.trabajadorId, true);
   };
 
+  const openCreateProfile = (user: ManagedUser) => {
+    const defaultRoleId = roles[0]?.id || '';
+    if (!defaultRoleId) {
+      setError('No hay roles disponibles para crear el perfil.');
+      return;
+    }
+    setPendingProfileOperation({ user, rolId: defaultRoleId, activo: true });
+  };
+
+  const createUserProfile = async () => {
+    if (!pendingProfileOperation || savingId) return;
+    if (!pendingProfileOperation.rolId) {
+      setError('Debes seleccionar un rol.');
+      return;
+    }
+    const { user, rolId, activo } = pendingProfileOperation;
+    setSavingId(user.auth_user_id);
+    setError(null);
+    try {
+      await adminRequest('admin-create-user-profile', 'POST', {
+        target_user_id: user.auth_user_id,
+        rol_id: rolId,
+        activo,
+      });
+      setPendingProfileOperation(null);
+      setSuccessMessage('Perfil creado correctamente. Ya puedes vincular la cuenta a un trabajador.');
+      await loadData();
+    } catch (createError) {
+      console.error('Error creating user profile:', createError);
+      setError(createError instanceof Error ? createError.message : 'No se pudo crear el perfil.');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 h-full">
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 w-full backdrop-blur-md">
@@ -204,13 +246,14 @@ export default function Usuarios() {
                 {loading ? <tr><td colSpan={6} className="px-6 py-14 text-center text-slate-500 font-bold animate-pulse">Cargando usuarios...</td></tr> : filteredUsuarios.length === 0 ? <tr><td colSpan={6} className="px-6 py-14 text-center text-slate-400">No se encontraron usuarios.</td></tr> : filteredUsuarios.map((user) => {
                   const isSaving = savingId === user.auth_user_id;
                   const hasAuthAccount = user.auth_status === 'active_auth_user';
+                  const isMissingProfile = user.profile_status === 'missing_profile';
                   return <tr key={user.auth_user_id} className="align-top hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                    <td className="px-5 py-4"><p className="font-bold">{user.nombre || 'Sin perfil'}</p><p className="text-xs text-slate-500">{user.email || 'Sin correo'}</p><p className="text-[10px] text-slate-400 font-mono mt-1">{user.auth_user_id}</p>{!hasAuthAccount && <p className="mt-1 text-[10px] font-bold text-rose-600">Perfil sin cuenta Auth</p>}</td>
-                    <td className="px-5 py-4"><span className={`inline-flex px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${ROLE_COLORS[user.rol || ''] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>{user.rol || 'Sin rol'}</span><select disabled={isSaving || !user.rol_id || !hasAuthAccount} value={user.rol_id || ''} onChange={(event) => void updateAccess(user, { rol_id: event.target.value })} className="mt-2 block w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs"><option value="" disabled>Sin rol</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.nombre}</option>)}</select></td>
-                    <td className="px-5 py-4"><button disabled={isSaving || !user.rol_id || !hasAuthAccount} onClick={() => void updateAccess(user, { activo: !user.activo })} className={`inline-flex items-center gap-2 text-xs font-black uppercase ${user.activo ? 'text-emerald-600' : 'text-slate-400'} disabled:opacity-50`}><span className={`size-2 rounded-full ${user.activo ? 'bg-emerald-500' : 'bg-slate-400'}`} />{user.activo ? 'Activo' : 'Inactivo'}</button></td>
-                    <td className="px-5 py-4">{user.trabajador ? <><p className="text-sm font-bold">{user.trabajador.nombre} {user.trabajador.apellidos || ''}</p><p className="text-xs text-slate-500">{user.trabajador.estado || 'Sin estado'}</p><button disabled={isSaving || !hasAuthAccount} onClick={() => void linkWorker(user, null)} className="mt-2 text-xs font-bold text-rose-600 hover:underline">Desvincular</button></> : <><span className="text-xs text-amber-600 font-bold">{user.estado_vinculacion === 'sin_perfil' ? 'Sin perfil' : 'Sin trabajador'}</span><button disabled={isSaving || !hasAuthAccount || user.estado_vinculacion === 'sin_perfil'} onClick={() => setLinkingUserId(linkingUserId === user.auth_user_id ? null : user.auth_user_id)} className="block mt-2 text-xs font-bold text-primary hover:underline">Vincular trabajador</button>{linkingUserId === user.auth_user_id && <select defaultValue="" disabled={isSaving} onChange={(event) => { if (event.target.value) void linkWorker(user, event.target.value); }} className="mt-2 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs"><option value="">Selecciona trabajador...</option>{availableWorkers.map((worker) => <option key={worker.id} value={worker.id}>{worker.nombre} {worker.apellidos || ''} &mdash; {worker.estado || 'Sin estado'}</option>)}</select>}</>}</td>
+                    <td className="px-5 py-4"><p className="font-bold">{user.nombre || 'Sin perfil'}</p><p className="text-xs text-slate-500">{user.email || 'Sin correo'}</p><p className="text-[10px] text-slate-400 font-mono mt-1">{user.auth_user_id}</p>{!hasAuthAccount && <p className="mt-1 text-[10px] font-bold text-rose-600">Perfil sin cuenta Authentication</p>}</td>
+                    <td className="px-5 py-4">{isMissingProfile ? <p className="text-xs font-bold text-amber-600">Sin perfil ni rol</p> : <><label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rol</label><span className={`mt-1 inline-flex px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${ROLE_COLORS[user.rol || ''] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>{user.rol || 'Sin rol'}</span><select disabled={isSaving || !hasAuthAccount} value={user.rol_id || ''} onChange={(event) => void updateAccess(user, { rol_id: event.target.value })} className="mt-2 block w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs disabled:opacity-50"><option value="" disabled>Sin rol</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.nombre}</option>)}</select></>}</td>
+                    <td className="px-5 py-4">{isMissingProfile ? <p className="text-xs text-slate-500">Sin permisos todavía</p> : <><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Activar/Desactivar</p><button disabled={isSaving || !hasAuthAccount} onClick={() => void updateAccess(user, { activo: !user.activo })} className={`mt-1 inline-flex items-center gap-2 text-xs font-black uppercase ${user.activo ? 'text-emerald-600' : 'text-slate-400'} disabled:opacity-50`}><span className={`size-2 rounded-full ${user.activo ? 'bg-emerald-500' : 'bg-slate-400'}`} />{user.activo ? 'Activo' : 'Inactivo'}</button></>}</td>
+                    <td className="px-5 py-4">{isMissingProfile ? <p className="text-xs text-slate-500">Crea el perfil antes de vincular trabajador.</p> : user.trabajador ? <><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Desvincular trabajador</p><p className="mt-1 text-sm font-bold">{user.trabajador.nombre} {user.trabajador.apellidos || ''}</p><p className="text-xs text-slate-500">{user.trabajador.estado || 'Sin estado'}</p><button disabled={isSaving || !hasAuthAccount} onClick={() => void linkWorker(user, null)} className="mt-2 text-xs font-bold text-rose-600 hover:underline disabled:opacity-50">Desvincular trabajador</button></> : <><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Vincular trabajador</p><span className="mt-1 block text-xs text-amber-600 font-bold">Sin trabajador</span><button disabled={isSaving || !hasAuthAccount} onClick={() => setLinkingUserId(linkingUserId === user.auth_user_id ? null : user.auth_user_id)} className="block mt-2 text-xs font-bold text-primary hover:underline disabled:opacity-50">Vincular trabajador</button>{linkingUserId === user.auth_user_id && <select defaultValue="" disabled={isSaving} onChange={(event) => { if (event.target.value) void linkWorker(user, event.target.value); }} className="mt-2 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs disabled:opacity-50"><option value="">Selecciona trabajador...</option>{availableWorkers.map((worker) => <option key={worker.id} value={worker.id}>{worker.nombre} {worker.apellidos || ''} &mdash; {worker.estado || 'Sin estado'}</option>)}</select>}</>}</td>
                     <td className="px-5 py-4 text-xs text-slate-500">{user.last_access_at ? new Date(user.last_access_at).toLocaleString('es-ES') : 'Nunca'}</td>
-                    <td className="px-5 py-4 text-right text-xs text-slate-400">{isSaving ? 'Guardando...' : 'Cambios individuales'}</td>
+                    <td className="px-5 py-4 text-right text-xs">{isSaving ? <span className="text-slate-400">Guardando...</span> : isMissingProfile && hasAuthAccount ? <button type="button" onClick={() => openCreateProfile(user)} disabled={roles.length === 0} className="rounded-lg bg-primary px-3 py-2 text-xs font-black text-white hover:opacity-90 disabled:opacity-50">Crear perfil y configurar acceso</button> : isMissingProfile ? <span className="text-slate-400">Cuenta Auth no disponible</span> : <span className="text-slate-500">Los cambios se guardan al modificar el rol o pulsar el estado.</span>}</td>
                   </tr>;
                 })}
               </tbody>
@@ -218,6 +261,21 @@ export default function Usuarios() {
           </div>
         </div>
       </div>
+      {pendingProfileOperation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="create-profile-title">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+          <h3 id="create-profile-title" className="text-lg font-black">Crear perfil y configurar acceso</h3>
+          <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">Se creará un perfil para <strong>{pendingProfileOperation.user.email || pendingProfileOperation.user.auth_user_id}</strong>. Después de crear el perfil podrás vincular esta cuenta a un trabajador.</p>
+          <label className="mt-5 block text-xs font-black uppercase tracking-widest text-slate-500">Rol</label>
+          <select value={pendingProfileOperation.rolId} disabled={savingId === pendingProfileOperation.user.auth_user_id} onChange={(event) => setPendingProfileOperation({ ...pendingProfileOperation, rolId: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800">
+            <option value="" disabled>Selecciona un rol...</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.nombre}</option>)}
+          </select>
+          <label className="mt-4 flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={pendingProfileOperation.activo} disabled={savingId === pendingProfileOperation.user.auth_user_id} onChange={(event) => setPendingProfileOperation({ ...pendingProfileOperation, activo: event.target.checked })} /> Activar acceso al crear el perfil</label>
+          <div className="mt-6 flex justify-end gap-3">
+            <button type="button" disabled={savingId === pendingProfileOperation.user.auth_user_id} onClick={() => setPendingProfileOperation(null)} className="rounded-xl px-4 py-2 text-sm font-bold text-slate-600 disabled:opacity-50 dark:text-slate-300">Cancelar</button>
+            <button type="button" disabled={savingId === pendingProfileOperation.user.auth_user_id || !pendingProfileOperation.rolId} onClick={() => void createUserProfile()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{savingId === pendingProfileOperation.user.auth_user_id ? 'Creando...' : 'Crear perfil'}</button>
+          </div>
+        </div>
+      </div>}
       {pendingLinkOperation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="link-confirmation-title">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
           <h3 id="link-confirmation-title" className="text-lg font-black">Confirmar {pendingLinkOperation.operation}</h3>
