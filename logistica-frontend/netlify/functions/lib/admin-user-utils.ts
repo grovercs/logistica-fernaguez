@@ -1,7 +1,10 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { HandlerEvent } from '@netlify/functions';
 
-const allowedProductionOrigins = new Set(['https://admin.appvielha.com']);
+const allowedProductionOrigins = new Set([
+  'https://admin.appvielha.com',
+  'https://deploy-preview-6--logistica-fernaguez-admin.netlify.app',
+]);
 
 export interface AdminContext {
   actorUserId: string;
