@@ -14,6 +14,7 @@ import Configuracion from './pages/Configuracion';
 import Especialidades from './pages/Especialidades';
 import Ayuda from './pages/Ayuda';
 import AdminMaintenance from './pages/AdminMaintenance';
+import Usuarios from './pages/Usuarios';
 
 function App() {
   return (
@@ -29,9 +30,9 @@ function App() {
 
           {/* Rutas protegidas: solo Admin y Editor */}
           <Route path="trabajadores" element={<RequireRole allowedRoles={['Administrador', 'Editor']}><Trabajadores /></RequireRole>} />
-          <Route path="usuarios" element={<RequireRole allowedRoles={['Administrador', 'Editor']}><AdminMaintenance /></RequireRole>} />
 
           {/* Rutas protegidas: solo Administrador */}
+          <Route path="usuarios" element={<RequireRole><Usuarios /></RequireRole>} />
           <Route path="aseguradoras" element={<RequireRole><Aseguradoras /></RequireRole>} />
           <Route path="tareas-frecuentes" element={<RequireRole><TareasFrecuentes /></RequireRole>} />
           <Route path="especialidades" element={<RequireRole><Especialidades /></RequireRole>} />

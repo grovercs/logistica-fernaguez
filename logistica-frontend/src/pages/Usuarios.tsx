@@ -1,223 +1,241 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { supabaseAdmin } from '../lib/supabase-admin';
-import AltaUsuarioModal from '../components/modals/AltaUsuarioModal';
-import EditarUsuarioModal from '../components/modals/EditarUsuarioModal';
+
+interface Role {
+  id: string;
+  nombre: string;
+}
+
+interface WorkerOption {
+  id: string;
+  nombre: string;
+  apellidos: string | null;
+  estado: string | null;
+}
+
+interface ManagedUser {
+  auth_user_id: string;
+  email: string | null;
+  nombre: string | null;
+  rol_id: string | null;
+  rol: string | null;
+  activo: boolean;
+  last_access_at: string | null;
+  trabajador: WorkerOption | null;
+  estado_vinculacion: 'vinculado' | 'sin_trabajador' | 'sin_perfil';
+  auth_status: 'active_auth_user' | 'missing_auth_user';
+  profile_status: 'active_profile' | 'missing_profile';
+}
+
+interface UserListResponse {
+  users: ManagedUser[];
+  available_workers: WorkerOption[];
+}
+
+interface PendingLinkOperation {
+  user: ManagedUser;
+  trabajadorId: string | null;
+  operation: 'vincular' | 'desvincular';
+  activeAssignments: number;
+}
 
 const ROLE_COLORS: Record<string, string> = {
-  'Administrador': 'bg-primary/10 text-primary border-primary/20',
-  'Editor': 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 border-blue-200 dark:border-blue-500/30',
-  'Trabajador': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30',
-  'Visualizador': 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 border-amber-200 dark:border-amber-500/30',
+  Administrador: 'bg-primary/10 text-primary border-primary/20',
+  Editor: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 border-blue-200 dark:border-blue-500/30',
+  Trabajador: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30',
+  Visualizador: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 border-amber-200 dark:border-amber-500/30',
 };
 
+async function adminRequest<T>(path: string, method: 'GET' | 'POST', body?: unknown): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('La sesi\u00f3n ha caducado. Inicia sesi\u00f3n de nuevo.');
+  const result = await fetch(`/.netlify/functions/${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const payload = await result.json().catch(() => ({})) as { error?: string; requires_confirmation?: boolean; active_assignments?: number } & T;
+  if (!result.ok) {
+    const error = new Error(payload.error || 'No se pudo completar la operaci\u00f3n.') as Error & { requiresConfirmation?: boolean; activeAssignments?: number };
+    error.requiresConfirmation = payload.requires_confirmation === true;
+    error.activeAssignments = typeof payload.active_assignments === 'number' ? payload.active_assignments : 0;
+    throw error;
+  }
+  return payload;
+}
+
 export default function Usuarios() {
-  const [usuarios, setUsuarios] = useState<any[]>([]);
-  const [roles, setRoles] = useState<any[]>([]);
+  const [usuarios, setUsuarios] = useState<ManagedUser[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [availableWorkers, setAvailableWorkers] = useState<WorkerOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedUsuario, setSelectedUsuario] = useState<any>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [linkingUserId, setLinkingUserId] = useState<string | null>(null);
+  const [pendingLinkOperation, setPendingLinkOperation] = useState<PendingLinkOperation | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
-        const [profilesReq, rolesReq, authUsersReq] = await Promise.all([
-            supabase.from('perfiles').select('*, roles(*)'),
-            supabase.from('roles').select('*'),
-            supabaseAdmin.auth.admin.listUsers()
-        ]);
-
-        if (profilesReq.data && authUsersReq.data?.users) {
-            const authMap = new Map(authUsersReq.data.users.map(u => [u.id, u.email]));
-            const combined = profilesReq.data.map(p => ({
-                ...p,
-                email: authMap.get(p.id) || 'Sin email'
-            }));
-            setUsuarios(combined);
-        }
-        
-        if (rolesReq.data) setRoles(rolesReq.data);
-    } catch (err) {
-        console.error('Error fetching users:', err);
+      const [{ data: rolesData, error: rolesError }, list] = await Promise.all([
+        // El cat?logo solo alimenta el selector: Functions y RPC validan de nuevo toda autorizaci?n.
+        supabase.from('roles').select('id, nombre').order('nombre'),
+        adminRequest<UserListResponse>('admin-list-users', 'GET'),
+      ]);
+      if (rolesError) throw rolesError;
+      setRoles(rolesData || []);
+      setUsuarios(list.users || []);
+      setAvailableWorkers(list.available_workers || []);
+    } catch (loadError) {
+      console.error('Error loading secure user management data:', loadError);
+      setError(loadError instanceof Error ? loadError.message : 'No se pudieron cargar los usuarios.');
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
-  const toggleStatus = async (user: any) => {
-    const { error } = await supabase
-      .from('perfiles')
-      .update({ activo: !user.activo })
-      .eq('id', user.id);
+  useEffect(() => {
+    void loadData();
+  }, []);
 
-    if (!error) fetchData();
+  const filteredUsuarios = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return usuarios;
+    return usuarios.filter((user) => [user.nombre, user.email, user.rol, user.trabajador?.nombre, user.trabajador?.apellidos]
+      .some((value) => value?.toLowerCase().includes(term)));
+  }, [searchTerm, usuarios]);
+
+  const updateAccess = async (user: ManagedUser, changes: { rol_id?: string; activo?: boolean }) => {
+    const changingAdministrator = user.rol === 'Administrador' && (changes.rol_id !== undefined || changes.activo === false);
+    if (changingAdministrator && !window.confirm('Vas a cambiar o desactivar una cuenta Administrador. Confirma que quedar\u00e1 otro Administrador activo.')) return;
+    setSavingId(user.auth_user_id);
+    setError(null);
+    try {
+      await adminRequest('admin-update-user-access', 'POST', { target_user_id: user.auth_user_id, ...changes });
+      await loadData();
+    } catch (updateError) {
+      console.error('Error updating user access:', updateError);
+      setError(updateError instanceof Error ? updateError.message : 'No se pudo actualizar el acceso.');
+    } finally {
+      setSavingId(null);
+    }
   };
 
-  const deleteUser = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que deseas eliminar este perfil? Esto no eliminará el usuario de Auth, pero le quitará sus permisos.')) return;
-    
-    const { error } = await supabase.from('perfiles').delete().eq('id', id);
-    if (!error) fetchData();
+  const linkWorker = async (user: ManagedUser, workerId: string | null, confirmActiveAssignments = false) => {
+    setSavingId(user.auth_user_id);
+    setError(null);
+    try {
+      await adminRequest('admin-link-user-worker', 'POST', {
+        target_user_id: user.auth_user_id,
+        trabajador_id: workerId,
+        confirm_active_assignments: confirmActiveAssignments,
+      });
+      setLinkingUserId(null);
+      setPendingLinkOperation(null);
+      setSuccessMessage(workerId ? 'Cuenta vinculada al trabajador correctamente.' : 'Cuenta desvinculada del trabajador correctamente.');
+      await loadData();
+    } catch (linkError) {
+      const confirmationError = linkError as Error & { requiresConfirmation?: boolean; activeAssignments?: number };
+      if (confirmationError.requiresConfirmation) {
+        setPendingLinkOperation({
+          user,
+          trabajadorId: workerId,
+          operation: workerId ? 'vincular' : 'desvincular',
+          activeAssignments: confirmationError.activeAssignments || 0,
+        });
+        return;
+      }
+      console.error('Error linking worker:', linkError);
+      setError(linkError instanceof Error ? linkError.message : 'No se pudo actualizar el v\u00ednculo.');
+    } finally {
+      setSavingId(null);
+    }
   };
 
-  const filteredUsuarios = usuarios.filter(u => 
-    u.nombre_completo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.id?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const confirmPendingLinkOperation = async () => {
+    if (!pendingLinkOperation || savingId) return;
+    await linkWorker(pendingLinkOperation.user, pendingLinkOperation.trabajadorId, true);
+  };
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 h-full">
-      {/* Header */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 w-full backdrop-blur-md">
-        <div className="max-w-7xl mx-auto flex items-center px-4 sm:px-8 h-16">
-          <div className="relative w-full max-w-md">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none">search</span>
-            <input 
-               className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-primary/50 outline-none rounded-xl text-sm transition-all placeholder:text-slate-400" 
-               placeholder="Buscar usuarios..." 
-               type="text"
-               value={searchTerm}
-               onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-      </header>
-      
-      {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-8 max-w-7xl mx-auto w-full">
-        
-        {/* Title & Action */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-4 sm:px-8 py-4">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">Gestión de Usuarios</h2>
-            <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Administra los accesos y permisos de la plataforma.</p>
+            <h2 className="text-2xl font-black tracking-tight">Gesti&oacute;n de Usuarios</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Accesos y v&iacute;nculos gestionados de forma segura por Administradores.</p>
           </div>
-          <button 
-             onClick={() => setIsAddModalOpen(true)}
-             className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all shadow-lg shadow-primary/20 shrink-0"
-          >
-            <span className="material-symbols-outlined text-[18px]">person_add</span>
-            Añadir Usuario
+          <button onClick={() => void loadData()} disabled={loading} className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 disabled:opacity-50">
+            Actualizar
           </button>
         </div>
-        
-        {/* Stats Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <p className="text-slate-500 text-sm font-medium">Total Perfiles</p>
-            <p className="text-2xl font-bold mt-1">{usuarios.length}</p>
+      </header>
+
+      <div className="flex-1 overflow-y-auto p-4 sm:p-8 max-w-7xl mx-auto w-full space-y-6">
+        {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex justify-between gap-4"><span>{error}</span><button onClick={() => setError(null)} aria-label="Cerrar error">&times;</button></div>}
+        {successMessage && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex justify-between gap-4"><span>{successMessage}</span><button onClick={() => setSuccessMessage(null)} aria-label="Cerrar confirmaci?n">&times;</button></div>}
+        <div className="flex flex-col sm:flex-row gap-4 justify-between">
+          <div className="relative w-full max-w-md">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+            <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Buscar por nombre, correo, rol o trabajador..." className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" />
           </div>
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <p className="text-slate-500 text-sm font-medium">Activos</p>
-            <p className="text-2xl font-bold mt-1 text-emerald-500">{usuarios.filter(u => u.activo).length}</p>
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <p className="text-slate-500 text-sm font-medium">Inactivos</p>
-            <p className="text-2xl font-bold mt-1 text-red-500">{usuarios.filter(u => !u.activo).length}</p>
-          </div>
+          <p className="text-xs text-slate-500 self-center">Sin borrado de cuentas, contrase&ntilde;as ni acciones masivas.</p>
         </div>
-        
-        {/* Table Container */}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Summary label="Usuarios" value={usuarios.length} />
+          <Summary label="Activos" value={usuarios.filter((user) => user.activo).length} tone="text-emerald-600" />
+          <Summary label="Sin trabajador vinculado" value={usuarios.filter((user) => user.estado_vinculacion === 'sin_trabajador').length} tone="text-amber-600" />
+        </div>
+
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-full">
-              <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800/50">
-                  <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Usuario</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden lg:table-cell">Email</th>
-                  <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Rol</th>
-                  <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center hidden sm:table-cell">Estado</th>
-                  <th className="px-4 sm:px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
-                </tr>
+            <table className="w-full min-w-[1000px] text-left">
+              <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <tr><th className="px-5 py-4">Usuario</th><th className="px-5 py-4">Rol real</th><th className="px-5 py-4">Estado</th><th className="px-5 py-4">Trabajador vinculado</th><th className="px-5 py-4">&Uacute;ltimo acceso</th><th className="px-5 py-4 text-right">Acciones</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {loading ? (
-                    <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-500 font-bold animate-pulse">Cargando perfiles...</td></tr>
-                ) : filteredUsuarios.length === 0 ? (
-                    <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic font-medium">No se encontraron usuarios.</td></tr>
-                ) : filteredUsuarios.map(u => (
-                    <tr key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-3">
-                              <div className="size-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-black text-[10px] shrink-0 border border-primary/20">
-                                  {u.nombre_completo?.substring(0, 2).toUpperCase() || '??'}
-                              </div>
-                              <div>
-                                  <span className="text-sm font-bold text-slate-900 dark:text-white block truncate max-w-[120px] sm:max-w-none">{u.nombre_completo || 'Sin nombre'}</span>
-                                  <span className="text-[10px] font-mono text-slate-400 hidden sm:inline">ID: {u.id.substring(0, 8)}</span>
-                              </div>
-                            </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 font-medium hidden lg:table-cell">
-                            {u.email}
-                        </td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-center">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm ${
-                                ROLE_COLORS[u.roles?.nombre || ''] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 border-slate-200'
-                            }`}>
-                                {u.roles?.nombre || 'Sin rol'}
-                            </span>
-                        </td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-center hidden sm:table-cell">
-                            <button 
-                                onClick={() => toggleStatus(u)}
-                                className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest ${
-                                    u.activo ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'
-                                }`}
-                            >
-                            <span className={`size-1.5 rounded-full ${u.activo ? 'bg-emerald-500' : 'bg-slate-400 shadow-sm'}`}></span>
-                            {u.activo ? 'Activo' : 'Inactivo'}
-                            </button>
-                        </td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button 
-                                  onClick={() => {
-                                      setSelectedUsuario(u);
-                                      setIsEditModalOpen(true);
-                                  }}
-                                  className="size-8 flex items-center justify-center text-slate-400 hover:text-primary transition-all hover:bg-primary/10 rounded-lg" title="Editar">
-                                  <span className="material-symbols-outlined text-[18px]">edit</span>
-                              </button>
-                              <button 
-                                  onClick={() => deleteUser(u.id)}
-                                  className="size-8 flex items-center justify-center text-slate-400 hover:text-red-500 transition-all hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg" title="Eliminar">
-                                  <span className="material-symbols-outlined text-[18px]">delete</span>
-                              </button>
-                            </div>
-                        </td>
-                    </tr>
-                ))}
+                {loading ? <tr><td colSpan={6} className="px-6 py-14 text-center text-slate-500 font-bold animate-pulse">Cargando usuarios...</td></tr> : filteredUsuarios.length === 0 ? <tr><td colSpan={6} className="px-6 py-14 text-center text-slate-400">No se encontraron usuarios.</td></tr> : filteredUsuarios.map((user) => {
+                  const isSaving = savingId === user.auth_user_id;
+                  const hasAuthAccount = user.auth_status === 'active_auth_user';
+                  return <tr key={user.auth_user_id} className="align-top hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                    <td className="px-5 py-4"><p className="font-bold">{user.nombre || 'Sin perfil'}</p><p className="text-xs text-slate-500">{user.email || 'Sin correo'}</p><p className="text-[10px] text-slate-400 font-mono mt-1">{user.auth_user_id}</p>{!hasAuthAccount && <p className="mt-1 text-[10px] font-bold text-rose-600">Perfil sin cuenta Auth</p>}</td>
+                    <td className="px-5 py-4"><span className={`inline-flex px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${ROLE_COLORS[user.rol || ''] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>{user.rol || 'Sin rol'}</span><select disabled={isSaving || !user.rol_id || !hasAuthAccount} value={user.rol_id || ''} onChange={(event) => void updateAccess(user, { rol_id: event.target.value })} className="mt-2 block w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs"><option value="" disabled>Sin rol</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.nombre}</option>)}</select></td>
+                    <td className="px-5 py-4"><button disabled={isSaving || !user.rol_id || !hasAuthAccount} onClick={() => void updateAccess(user, { activo: !user.activo })} className={`inline-flex items-center gap-2 text-xs font-black uppercase ${user.activo ? 'text-emerald-600' : 'text-slate-400'} disabled:opacity-50`}><span className={`size-2 rounded-full ${user.activo ? 'bg-emerald-500' : 'bg-slate-400'}`} />{user.activo ? 'Activo' : 'Inactivo'}</button></td>
+                    <td className="px-5 py-4">{user.trabajador ? <><p className="text-sm font-bold">{user.trabajador.nombre} {user.trabajador.apellidos || ''}</p><p className="text-xs text-slate-500">{user.trabajador.estado || 'Sin estado'}</p><button disabled={isSaving || !hasAuthAccount} onClick={() => void linkWorker(user, null)} className="mt-2 text-xs font-bold text-rose-600 hover:underline">Desvincular</button></> : <><span className="text-xs text-amber-600 font-bold">{user.estado_vinculacion === 'sin_perfil' ? 'Sin perfil' : 'Sin trabajador'}</span><button disabled={isSaving || !hasAuthAccount || user.estado_vinculacion === 'sin_perfil'} onClick={() => setLinkingUserId(linkingUserId === user.auth_user_id ? null : user.auth_user_id)} className="block mt-2 text-xs font-bold text-primary hover:underline">Vincular trabajador</button>{linkingUserId === user.auth_user_id && <select defaultValue="" disabled={isSaving} onChange={(event) => { if (event.target.value) void linkWorker(user, event.target.value); }} className="mt-2 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs"><option value="">Selecciona trabajador...</option>{availableWorkers.map((worker) => <option key={worker.id} value={worker.id}>{worker.nombre} {worker.apellidos || ''} &mdash; {worker.estado || 'Sin estado'}</option>)}</select>}</>}</td>
+                    <td className="px-5 py-4 text-xs text-slate-500">{user.last_access_at ? new Date(user.last_access_at).toLocaleString('es-ES') : 'Nunca'}</td>
+                    <td className="px-5 py-4 text-right text-xs text-slate-400">{isSaving ? 'Guardando...' : 'Cambios individuales'}</td>
+                  </tr>;
+                })}
               </tbody>
             </table>
           </div>
         </div>
-
       </div>
-      
-      <AltaUsuarioModal 
-        isOpen={isAddModalOpen} 
-        onClose={() => setIsAddModalOpen(false)}
-        onCreated={fetchData} 
-      />
-
-      <EditarUsuarioModal 
-        isOpen={isEditModalOpen}
-        onClose={() => {
-            setIsEditModalOpen(false);
-            setSelectedUsuario(null);
-        }}
-        usuario={selectedUsuario}
-        roles={roles}
-        onUpdated={fetchData}
-      />
+      {pendingLinkOperation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="link-confirmation-title">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+          <h3 id="link-confirmation-title" className="text-lg font-black">Confirmar {pendingLinkOperation.operation}</h3>
+          <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+            {pendingLinkOperation.operation === 'vincular'
+              ? `El trabajador seleccionado tiene ${pendingLinkOperation.activeAssignments} asignaciones activas. \u00bfDeseas vincular esta cuenta igualmente?`
+              : `Este trabajador tiene ${pendingLinkOperation.activeAssignments} asignaciones activas. Si desvinculas la cuenta, conservar\u00e1 sus asignaciones e historial, pero dejar\u00e1 de poder acceder como ese trabajador. \u00bfDeseas continuar?`}
+          </p>
+          <div className="mt-6 flex justify-end gap-3">
+            <button type="button" disabled={savingId === pendingLinkOperation.user.auth_user_id} onClick={() => setPendingLinkOperation(null)} className="rounded-xl px-4 py-2 text-sm font-bold text-slate-600 disabled:opacity-50 dark:text-slate-300">Cancelar</button>
+            <button type="button" disabled={savingId === pendingLinkOperation.user.auth_user_id} onClick={() => void confirmPendingLinkOperation()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{savingId === pendingLinkOperation.user.auth_user_id ? 'Procesando...' : 'Confirmar'}</button>
+          </div>
+        </div>
+      </div>}
     </div>
   );
+}
+
+function Summary({ label, value, tone = 'text-slate-900 dark:text-white' }: { label: string; value: number; tone?: string }) {
+  return <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-widest text-slate-400">{label}</p><p className={`mt-2 text-2xl font-black ${tone}`}>{value}</p></div>;
 }
