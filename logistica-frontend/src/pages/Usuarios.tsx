@@ -43,6 +43,7 @@ interface PendingProfileOperation {
   user: ManagedUser;
   rolId: string;
   activo: boolean;
+  confirmAdministrator: boolean;
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -171,12 +172,11 @@ export default function Usuarios() {
   };
 
   const openCreateProfile = (user: ManagedUser) => {
-    const defaultRoleId = roles[0]?.id || '';
-    if (!defaultRoleId) {
+    if (roles.length === 0) {
       setError('No hay roles disponibles para crear el perfil.');
       return;
     }
-    setPendingProfileOperation({ user, rolId: defaultRoleId, activo: true });
+    setPendingProfileOperation({ user, rolId: '', activo: true, confirmAdministrator: false });
   };
 
   const createUserProfile = async () => {
@@ -186,6 +186,11 @@ export default function Usuarios() {
       return;
     }
     const { user, rolId, activo } = pendingProfileOperation;
+    const selectedRole = roles.find((role) => role.id === rolId);
+    if (selectedRole?.nombre === 'Administrador' && !pendingProfileOperation.confirmAdministrator) {
+      setError('Confirma expresamente la creación de una cuenta Administrador.');
+      return;
+    }
     setSavingId(user.auth_user_id);
     setError(null);
     try {
@@ -266,13 +271,14 @@ export default function Usuarios() {
           <h3 id="create-profile-title" className="text-lg font-black">Crear perfil y configurar acceso</h3>
           <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">Se creará un perfil para <strong>{pendingProfileOperation.user.email || pendingProfileOperation.user.auth_user_id}</strong>. Después de crear el perfil podrás vincular esta cuenta a un trabajador.</p>
           <label className="mt-5 block text-xs font-black uppercase tracking-widest text-slate-500">Rol</label>
-          <select value={pendingProfileOperation.rolId} disabled={savingId === pendingProfileOperation.user.auth_user_id} onChange={(event) => setPendingProfileOperation({ ...pendingProfileOperation, rolId: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800">
+          <select value={pendingProfileOperation.rolId} disabled={savingId === pendingProfileOperation.user.auth_user_id} onChange={(event) => setPendingProfileOperation({ ...pendingProfileOperation, rolId: event.target.value, confirmAdministrator: false })} className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800">
             <option value="" disabled>Selecciona un rol...</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.nombre}</option>)}
           </select>
+          {roles.find((role) => role.id === pendingProfileOperation.rolId)?.nombre === 'Administrador' && <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-black">Advertencia: acceso Administrador</p><p className="mt-1">Esta cuenta podrá gestionar usuarios y datos administrativos.</p><label className="mt-3 flex items-start gap-2 font-bold"><input type="checkbox" checked={pendingProfileOperation.confirmAdministrator} disabled={savingId === pendingProfileOperation.user.auth_user_id} onChange={(event) => setPendingProfileOperation({ ...pendingProfileOperation, confirmAdministrator: event.target.checked })} /> Confirmo que deseo crear una cuenta Administrador.</label></div>}
           <label className="mt-4 flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={pendingProfileOperation.activo} disabled={savingId === pendingProfileOperation.user.auth_user_id} onChange={(event) => setPendingProfileOperation({ ...pendingProfileOperation, activo: event.target.checked })} /> Activar acceso al crear el perfil</label>
           <div className="mt-6 flex justify-end gap-3">
             <button type="button" disabled={savingId === pendingProfileOperation.user.auth_user_id} onClick={() => setPendingProfileOperation(null)} className="rounded-xl px-4 py-2 text-sm font-bold text-slate-600 disabled:opacity-50 dark:text-slate-300">Cancelar</button>
-            <button type="button" disabled={savingId === pendingProfileOperation.user.auth_user_id || !pendingProfileOperation.rolId} onClick={() => void createUserProfile()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{savingId === pendingProfileOperation.user.auth_user_id ? 'Creando...' : 'Crear perfil'}</button>
+            <button type="button" disabled={savingId === pendingProfileOperation.user.auth_user_id || !pendingProfileOperation.rolId || (roles.find((role) => role.id === pendingProfileOperation.rolId)?.nombre === 'Administrador' && !pendingProfileOperation.confirmAdministrator)} onClick={() => void createUserProfile()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{savingId === pendingProfileOperation.user.auth_user_id ? 'Creando...' : 'Crear perfil'}</button>
           </div>
         </div>
       </div>}
