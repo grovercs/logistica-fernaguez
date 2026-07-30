@@ -5,6 +5,7 @@ const userId = '12345678-1234-4123-8123-123456789abc';
 const dependencies = (overrides: Partial<AdminAuthorizationDependencies> = {}): AdminAuthorizationDependencies => ({
   supabaseUrlHost: 'project.supabase.co',
   getAuthenticatedUser: async () => ({ userId, errorCode: null }),
+  verifyServerAdminUser: async (requestedUserId) => ({ userFound: requestedUserId === userId, errorCode: null }),
   getProfile: async () => ({ profile: { id: userId, rol_id: '87654321-1234-4123-8123-123456789abc', activo: true }, errorCode: null }),
   getRoleName: async () => ({ roleName: 'Administrador', errorCode: null }),
   ...overrides,

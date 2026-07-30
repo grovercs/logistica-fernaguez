@@ -39,8 +39,13 @@ const hostnameFromHeader = (value: string | undefined): string | undefined => {
 const allowedRequestHost = (hostname: string | undefined): boolean =>
   Boolean(hostname && (allowedProductionHosts.has(hostname) || isDevelopmentHost(hostname)));
 
+const serverClientAuthOptions = {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+};
+
 export interface AdminContext {
   actorUserId: string;
+  // This client is created with SUPABASE_SERVICE_ROLE_KEY and is server-only.
   admin: SupabaseClient;
 }
 
@@ -121,6 +126,7 @@ export const response = (statusCode: number, body: unknown, origin?: string) => 
 export interface AdminAuthorizationDependencies {
   supabaseUrlHost: string | null;
   getAuthenticatedUser: (token: string) => Promise<{ userId: string | null; errorCode: string | null }>;
+  verifyServerAdminUser: (userId: string) => Promise<{ userFound: boolean; errorCode: string | null }>;
   getProfile: (userId: string) => Promise<{ profile: { id: string; rol_id: string | null; activo: boolean | null } | null; errorCode: string | null }>;
   getRoleName: (roleId: string) => Promise<{ roleName: string | null; errorCode: string | null }>;
 }
@@ -167,6 +173,15 @@ export async function validateActiveAdministrator(token: string | undefined, dep
 
   const userId = authenticated.userId;
   const authenticatedUserId = userId.slice(0, 8);
+  const serverUser = await dependencies.verifyServerAdminUser(userId);
+  if (serverUser.errorCode || !serverUser.userFound) {
+    logAdminAuthorization({
+      ...baseLog, auth_validation: 'success', authenticated_user_id: authenticatedUserId,
+      error_code: serverUser.errorCode || 'SERVER_ADMIN_USER_NOT_FOUND',
+    });
+    throw new Error('SERVER_ADMIN_CLIENT_ERROR');
+  }
+
   const profileResult = await dependencies.getProfile(userId);
   if (profileResult.errorCode) {
     logAdminAuthorization({
@@ -224,16 +239,23 @@ export async function requireActiveAdministrator(event: HandlerEvent): Promise<A
     throw new Error('SERVER_CONFIGURATION_ERROR');
   }
 
-  const authClient = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
-  const admin = createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  // The anonymous client only validates the bearer JWT. It never reads application tables.
+  const authValidationClient = createClient(url, anonKey, serverClientAuthOptions);
+  // All privileged reads and auth.admin calls use this separate server-only client.
+  const serverAdminClient = createClient(url, serviceRoleKey, serverClientAuthOptions);
   const actorUserId = await validateActiveAdministrator(token, {
     supabaseUrlHost,
     getAuthenticatedUser: async (bearerToken) => {
-      const { data: { user }, error } = await authClient.auth.getUser(bearerToken);
+      const { data: { user }, error } = await authValidationClient.auth.getUser(bearerToken);
       return { userId: user?.id || null, errorCode: error?.code || null };
     },
+    verifyServerAdminUser: async (userId) => {
+      const { data, error } = await serverAdminClient.auth.admin.getUserById(userId);
+      return { userFound: Boolean(data.user), errorCode: error?.code || null };
+    },
     getProfile: async (userId) => {
-      const { data, error } = await admin
+      const { data, error } = await serverAdminClient
+        .schema('public')
         .from('perfiles')
         .select('id, rol_id, activo')
         .eq('id', userId)
@@ -241,7 +263,8 @@ export async function requireActiveAdministrator(event: HandlerEvent): Promise<A
       return { profile: data, errorCode: error?.code || null };
     },
     getRoleName: async (roleId) => {
-      const { data, error } = await admin
+      const { data, error } = await serverAdminClient
+        .schema('public')
         .from('roles')
         .select('nombre')
         .eq('id', roleId)
@@ -249,7 +272,7 @@ export async function requireActiveAdministrator(event: HandlerEvent): Promise<A
       return { roleName: data?.nombre || null, errorCode: error?.code || null };
     },
   });
-  return { actorUserId, admin };
+  return { actorUserId, admin: serverAdminClient };
 }
 
 export async function writeAudit(admin: SupabaseClient, entry: {

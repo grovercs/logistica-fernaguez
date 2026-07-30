@@ -30,9 +30,9 @@ export const handler: Handler = async (event) => {
   try {
     const context = await requireActiveAdministrator(event);
     const [{ data: profiles, error: profilesError }, { data: roles, error: rolesError }, { data: workers, error: workersError }, authUsers] = await Promise.all([
-      context.admin.from('perfiles').select('id, nombre_completo, rol_id, activo'),
-      context.admin.from('roles').select('id, nombre'),
-      context.admin.from('trabajadores').select('id, auth_user_id, nombre, apellidos, estado').order('nombre').order('apellidos'),
+      context.admin.schema('public').from('perfiles').select('id, nombre_completo, rol_id, activo'),
+      context.admin.schema('public').from('roles').select('id, nombre'),
+      context.admin.schema('public').from('trabajadores').select('id, auth_user_id, nombre, apellidos, estado').order('nombre').order('apellidos'),
       listAllAuthUsers(context.admin),
     ]);
     if (profilesError || rolesError || workersError) throw new Error('Unable to load user management data');
