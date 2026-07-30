@@ -29,14 +29,16 @@ export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'GET') return response(405, { error: 'Method not allowed' }, origin);
   try {
     const context = await requireActiveAdministrator(event);
-    const [{ data: profiles, error: profilesError }, { data: workers, error: workersError }, authUsers] = await Promise.all([
-      context.admin.from('perfiles').select('id, nombre_completo, rol_id, activo, roles(nombre)'),
+    const [{ data: profiles, error: profilesError }, { data: roles, error: rolesError }, { data: workers, error: workersError }, authUsers] = await Promise.all([
+      context.admin.from('perfiles').select('id, nombre_completo, rol_id, activo'),
+      context.admin.from('roles').select('id, nombre'),
       context.admin.from('trabajadores').select('id, auth_user_id, nombre, apellidos, estado').order('nombre').order('apellidos'),
       listAllAuthUsers(context.admin),
     ]);
-    if (profilesError || workersError) throw new Error('Unable to load user management data');
+    if (profilesError || rolesError || workersError) throw new Error('Unable to load user management data');
 
     const profileById = new Map((profiles || []).map((profile) => [profile.id, profile]));
+    const roleNameById = new Map((roles || []).map((role) => [role.id, role.nombre]));
     const workerByAuthId = new Map((workers || []).filter((worker) => worker.auth_user_id).map((worker) => [worker.auth_user_id, worker]));
     const authUserIds = new Set(authUsers.map((user) => user.id));
     const users = authUsers.map((authUser) => {
@@ -44,7 +46,7 @@ export const handler: Handler = async (event) => {
       const worker = workerByAuthId.get(authUser.id);
       return {
         auth_user_id: authUser.id, email: authUser.email ?? null, nombre: profile?.nombre_completo ?? null,
-        rol_id: profile?.rol_id ?? null, rol: (profile?.roles as { nombre?: string } | null)?.nombre ?? null,
+        rol_id: profile?.rol_id ?? null, rol: profile?.rol_id ? roleNameById.get(profile.rol_id) ?? null : null,
         activo: profile?.activo ?? false, last_access_at: authUser.last_sign_in_at ?? null,
         auth_status: 'active_auth_user', profile_status: profile ? 'active_profile' : 'missing_profile',
         trabajador: worker ? { id: worker.id, nombre: worker.nombre, apellidos: worker.apellidos, estado: worker.estado } : null,
@@ -56,7 +58,7 @@ export const handler: Handler = async (event) => {
       const worker = workerByAuthId.get(profile.id);
       users.push({
         auth_user_id: profile.id, email: null, nombre: profile.nombre_completo ?? null,
-        rol_id: profile.rol_id ?? null, rol: (profile.roles as { nombre?: string } | null)?.nombre ?? null,
+        rol_id: profile.rol_id ?? null, rol: profile.rol_id ? roleNameById.get(profile.rol_id) ?? null : null,
         activo: profile.activo ?? false, last_access_at: null,
         auth_status: 'missing_auth_user', profile_status: 'active_profile',
         trabajador: worker ? { id: worker.id, nombre: worker.nombre, apellidos: worker.apellidos, estado: worker.estado } : null,

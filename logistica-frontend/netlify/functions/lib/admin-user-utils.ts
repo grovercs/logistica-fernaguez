@@ -118,25 +118,138 @@ export const response = (statusCode: number, body: unknown, origin?: string) => 
   body: statusCode === 204 ? '' : JSON.stringify(body),
 });
 
+export interface AdminAuthorizationDependencies {
+  supabaseUrlHost: string | null;
+  getAuthenticatedUser: (token: string) => Promise<{ userId: string | null; errorCode: string | null }>;
+  getProfile: (userId: string) => Promise<{ profile: { id: string; rol_id: string | null; activo: boolean | null } | null; errorCode: string | null }>;
+  getRoleName: (roleId: string) => Promise<{ roleName: string | null; errorCode: string | null }>;
+}
+
+const configuredSupabaseHost = (url: string | undefined): string | null => {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+};
+
+const logAdminAuthorization = (details: {
+  auth_validation: 'success' | 'failure';
+  authenticated_user_id: string | null;
+  profile_lookup: 'found' | 'not_found' | 'error' | null;
+  profile_active: boolean | null;
+  role_lookup: string | null;
+  admin_check: 'allowed' | 'denied';
+  supabase_url_host: string | null;
+  error_code: string | null;
+}) => console.info('admin_authorization', JSON.stringify(details));
+
+export async function validateActiveAdministrator(token: string | undefined, dependencies: AdminAuthorizationDependencies): Promise<string> {
+  const baseLog = {
+    authenticated_user_id: null,
+    profile_lookup: null,
+    profile_active: null,
+    role_lookup: null,
+    admin_check: 'denied' as const,
+    supabase_url_host: dependencies.supabaseUrlHost,
+  };
+  if (!token) {
+    logAdminAuthorization({ ...baseLog, auth_validation: 'failure', error_code: 'MISSING_BEARER_TOKEN' });
+    throw new Error('UNAUTHORIZED');
+  }
+
+  const authenticated = await dependencies.getAuthenticatedUser(token);
+  if (authenticated.errorCode || !authenticated.userId) {
+    logAdminAuthorization({ ...baseLog, auth_validation: 'failure', error_code: authenticated.errorCode || 'AUTH_USER_NOT_FOUND' });
+    throw new Error('UNAUTHORIZED');
+  }
+
+  const userId = authenticated.userId;
+  const authenticatedUserId = userId.slice(0, 8);
+  const profileResult = await dependencies.getProfile(userId);
+  if (profileResult.errorCode) {
+    logAdminAuthorization({
+      ...baseLog, auth_validation: 'success', authenticated_user_id: authenticatedUserId,
+      profile_lookup: 'error', error_code: profileResult.errorCode,
+    });
+    throw new Error('ADMIN_PROFILE_LOOKUP_ERROR');
+  }
+  if (!profileResult.profile) {
+    logAdminAuthorization({
+      ...baseLog, auth_validation: 'success', authenticated_user_id: authenticatedUserId,
+      profile_lookup: 'not_found', error_code: null,
+    });
+    throw new Error('FORBIDDEN');
+  }
+
+  const profile = profileResult.profile;
+  let roleName: string | null = null;
+  if (profile.rol_id) {
+    const roleResult = await dependencies.getRoleName(profile.rol_id);
+    if (roleResult.errorCode) {
+      logAdminAuthorization({
+        ...baseLog, auth_validation: 'success', authenticated_user_id: authenticatedUserId,
+        profile_lookup: 'found', profile_active: profile.activo, role_lookup: null,
+        error_code: roleResult.errorCode,
+      });
+      throw new Error('ADMIN_ROLE_LOOKUP_ERROR');
+    }
+    roleName = roleResult.roleName;
+  }
+
+  const allowed = profile.activo === true && roleName === 'Administrador';
+  logAdminAuthorization({
+    ...baseLog, auth_validation: 'success', authenticated_user_id: authenticatedUserId,
+    profile_lookup: 'found', profile_active: profile.activo, role_lookup: roleName,
+    admin_check: allowed ? 'allowed' : 'denied', error_code: null,
+  });
+  if (!allowed) throw new Error('FORBIDDEN');
+  return userId;
+}
+
 export async function requireActiveAdministrator(event: HandlerEvent): Promise<AdminContext> {
   const url = process.env.SUPABASE_URL;
   const anonKey = process.env.SUPABASE_ANON_KEY;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const authorization = event.headers.authorization || event.headers.Authorization;
   const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
-  if (!url || !anonKey || !serviceRoleKey) throw new Error('SERVER_CONFIGURATION_ERROR');
-  if (!token) throw new Error('UNAUTHORIZED');
+  const supabaseUrlHost = configuredSupabaseHost(url);
+  if (!url || !anonKey || !serviceRoleKey || !supabaseUrlHost) {
+    logAdminAuthorization({
+      auth_validation: 'failure', authenticated_user_id: null, profile_lookup: null,
+      profile_active: null, role_lookup: null, admin_check: 'denied',
+      supabase_url_host: supabaseUrlHost, error_code: 'SERVER_CONFIGURATION_ERROR',
+    });
+    throw new Error('SERVER_CONFIGURATION_ERROR');
+  }
 
   const authClient = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { data: { user }, error: userError } = await authClient.auth.getUser(token);
-  if (userError || !user) throw new Error('UNAUTHORIZED');
-
   const admin = createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { data: profile, error: profileError } = await admin
-    .from('perfiles').select('id, activo, roles(nombre)').eq('id', user.id).maybeSingle();
-  const roleName = (profile?.roles as { nombre?: string } | null)?.nombre;
-  if (profileError || !profile?.activo || roleName !== 'Administrador') throw new Error('FORBIDDEN');
-  return { actorUserId: user.id, admin };
+  const actorUserId = await validateActiveAdministrator(token, {
+    supabaseUrlHost,
+    getAuthenticatedUser: async (bearerToken) => {
+      const { data: { user }, error } = await authClient.auth.getUser(bearerToken);
+      return { userId: user?.id || null, errorCode: error?.code || null };
+    },
+    getProfile: async (userId) => {
+      const { data, error } = await admin
+        .from('perfiles')
+        .select('id, rol_id, activo')
+        .eq('id', userId)
+        .maybeSingle();
+      return { profile: data, errorCode: error?.code || null };
+    },
+    getRoleName: async (roleId) => {
+      const { data, error } = await admin
+        .from('roles')
+        .select('nombre')
+        .eq('id', roleId)
+        .maybeSingle();
+      return { roleName: data?.nombre || null, errorCode: error?.code || null };
+    },
+  });
+  return { actorUserId, admin };
 }
 
 export async function writeAudit(admin: SupabaseClient, entry: {
