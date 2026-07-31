@@ -4,11 +4,13 @@ import type { HandlerEvent } from '@netlify/functions';
 const allowedProductionOrigins = new Set([
   'https://admin.appvielha.com',
   'https://deploy-preview-6--logistica-fernaguez-admin.netlify.app',
+  'https://deploy-preview-7--logistica-fernaguez-admin.netlify.app',
 ]);
 
 const allowedProductionHosts = new Set([
   'admin.appvielha.com',
   'deploy-preview-6--logistica-fernaguez-admin.netlify.app',
+  'deploy-preview-7--logistica-fernaguez-admin.netlify.app',
 ]);
 
 const isDevelopmentHost = (hostname: string) => hostname === 'localhost' || hostname === '127.0.0.1';

@@ -23,5 +23,19 @@ assert.match(source, /isMissingProfile && hasAuthAccount[\s\S]*Crear perfil y co
 assert.match(source, /isMissingProfile \? 'Cuenta Auth no disponible'[\s\S]*Editar perfil/);
 assert.doesNotMatch(source, /\.from\('perfiles'\)\.(?:update|insert|delete)/);
 assert.doesNotMatch(source, /\.from\('trabajadores'\)\.(?:update|insert|delete)/);
+assert.match(source, /isMissingProfile && hasAuthAccount[\s\S]*Eliminar cuenta de prueba/);
+assert.match(source, /openDeleteTestUser/);
+assert.match(source, /if \(!deleteTestUserOperation \|\| savingId \|\| deleteTestUserInFlight\.current\) return;/);
+assert.match(source, /deleteTestUserInFlight\.current = true/);
+assert.match(source, /deleteTestUserInFlight\.current = false/);
+assert.match(source, /setSavingId\(user\.auth_user_id\)/);
+assert.match(source, /setDeleteTestUserOperation\(null\)/);
+assert.match(source, /await loadData\(\)/);
+assert.match(source, /adminRequest\('admin-delete-test-user', 'POST'/);
+assert.match(source, /confirmation_email: confirmationEmail/);
+assert.match(source, /Escribe exactamente el correo para confirmar/);
+assert.match(source, /Confirmaci?n final: esta cuenta tuvo actividad/);
+assert.match(source, /deleteTestUserOperation\.confirmationEmail !== deleteTestUserOperation\.user\.email/);
+assert.doesNotMatch(source, /admin-delete-test-user[\s\S]*?supabase\.from\('(?:perfiles|trabajadores)'\)\.(?:update|insert|delete)/);
 
 console.log('Usuarios edit profile UI contract tests passed');

@@ -47,7 +47,7 @@ export const handler: Handler = async (event) => {
       return {
         auth_user_id: authUser.id, email: authUser.email ?? null, nombre: profile?.nombre_completo ?? null,
         rol_id: profile?.rol_id ?? null, rol: profile?.rol_id ? roleNameById.get(profile.rol_id) ?? null : null,
-        activo: profile?.activo ?? false, last_access_at: authUser.last_sign_in_at ?? null,
+        activo: profile?.activo ?? false, created_at: authUser.created_at ?? null, last_access_at: authUser.last_sign_in_at ?? null,
         auth_status: 'active_auth_user', profile_status: profile ? 'active_profile' : 'missing_profile',
         trabajador: worker ? { id: worker.id, nombre: worker.nombre, apellidos: worker.apellidos, estado: worker.estado } : null,
         estado_vinculacion: !profile ? 'sin_perfil' : worker ? 'vinculado' : 'sin_trabajador',
@@ -59,7 +59,7 @@ export const handler: Handler = async (event) => {
       users.push({
         auth_user_id: profile.id, email: null, nombre: profile.nombre_completo ?? null,
         rol_id: profile.rol_id ?? null, rol: profile.rol_id ? roleNameById.get(profile.rol_id) ?? null : null,
-        activo: profile.activo ?? false, last_access_at: null,
+        activo: profile.activo ?? false, created_at: null, last_access_at: null,
         auth_status: 'missing_auth_user', profile_status: 'active_profile',
         trabajador: worker ? { id: worker.id, nombre: worker.nombre, apellidos: worker.apellidos, estado: worker.estado } : null,
         estado_vinculacion: worker ? 'vinculado' : 'sin_trabajador',

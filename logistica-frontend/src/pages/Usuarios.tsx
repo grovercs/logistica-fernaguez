@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 interface Role {
@@ -20,6 +20,7 @@ interface ManagedUser {
   rol_id: string | null;
   rol: string | null;
   activo: boolean;
+  created_at: string | null;
   last_access_at: string | null;
   trabajador: WorkerOption | null;
   estado_vinculacion: 'vinculado' | 'sin_trabajador' | 'sin_perfil';
@@ -39,6 +40,12 @@ interface PendingProfileOperation {
   rolId: string;
   activo: boolean;
   confirmAdministrator: boolean;
+}
+
+interface DeleteTestUserOperation {
+  user: ManagedUser;
+  confirmationEmail: string;
+  confirmSignedInAccount: boolean;
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -78,6 +85,8 @@ export default function Usuarios() {
   const [pendingProfileOperation, setPendingProfileOperation] = useState<PendingProfileOperation | null>(null);
   const [editProfileOperation, setEditProfileOperation] = useState<EditProfileOperation | null>(null);
   const [editConfirmation, setEditConfirmation] = useState<'changes' | 'assignments' | null>(null);
+  const [deleteTestUserOperation, setDeleteTestUserOperation] = useState<DeleteTestUserOperation | null>(null);
+  const deleteTestUserInFlight = useRef(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -158,6 +167,43 @@ export default function Usuarios() {
     }
   };
 
+
+  const openDeleteTestUser = (user: ManagedUser) => {
+    setError(null);
+    setDeleteTestUserOperation({ user, confirmationEmail: '', confirmSignedInAccount: false });
+  };
+
+  const deleteTestUser = async () => {
+    if (!deleteTestUserOperation || savingId || deleteTestUserInFlight.current) return;
+    const { user, confirmationEmail, confirmSignedInAccount } = deleteTestUserOperation;
+    if (!user.email || confirmationEmail !== user.email) {
+      setError('Escribe exactamente el correo de la cuenta para confirmar la eliminaci?n.');
+      return;
+    }
+    if (user.last_access_at && !confirmSignedInAccount) {
+      setDeleteTestUserOperation({ ...deleteTestUserOperation, confirmSignedInAccount: true });
+      return;
+    }
+    deleteTestUserInFlight.current = true;
+    setSavingId(user.auth_user_id);
+    setError(null);
+    try {
+      await adminRequest('admin-delete-test-user', 'POST', {
+        target_user_id: user.auth_user_id,
+        confirmation_email: confirmationEmail,
+      });
+      setDeleteTestUserOperation(null);
+      setSuccessMessage('Cuenta de prueba eliminada definitivamente.');
+      await loadData();
+    } catch (deleteError) {
+      console.error('Error deleting test account:', deleteError);
+      setError(deleteError instanceof Error ? deleteError.message : 'No se pudo eliminar la cuenta de prueba.');
+    } finally {
+      deleteTestUserInFlight.current = false;
+      setSavingId(null);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 h-full">
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 w-full backdrop-blur-md">
@@ -180,7 +226,7 @@ export default function Usuarios() {
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
             <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Buscar por nombre, correo, rol o trabajador..." className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" />
           </div>
-          <p className="text-xs text-slate-500 self-center">Sin borrado de cuentas, contrase&ntilde;as ni acciones masivas.</p>
+          <p className="text-xs text-slate-500 self-center">Sin borrado de perfiles, contrase&ntilde;as ni acciones masivas.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -209,7 +255,7 @@ export default function Usuarios() {
                     <td className="px-5 py-4"><span className={`text-xs font-black uppercase ${user.activo ? 'text-emerald-600' : 'text-slate-400'}`}>{isMissingProfile ? 'Sin permisos' : user.activo ? 'Activo' : 'Inactivo'}</span></td>
                     <td className="px-5 py-4 text-sm">{isMissingProfile ? 'Crea el perfil antes de vincular trabajador.' : user.trabajador ? `${user.trabajador.nombre} ${user.trabajador.apellidos || ''}` : 'Sin trabajador vinculado'}</td>
                     <td className="px-5 py-4 text-xs text-slate-500">{user.last_access_at ? new Date(user.last_access_at).toLocaleString('es-ES') : 'Nunca'}</td>
-                    <td className="px-5 py-4 text-right text-xs">{isSaving ? 'Guardando...' : isMissingProfile && hasAuthAccount ? <button type="button" onClick={() => openCreateProfile(user)} className="rounded-lg bg-primary px-3 py-2 font-black text-white">Crear perfil y configurar acceso</button> : isMissingProfile ? 'Cuenta Auth no disponible' : <button type="button" onClick={() => openEditProfile(user)} className="rounded-lg bg-primary px-3 py-2 font-black text-white">Editar perfil</button>}</td>
+                    <td className="px-5 py-4 text-right text-xs">{isSaving ? 'Guardando...' : isMissingProfile && hasAuthAccount ? <div className="flex flex-col items-end gap-2"><button type="button" onClick={() => openCreateProfile(user)} className="rounded-lg bg-primary px-3 py-2 font-black text-white">Crear perfil y configurar acceso</button><button type="button" onClick={() => openDeleteTestUser(user)} className="rounded-lg border border-rose-300 px-3 py-2 font-black text-rose-700 hover:bg-rose-50 dark:border-rose-700 dark:text-rose-300">Eliminar cuenta de prueba</button></div> : isMissingProfile ? 'Cuenta Auth no disponible' : <button type="button" onClick={() => openEditProfile(user)} className="rounded-lg bg-primary px-3 py-2 font-black text-white">Editar perfil</button>}</td>
                   </tr>;
                 })}
               </tbody>
@@ -219,6 +265,18 @@ export default function Usuarios() {
       </div>
       {editConfirmation && editProfileOperation && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true"><div className="w-full max-w-md rounded-2xl bg-white p-6 dark:bg-slate-900"><h3 className="text-lg font-black">Confirmar cambios de perfil</h3><p className="mt-2 text-sm">{editProfileOperation.user.nombre || editProfileOperation.user.email}</p>{editConfirmation === 'assignments' ? <p className="mt-4 text-sm">Este trabajador tiene {editProfileOperation.activeAssignmentsCount} asignaciones activas. El cambio conservará sus asignaciones e historial, pero puede afectar su acceso. ¿Deseas continuar?</p> : <><p className="mt-4 text-sm">Rol: Anterior: {editProfileOperation.user.rol || 'Sin rol'} | Nuevo: {roles.find(r=>r.id===editProfileOperation.rolId)?.nombre || 'Sin rol'}<br/>Estado: Anterior: {editProfileOperation.user.activo?'Activo':'Inactivo'} | Nuevo: {editProfileOperation.activo?'Activo':'Inactivo'}<br/>Trabajador: Anterior: {editProfileOperation.user.trabajador?.nombre || 'Sin trabajador vinculado'} | Nuevo: {availableWorkers.find(w=>w.id===editProfileOperation.trabajadorId)?.nombre || (editProfileOperation.trabajadorId ? editProfileOperation.user.trabajador?.nombre : 'Sin trabajador vinculado')}</p>{(editProfileOperation.user.rol==='Administrador'||roles.find(r=>r.id===editProfileOperation.rolId)?.nombre==='Administrador')&&<p className="mt-3 text-sm font-bold text-amber-700">Este cambio modifica permisos administrativos.</p>}{editProfileOperation.user.activo&&!editProfileOperation.activo&&<p className="mt-3 text-sm">Este usuario perderá el acceso a la aplicación, pero conservará su historial, asignaciones e intervenciones.</p>}{editProfileOperation.trabajadorId!==(editProfileOperation.user.trabajador?.id||'')&&<p className="mt-3 text-sm">El cambio no borrará asignaciones, reportes ni historial.</p>}</>}<div className="mt-6 flex justify-end gap-3"><button disabled={Boolean(savingId)} onClick={()=>setEditConfirmation(null)}>Cancelar</button><button disabled={Boolean(savingId)} onClick={()=>void submitEditProfile(editConfirmation==='assignments')} className="rounded bg-primary px-4 py-2 text-white">Confirmar cambios</button></div></div></div>}
       {editProfileOperation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true"><div className="w-full max-w-lg rounded-2xl bg-white p-6 dark:bg-slate-900"><h3 className="text-lg font-black">Editar perfil</h3><p className="mt-2 text-sm text-slate-500"><span>{editProfileOperation.user.email || 'Sin correo'}</span><span className="ml-2">Último acceso: {editProfileOperation.user.last_access_at ? new Date(editProfileOperation.user.last_access_at).toLocaleString('es-ES') : 'Nunca'}</span></p><label className="mt-4 block text-xs font-black">Nombre completo</label><input value={editProfileOperation.nombre} maxLength={120} onChange={e=>setEditProfileOperation({...editProfileOperation,nombre:e.target.value})} className="mt-1 w-full rounded border p-2"/><label className="mt-4 block text-xs font-black">Rol</label><select value={editProfileOperation.rolId} onChange={e=>setEditProfileOperation({...editProfileOperation,rolId:e.target.value})} className="mt-1 w-full rounded border p-2"><option value="" disabled>Selecciona un rol</option>{roles.map(r=><option key={r.id} value={r.id}>{r.nombre}</option>)}</select><label className="mt-4 flex gap-2"><input type="checkbox" checked={editProfileOperation.activo} onChange={e=>setEditProfileOperation({...editProfileOperation,activo:e.target.checked})}/> Activo</label><label className="mt-4 block text-xs font-black">Trabajador vinculado</label><select value={editProfileOperation.trabajadorId} onChange={e=>setEditProfileOperation({...editProfileOperation,trabajadorId:e.target.value,confirmAssignments:false})} className="mt-1 w-full rounded border p-2"><option value="">Sin trabajador vinculado</option>{editProfileOperation.user.trabajador && <option value={editProfileOperation.user.trabajador.id}>{editProfileOperation.user.trabajador.nombre} {editProfileOperation.user.trabajador.apellidos || ''}</option>}{availableWorkers.map(w=><option key={w.id} value={w.id}>{w.nombre} {w.apellidos || ''}</option>)}</select>{editProfileOperation.confirmAssignments && <label className="mt-4 flex gap-2 text-sm"><input type="checkbox" checked onChange={()=>{}} readOnly/> Confirmo el cambio de vínculo con asignaciones activas.</label>}<div className="mt-6 flex justify-end gap-3"><button disabled={Boolean(savingId)} onClick={()=>setEditProfileOperation(null)}>Cancelar</button><button disabled={Boolean(savingId)||!editHasChanges(editProfileOperation)} onClick={saveEditProfile} className="rounded bg-primary px-4 py-2 text-white">Guardar cambios</button></div></div></div>}
+      {deleteTestUserOperation && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-test-user-title">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+          <h3 id="delete-test-user-title" className="text-lg font-black text-rose-700 dark:text-rose-300">Eliminar cuenta de prueba</h3>
+          <p className="mt-3 text-sm">Esta eliminaci&oacute;n es definitiva y s&oacute;lo est&aacute; disponible para cuentas sin perfil, sin trabajador vinculado y sin archivos propios.</p>
+          <dl className="mt-4 space-y-2 text-sm"><div><dt className="font-bold">Correo</dt><dd>{deleteTestUserOperation.user.email}</dd></div><div><dt className="font-bold">Fecha de creaci&oacute;n</dt><dd>{deleteTestUserOperation.user.created_at ? new Date(deleteTestUserOperation.user.created_at).toLocaleString('es-ES') : 'No disponible'}</dd></div><div><dt className="font-bold">&Uacute;ltimo acceso</dt><dd>{deleteTestUserOperation.user.last_access_at ? new Date(deleteTestUserOperation.user.last_access_at).toLocaleString('es-ES') : 'Nunca'}</dd></div></dl>
+          <label className="mt-5 block text-sm font-bold">Escribe exactamente el correo para confirmar</label>
+          <input value={deleteTestUserOperation.confirmationEmail} onChange={(event) => setDeleteTestUserOperation({ ...deleteTestUserOperation, confirmationEmail: event.target.value, confirmSignedInAccount: false })} disabled={Boolean(savingId)} className="mt-2 w-full rounded-lg border border-slate-300 p-2 disabled:opacity-50 dark:border-slate-700" autoComplete="off" />
+          {deleteTestUserOperation.user.last_access_at && deleteTestUserOperation.confirmationEmail === deleteTestUserOperation.user.email && !deleteTestUserOperation.confirmSignedInAccount && <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Esta cuenta ha iniciado sesi&oacute;n anteriormente. Al continuar se mostrar&aacute; una segunda confirmaci&oacute;n.</div>}
+          {deleteTestUserOperation.user.last_access_at && deleteTestUserOperation.confirmSignedInAccount && <div className="mt-4 rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm text-rose-900">Confirmaci&oacute;n final: esta cuenta tuvo actividad. La eliminaci&oacute;n no se puede deshacer.</div>}
+          <div className="mt-6 flex justify-end gap-3"><button type="button" disabled={Boolean(savingId)} onClick={() => setDeleteTestUserOperation(null)} className="rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-50">Cancelar</button><button type="button" disabled={Boolean(savingId) || deleteTestUserOperation.confirmationEmail !== deleteTestUserOperation.user.email} onClick={() => void deleteTestUser()} className="rounded-xl bg-rose-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{deleteTestUserOperation.user.last_access_at && !deleteTestUserOperation.confirmSignedInAccount ? 'Continuar' : 'Eliminar definitivamente'}</button></div>
+        </div>
+      </div>}
       {pendingProfileOperation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="create-profile-title">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
           <h3 id="create-profile-title" className="text-lg font-black">Crear perfil y configurar acceso</h3>
