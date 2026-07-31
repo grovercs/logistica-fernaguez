@@ -192,6 +192,11 @@ const Layout = () => {
                   Trabajadores
                 </NavLink>
 
+              </>
+            )}
+
+            {userProfile?.rol === 'Administrador' && (
+              <>
                 <NavLink
                   to="/usuarios"
                   className={({ isActive }) =>
@@ -203,11 +208,6 @@ const Layout = () => {
                   <Users className="w-5 h-5 mr-3" />
                   Usuarios
                 </NavLink>
-              </>
-            )}
-
-            {userProfile?.rol === 'Administrador' && (
-              <>
                 <div className="pt-6 pb-2">
                   <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
                     Administración

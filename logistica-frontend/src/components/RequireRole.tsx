@@ -21,11 +21,11 @@ export default function RequireRole({ children, allowedRoles = ['Administrador']
       }
       const { data } = await supabase
         .from('perfiles')
-        .select('roles(nombre)')
+        .select('activo, roles(nombre)')
         .eq('id', session.user.id)
         .single();
 
-      const roleName = (data?.roles as any)?.nombre || 'Sin rol';
+      const roleName = data?.activo ? ((data?.roles as any)?.nombre || 'Sin rol') : 'Sin rol';
       setRole(roleName);
       setLoading(false);
     };
