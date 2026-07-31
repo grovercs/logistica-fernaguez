@@ -32,12 +32,7 @@ interface UserListResponse {
   available_workers: WorkerOption[];
 }
 
-interface PendingLinkOperation {
-  user: ManagedUser;
-  trabajadorId: string | null;
-  operation: 'vincular' | 'desvincular';
-  activeAssignments: number;
-}
+interface EditProfileOperation { user: ManagedUser; nombre: string; rolId: string; activo: boolean; trabajadorId: string; confirmAssignments: boolean; activeAssignmentsCount: number; }
 
 interface PendingProfileOperation {
   user: ManagedUser;
@@ -64,11 +59,11 @@ async function adminRequest<T>(path: string, method: 'GET' | 'POST', body?: unkn
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
-  const payload = await result.json().catch(() => ({})) as { error?: string; requires_confirmation?: boolean; active_assignments?: number } & T;
+  const payload = await result.json().catch(() => ({})) as { error?: string; code?: string; requires_confirmation?: boolean; active_assignments?: number; active_assignments_count?: number } & T;
   if (!result.ok) {
     const error = new Error(payload.error || 'No se pudo completar la operaci\u00f3n.') as Error & { requiresConfirmation?: boolean; activeAssignments?: number };
-    error.requiresConfirmation = payload.requires_confirmation === true;
-    error.activeAssignments = typeof payload.active_assignments === 'number' ? payload.active_assignments : 0;
+    error.requiresConfirmation = payload.requires_confirmation === true || payload.code === 'active_assignments_confirmation_required';
+    error.activeAssignments = typeof payload.active_assignments_count === 'number' ? payload.active_assignments_count : typeof payload.active_assignments === 'number' ? payload.active_assignments : 0;
     throw error;
   }
   return payload;
@@ -80,9 +75,9 @@ export default function Usuarios() {
   const [availableWorkers, setAvailableWorkers] = useState<WorkerOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [linkingUserId, setLinkingUserId] = useState<string | null>(null);
-  const [pendingLinkOperation, setPendingLinkOperation] = useState<PendingLinkOperation | null>(null);
   const [pendingProfileOperation, setPendingProfileOperation] = useState<PendingProfileOperation | null>(null);
+  const [editProfileOperation, setEditProfileOperation] = useState<EditProfileOperation | null>(null);
+  const [editConfirmation, setEditConfirmation] = useState<'changes' | 'assignments' | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -119,57 +114,10 @@ export default function Usuarios() {
       .some((value) => value?.toLowerCase().includes(term)));
   }, [searchTerm, usuarios]);
 
-  const updateAccess = async (user: ManagedUser, changes: { rol_id?: string; activo?: boolean }) => {
-    const changingAdministrator = user.rol === 'Administrador' && (changes.rol_id !== undefined || changes.activo === false);
-    if (changingAdministrator && !window.confirm('Vas a cambiar o desactivar una cuenta Administrador. Confirma que quedar\u00e1 otro Administrador activo.')) return;
-    setSavingId(user.auth_user_id);
-    setError(null);
-    try {
-      await adminRequest('admin-update-user-access', 'POST', { target_user_id: user.auth_user_id, ...changes });
-      await loadData();
-    } catch (updateError) {
-      console.error('Error updating user access:', updateError);
-      setError(updateError instanceof Error ? updateError.message : 'No se pudo actualizar el acceso.');
-    } finally {
-      setSavingId(null);
-    }
-  };
-
-  const linkWorker = async (user: ManagedUser, workerId: string | null, confirmActiveAssignments = false) => {
-    setSavingId(user.auth_user_id);
-    setError(null);
-    try {
-      await adminRequest('admin-link-user-worker', 'POST', {
-        target_user_id: user.auth_user_id,
-        trabajador_id: workerId,
-        confirm_active_assignments: confirmActiveAssignments,
-      });
-      setLinkingUserId(null);
-      setPendingLinkOperation(null);
-      setSuccessMessage(workerId ? 'Cuenta vinculada al trabajador correctamente.' : 'Cuenta desvinculada del trabajador correctamente.');
-      await loadData();
-    } catch (linkError) {
-      const confirmationError = linkError as Error & { requiresConfirmation?: boolean; activeAssignments?: number };
-      if (confirmationError.requiresConfirmation) {
-        setPendingLinkOperation({
-          user,
-          trabajadorId: workerId,
-          operation: workerId ? 'vincular' : 'desvincular',
-          activeAssignments: confirmationError.activeAssignments || 0,
-        });
-        return;
-      }
-      console.error('Error linking worker:', linkError);
-      setError(linkError instanceof Error ? linkError.message : 'No se pudo actualizar el v\u00ednculo.');
-    } finally {
-      setSavingId(null);
-    }
-  };
-
-  const confirmPendingLinkOperation = async () => {
-    if (!pendingLinkOperation || savingId) return;
-    await linkWorker(pendingLinkOperation.user, pendingLinkOperation.trabajadorId, true);
-  };
+  const openEditProfile = (user: ManagedUser) => { setEditConfirmation(null); setEditProfileOperation({ user, nombre: user.nombre || '', rolId: user.rol_id || '', activo: user.activo, trabajadorId: user.trabajador?.id || '', confirmAssignments: false, activeAssignmentsCount: 0 }); };
+  const editHasChanges = (e: EditProfileOperation) => e.nombre.trim() !== (e.user.nombre || '').trim() || e.rolId !== e.user.rol_id || e.activo !== e.user.activo || e.trabajadorId !== (e.user.trabajador?.id || '');
+  const submitEditProfile = async (confirmAssignments = false) => { if (!editProfileOperation || savingId) return; const e=editProfileOperation; setSavingId(e.user.auth_user_id); try { await adminRequest('admin-update-user-profile','POST',{target_user_id:e.user.auth_user_id,nombre_completo:e.nombre.trim()||null,rol_id:e.rolId,activo:e.activo,trabajador_id:e.trabajadorId||null,confirm_active_assignments:confirmAssignments}); setEditConfirmation(null); setEditProfileOperation(null); setSuccessMessage('Perfil actualizado correctamente.'); await loadData(); } catch (error) { const message=error instanceof Error?error.message:'No se pudo actualizar el perfil.'; if ((error as Error & { requiresConfirmation?: boolean; activeAssignments?: number }).requiresConfirmation) { setEditProfileOperation({...e,confirmAssignments:true,activeAssignmentsCount:(error as Error & { activeAssignments?: number }).activeAssignments || 0}); setEditConfirmation('assignments'); } else setError(message); } finally { setSavingId(null); } };
+  const saveEditProfile = () => { if (!editProfileOperation || savingId || !editHasChanges(editProfileOperation)) return; const e=editProfileOperation; if (!e.rolId) { setError('Debes seleccionar un rol.'); return; } const sensitive=e.rolId!==e.user.rol_id||e.activo!==e.user.activo||e.trabajadorId!==(e.user.trabajador?.id||''); if(sensitive){setEditConfirmation('changes');return;} void submitEditProfile(false); };
 
   const openCreateProfile = (user: ManagedUser) => {
     if (roles.length === 0) {
@@ -257,11 +205,11 @@ export default function Usuarios() {
                   const displayName = isMissingProfile ? 'Sin perfil' : hasConfiguredName ? user.nombre : emailLocalPart || 'Usuario sin nombre';
                   return <tr key={user.auth_user_id} className="align-top hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                     <td className="px-5 py-4"><p className="font-bold">{displayName}</p><p className="text-xs text-slate-500">{user.email || 'Sin correo'}</p>{!isMissingProfile && !hasConfiguredName && <p className="mt-1 text-[10px] font-bold text-slate-400">Nombre no configurado</p>}<p className="text-[10px] text-slate-400 font-mono mt-1">{user.auth_user_id}</p>{!hasAuthAccount && <p className="mt-1 text-[10px] font-bold text-rose-600">Perfil sin cuenta Authentication</p>}</td>
-                    <td className="px-5 py-4">{isMissingProfile ? <p className="text-xs font-bold text-amber-600">Sin perfil ni rol</p> : <><label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rol</label><span className={`mt-1 inline-flex px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${ROLE_COLORS[user.rol || ''] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>{user.rol || 'Sin rol'}</span><select disabled={isSaving || !hasAuthAccount} value={user.rol_id || ''} onChange={(event) => void updateAccess(user, { rol_id: event.target.value })} className="mt-2 block w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs disabled:opacity-50"><option value="" disabled>Sin rol</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.nombre}</option>)}</select></>}</td>
-                    <td className="px-5 py-4">{isMissingProfile ? <p className="text-xs text-slate-500">Sin permisos todavía</p> : <><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Activar/Desactivar</p><button disabled={isSaving || !hasAuthAccount} onClick={() => void updateAccess(user, { activo: !user.activo })} className={`mt-1 inline-flex items-center gap-2 text-xs font-black uppercase ${user.activo ? 'text-emerald-600' : 'text-slate-400'} disabled:opacity-50`}><span className={`size-2 rounded-full ${user.activo ? 'bg-emerald-500' : 'bg-slate-400'}`} />{user.activo ? 'Activo' : 'Inactivo'}</button></>}</td>
-                    <td className="px-5 py-4">{isMissingProfile ? <p className="text-xs text-slate-500">Crea el perfil antes de vincular trabajador.</p> : user.trabajador ? <><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Desvincular trabajador</p><p className="mt-1 text-sm font-bold">{user.trabajador.nombre} {user.trabajador.apellidos || ''}</p><p className="text-xs text-slate-500">{user.trabajador.estado || 'Sin estado'}</p><button disabled={isSaving || !hasAuthAccount} onClick={() => void linkWorker(user, null)} className="mt-2 text-xs font-bold text-rose-600 hover:underline disabled:opacity-50">Desvincular trabajador</button></> : <><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Vincular trabajador</p><span className="mt-1 block text-xs text-amber-600 font-bold">Sin trabajador</span><button disabled={isSaving || !hasAuthAccount} onClick={() => setLinkingUserId(linkingUserId === user.auth_user_id ? null : user.auth_user_id)} className="block mt-2 text-xs font-bold text-primary hover:underline disabled:opacity-50">Vincular trabajador</button>{linkingUserId === user.auth_user_id && <select defaultValue="" disabled={isSaving} onChange={(event) => { if (event.target.value) void linkWorker(user, event.target.value); }} className="mt-2 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs disabled:opacity-50"><option value="">Selecciona trabajador...</option>{availableWorkers.map((worker) => <option key={worker.id} value={worker.id}>{worker.nombre} {worker.apellidos || ''} &mdash; {worker.estado || 'Sin estado'}</option>)}</select>}</>}</td>
+                    <td className="px-5 py-4"><span className={`inline-flex px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${ROLE_COLORS[user.rol || ''] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>{isMissingProfile ? 'Sin perfil' : user.rol || 'Sin rol'}</span></td>
+                    <td className="px-5 py-4"><span className={`text-xs font-black uppercase ${user.activo ? 'text-emerald-600' : 'text-slate-400'}`}>{isMissingProfile ? 'Sin permisos' : user.activo ? 'Activo' : 'Inactivo'}</span></td>
+                    <td className="px-5 py-4 text-sm">{isMissingProfile ? 'Crea el perfil antes de vincular trabajador.' : user.trabajador ? `${user.trabajador.nombre} ${user.trabajador.apellidos || ''}` : 'Sin trabajador vinculado'}</td>
                     <td className="px-5 py-4 text-xs text-slate-500">{user.last_access_at ? new Date(user.last_access_at).toLocaleString('es-ES') : 'Nunca'}</td>
-                    <td className="px-5 py-4 text-right text-xs">{isSaving ? <span className="text-slate-400">Guardando...</span> : isMissingProfile && hasAuthAccount ? <button type="button" onClick={() => openCreateProfile(user)} disabled={roles.length === 0} className="rounded-lg bg-primary px-3 py-2 text-xs font-black text-white hover:opacity-90 disabled:opacity-50">Crear perfil y configurar acceso</button> : isMissingProfile ? <span className="text-slate-400">Cuenta Auth no disponible</span> : <span className="text-slate-500">Los cambios se guardan al modificar el rol o pulsar el estado.</span>}</td>
+                    <td className="px-5 py-4 text-right text-xs">{isSaving ? 'Guardando...' : isMissingProfile && hasAuthAccount ? <button type="button" onClick={() => openCreateProfile(user)} className="rounded-lg bg-primary px-3 py-2 font-black text-white">Crear perfil y configurar acceso</button> : isMissingProfile ? 'Cuenta Auth no disponible' : <button type="button" onClick={() => openEditProfile(user)} className="rounded-lg bg-primary px-3 py-2 font-black text-white">Editar perfil</button>}</td>
                   </tr>;
                 })}
               </tbody>
@@ -269,6 +217,8 @@ export default function Usuarios() {
           </div>
         </div>
       </div>
+      {editConfirmation && editProfileOperation && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true"><div className="w-full max-w-md rounded-2xl bg-white p-6 dark:bg-slate-900"><h3 className="text-lg font-black">Confirmar cambios de perfil</h3><p className="mt-2 text-sm">{editProfileOperation.user.nombre || editProfileOperation.user.email}</p>{editConfirmation === 'assignments' ? <p className="mt-4 text-sm">Este trabajador tiene {editProfileOperation.activeAssignmentsCount} asignaciones activas. El cambio conservar? sus asignaciones e historial, pero puede afectar su acceso. ?Deseas continuar?</p> : <><p className="mt-4 text-sm">Rol: {editProfileOperation.user.rol || 'Sin rol'} ? {roles.find(r=>r.id===editProfileOperation.rolId)?.nombre || 'Sin rol'}<br/>Estado: {editProfileOperation.user.activo?'Activo':'Inactivo'} ? {editProfileOperation.activo?'Activo':'Inactivo'}<br/>Trabajador: {editProfileOperation.user.trabajador?.nombre || 'Sin trabajador vinculado'} ? {availableWorkers.find(w=>w.id===editProfileOperation.trabajadorId)?.nombre || (editProfileOperation.trabajadorId ? editProfileOperation.user.trabajador?.nombre : 'Sin trabajador vinculado')}</p>{(editProfileOperation.user.rol==='Administrador'||roles.find(r=>r.id===editProfileOperation.rolId)?.nombre==='Administrador')&&<p className="mt-3 text-sm font-bold text-amber-700">Este cambio modifica permisos administrativos.</p>}{editProfileOperation.user.activo&&!editProfileOperation.activo&&<p className="mt-3 text-sm">Este usuario perder? el acceso a la aplicaci?n, pero conservar? su historial, asignaciones e intervenciones.</p>}{editProfileOperation.trabajadorId!==(editProfileOperation.user.trabajador?.id||'')&&<p className="mt-3 text-sm">El cambio no borrar? asignaciones, reportes ni historial.</p>}</>}<div className="mt-6 flex justify-end gap-3"><button disabled={Boolean(savingId)} onClick={()=>setEditConfirmation(null)}>Cancelar</button><button disabled={Boolean(savingId)} onClick={()=>void submitEditProfile(editConfirmation==='assignments')} className="rounded bg-primary px-4 py-2 text-white">Confirmar cambios</button></div></div></div>}
+      {editProfileOperation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true"><div className="w-full max-w-lg rounded-2xl bg-white p-6 dark:bg-slate-900"><h3 className="text-lg font-black">Editar perfil</h3><p className="mt-2 text-sm text-slate-500">{editProfileOperation.user.email || 'Sin correo'} ? ?ltimo acceso: {editProfileOperation.user.last_access_at ? new Date(editProfileOperation.user.last_access_at).toLocaleString('es-ES') : 'Nunca'}</p><label className="mt-4 block text-xs font-black">Nombre completo</label><input value={editProfileOperation.nombre} maxLength={120} onChange={e=>setEditProfileOperation({...editProfileOperation,nombre:e.target.value})} className="mt-1 w-full rounded border p-2"/><label className="mt-4 block text-xs font-black">Rol</label><select value={editProfileOperation.rolId} onChange={e=>setEditProfileOperation({...editProfileOperation,rolId:e.target.value})} className="mt-1 w-full rounded border p-2"><option value="" disabled>Selecciona un rol</option>{roles.map(r=><option key={r.id} value={r.id}>{r.nombre}</option>)}</select><label className="mt-4 flex gap-2"><input type="checkbox" checked={editProfileOperation.activo} onChange={e=>setEditProfileOperation({...editProfileOperation,activo:e.target.checked})}/> Activo</label><label className="mt-4 block text-xs font-black">Trabajador vinculado</label><select value={editProfileOperation.trabajadorId} onChange={e=>setEditProfileOperation({...editProfileOperation,trabajadorId:e.target.value,confirmAssignments:false})} className="mt-1 w-full rounded border p-2"><option value="">Sin trabajador vinculado</option>{editProfileOperation.user.trabajador && <option value={editProfileOperation.user.trabajador.id}>{editProfileOperation.user.trabajador.nombre} {editProfileOperation.user.trabajador.apellidos || ''}</option>}{availableWorkers.map(w=><option key={w.id} value={w.id}>{w.nombre} {w.apellidos || ''}</option>)}</select>{editProfileOperation.confirmAssignments && <label className="mt-4 flex gap-2 text-sm"><input type="checkbox" checked onChange={()=>{}} readOnly/> Confirmo el cambio de v?nculo con asignaciones activas.</label>}<div className="mt-6 flex justify-end gap-3"><button disabled={Boolean(savingId)} onClick={()=>setEditProfileOperation(null)}>Cancelar</button><button disabled={Boolean(savingId)||!editHasChanges(editProfileOperation)} onClick={saveEditProfile} className="rounded bg-primary px-4 py-2 text-white">Guardar cambios</button></div></div></div>}
       {pendingProfileOperation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="create-profile-title">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
           <h3 id="create-profile-title" className="text-lg font-black">Crear perfil y configurar acceso</h3>
@@ -282,20 +232,6 @@ export default function Usuarios() {
           <div className="mt-6 flex justify-end gap-3">
             <button type="button" disabled={savingId === pendingProfileOperation.user.auth_user_id} onClick={() => setPendingProfileOperation(null)} className="rounded-xl px-4 py-2 text-sm font-bold text-slate-600 disabled:opacity-50 dark:text-slate-300">Cancelar</button>
             <button type="button" disabled={savingId === pendingProfileOperation.user.auth_user_id || !pendingProfileOperation.rolId || (roles.find((role) => role.id === pendingProfileOperation.rolId)?.nombre === 'Administrador' && !pendingProfileOperation.confirmAdministrator)} onClick={() => void createUserProfile()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{savingId === pendingProfileOperation.user.auth_user_id ? 'Creando...' : 'Crear perfil'}</button>
-          </div>
-        </div>
-      </div>}
-      {pendingLinkOperation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="link-confirmation-title">
-        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
-          <h3 id="link-confirmation-title" className="text-lg font-black">Confirmar {pendingLinkOperation.operation}</h3>
-          <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-            {pendingLinkOperation.operation === 'vincular'
-              ? `El trabajador seleccionado tiene ${pendingLinkOperation.activeAssignments} asignaciones activas. \u00bfDeseas vincular esta cuenta igualmente?`
-              : `Este trabajador tiene ${pendingLinkOperation.activeAssignments} asignaciones activas. Si desvinculas la cuenta, conservar\u00e1 sus asignaciones e historial, pero dejar\u00e1 de poder acceder como ese trabajador. \u00bfDeseas continuar?`}
-          </p>
-          <div className="mt-6 flex justify-end gap-3">
-            <button type="button" disabled={savingId === pendingLinkOperation.user.auth_user_id} onClick={() => setPendingLinkOperation(null)} className="rounded-xl px-4 py-2 text-sm font-bold text-slate-600 disabled:opacity-50 dark:text-slate-300">Cancelar</button>
-            <button type="button" disabled={savingId === pendingLinkOperation.user.auth_user_id} onClick={() => void confirmPendingLinkOperation()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{savingId === pendingLinkOperation.user.auth_user_id ? 'Procesando...' : 'Confirmar'}</button>
           </div>
         </div>
       </div>}
