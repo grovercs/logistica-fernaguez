@@ -7,6 +7,25 @@
 - `logistica-frontend/src/components/modals/EditarReporteModal.tsx` — Al quitar una foto, la borra de Cloudinary
 - `logistica-mobile/src/pages/mobile/MobileDetalleOrden.tsx` — Al borrar reporte, borra fotos de Cloudinary
 
+## Configuracion segura antes del despliegue
+
+No incluyas secretos en este repositorio ni los pases al navegador. Configura
+estos secretos en Supabase Edge Functions:
+
+```bash
+npx supabase secrets set \
+  CLOUDINARY_CLOUD_NAME='...' \
+  CLOUDINARY_API_KEY='...' \
+  CLOUDINARY_API_SECRET='...' \
+  SUPABASE_URL='...' \
+  SUPABASE_ANON_KEY='...' \
+  SUPABASE_SERVICE_ROLE_KEY='...'
+```
+
+La Function valida el JWT con la clave anon y comprueba que el solicitante es
+un Administrador activo con el cliente server-side. La service role no se
+entrega al navegador.
+
 ## Comandos para desplegar
 
 1. **Link proyecto** (si no está linkeado):
@@ -24,19 +43,11 @@ npx supabase functions deploy delete-cloudinary-images
 Después del deploy, la función estará disponible en:
 `https://tqwxvryvhwijbsixmzkq.supabase.co/functions/v1/delete-cloudinary-images`
 
-## Nota sobre CORS
-Si el frontend da error de CORS al llamar a la Edge Function, añadir al inicio de `index.ts`:
-```typescript
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+## CORS
 
-// Manejar OPTIONS preflight
-if (req.method === 'OPTIONS') {
-  return new Response('ok', { headers: corsHeaders });
-}
-```
+La Function permite explicitamente `https://admin.appvielha.com`, desarrollo
+en localhost/127.0.0.1 y `https://app.appvielha.com` mientras el flujo movil
+existente de borrado de evidencias siga invocandola. No usa comodines.
 
 ## Prueba manual (curl)
 ```bash
