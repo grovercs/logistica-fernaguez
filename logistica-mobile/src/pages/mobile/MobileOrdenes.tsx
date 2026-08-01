@@ -11,10 +11,57 @@ interface TrabajadorDirectoryRow {
     estado: string;
 }
 
+interface MobileWorkerAssignmentCard {
+    id: string;
+    id_legible: string;
+    estado: string;
+    cliente: string | null;
+    direccion: string | null;
+    tecnico_id: string | null;
+    fecha_programada: string | null;
+    orden_creado_en: string | null;
+    asignacion_id: string;
+    orden_id: string;
+    fecha_asignacion: string | null;
+    hora_asignacion: string | null;
+    estado_asignacion: 'pendiente' | 'en_progreso';
+    notas_asignacion: string | null;
+    asignacion_creada_en: string | null;
+}
+
+const assignmentStatusLabel: Record<MobileWorkerAssignmentCard['estado_asignacion'], string> = {
+    pendiente: 'Pendiente',
+    en_progreso: 'En curso',
+};
+
+const parseLocalDate = (value: string | null | undefined) => {
+    if (!value) return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+    if (!match) return null;
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatLocalDate = (value: string | null | undefined) => {
+    const date = parseLocalDate(value);
+    return date ? date.toLocaleDateString('es-ES') : 'Sin fecha';
+};
+
+const isCreatedToday = (value: string | null | undefined) => {
+    if (!value) return false;
+    const created = new Date(value);
+    if (Number.isNaN(created.getTime())) return false;
+    const today = new Date();
+    return created.getFullYear() === today.getFullYear()
+        && created.getMonth() === today.getMonth()
+        && created.getDate() === today.getDate();
+};
+
 const MobileOrdenes = () => {
     const navigate = useNavigate();
     const [ordenes, setOrdenes] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [currentUserName, setCurrentUserName] = useState<string>('');
     const [currentUserRole, setCurrentUserRole] = useState<string>('');
     const [currentUserEspecialidad, setCurrentUserEspecialidad] = useState<string>('');
@@ -90,21 +137,100 @@ const MobileOrdenes = () => {
     }, []);
 
     // Fetch orders function - can be called to refresh
-    const fetchOrdenes = async (_userId: string, _roleName: string) => {
-        let query = supabase.from('ordenes').select('*');
+    const fetchOrdenes = async (userId: string, roleName: string) => {
+        setLoadError(null);
 
-        // Todos los trabajadores ven TODAS las órdenes
-        // (Antes: solo veían las suyas)
-        // Ahora pueden ver el panorama completo del trabajo
+        if (roleName === 'Trabajador') {
+            // RLS limits this query to the authenticated worker's own assignments.
+            // The assignment is the source of truth for the worker's active work list.
+            const { data, error } = await supabase
+                .from('orden_asignaciones')
+                .select(`
+                    id,
+                    orden_id,
+                    trabajador_id,
+                    fecha_asignacion,
+                    hora_programada,
+                    estado,
+                    notas,
+                    creado_en,
+                    orden:ordenes!inner (
+                        id,
+                        id_legible,
+                        estado,
+                        cliente,
+                        direccion,
+                        tecnico_id,
+                        fecha_programada,
+                        creado_en
+                    )
+                `)
+                .in('estado', ['pendiente', 'en_progreso'])
+                .neq('ordenes.estado', 'Finalizada')
+                .neq('ordenes.estado', 'Papelera');
 
-        const { data, error } = await query
+            if (error) {
+                console.error('mobile_orders_assignments_load_failed', {
+                    user_id_prefix: userId.slice(0, 8),
+                    code: error.code ?? 'unknown',
+                });
+                setLoadError('No se pudieron cargar tus asignaciones');
+                return;
+            }
+
+            const assignmentCards: MobileWorkerAssignmentCard[] = (data ?? [])
+                .flatMap((assignment: any) => {
+                    const orden = assignment.orden;
+                    if (!orden) return [];
+                    return [{
+                        id: orden.id,
+                        id_legible: orden.id_legible,
+                        estado: orden.estado,
+                        cliente: orden.cliente,
+                        direccion: orden.direccion,
+                        tecnico_id: orden.tecnico_id,
+                        fecha_programada: orden.fecha_programada,
+                        orden_creado_en: orden.creado_en,
+                        asignacion_id: assignment.id,
+                        orden_id: assignment.orden_id,
+                        fecha_asignacion: assignment.fecha_asignacion,
+                        hora_asignacion: assignment.hora_programada,
+                        estado_asignacion: assignment.estado,
+                        notas_asignacion: assignment.notas,
+                        asignacion_creada_en: assignment.creado_en,
+                    }];
+                })
+                .sort((a, b) => {
+                    const assignmentDateA = parseLocalDate(a.fecha_asignacion)?.getTime() ?? 0;
+                    const assignmentDateB = parseLocalDate(b.fecha_asignacion)?.getTime() ?? 0;
+                    if (assignmentDateA !== assignmentDateB) return assignmentDateB - assignmentDateA;
+                    if ((a.hora_asignacion ?? '') !== (b.hora_asignacion ?? '')) {
+                        return (b.hora_asignacion ?? '').localeCompare(a.hora_asignacion ?? '');
+                    }
+                    const createdA = a.asignacion_creada_en ? new Date(a.asignacion_creada_en).getTime() : 0;
+                    const createdB = b.asignacion_creada_en ? new Date(b.asignacion_creada_en).getTime() : 0;
+                    if (createdA !== createdB) return createdB - createdA;
+                    const orderCreatedA = a.orden_creado_en ? new Date(a.orden_creado_en).getTime() : 0;
+                    const orderCreatedB = b.orden_creado_en ? new Date(b.orden_creado_en).getTime() : 0;
+                    return orderCreatedB - orderCreatedA;
+                });
+            setOrdenes(assignmentCards);
+            return;
+        }
+
+        // Administrative and viewer behavior remains unchanged; RLS still controls access.
+        const { data, error } = await supabase
+            .from('ordenes')
+            .select('*')
             .neq('estado', 'Finalizada')
             .neq('estado', 'Papelera')
             .order('creado_en', { ascending: false });
 
-        if (!error && data) {
-            setOrdenes(data);
+        if (error) {
+            setLoadError('No se pudieron cargar las órdenes');
+            return;
         }
+        setOrdenes(data ?? []);
     };
 
     // Refresh data when page becomes visible (returning from detail page)
@@ -144,12 +270,15 @@ const MobileOrdenes = () => {
         'Archivado': 8,
     };
 
-    const displayOrdenes = ordenes
-        .filter(o => {
-            if (!filterWorkerId) return true;
-            return o.tecnico_id === filterWorkerId || workersList.find(w => w.id === filterWorkerId)?.auth_user_id === o.tecnico_id;
-        })
-        .sort((a, b) => {
+    const filteredOrdenes = ordenes.filter(o => {
+        if (!filterWorkerId) return true;
+        return o.tecnico_id === filterWorkerId || workersList.find(w => w.id === filterWorkerId)?.auth_user_id === o.tecnico_id;
+    });
+
+    // Worker cards were already sorted by assignment timing in fetchOrdenes.
+    const displayOrdenes = currentUserRole === 'Trabajador'
+        ? filteredOrdenes
+        : filteredOrdenes.sort((a, b) => {
             const prioA = statusPriority[a.estado] || 99;
             const prioB = statusPriority[b.estado] || 99;
             if (prioA !== prioB) return prioA - prioB;
@@ -242,6 +371,13 @@ const MobileOrdenes = () => {
 
                 {loading ? (
                     <div className="text-center text-slate-500 dark:text-slate-400 py-8">Cargando órdenes...</div>
+                ) : loadError ? (
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl text-center text-slate-500 dark:text-slate-400 shadow-sm border border-red-200 dark:border-red-900/50 space-y-3">
+                        <p>{loadError}</p>
+                        <button type="button" onClick={refreshData} className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold">
+                            Reintentar
+                        </button>
+                    </div>
                 ) : displayOrdenes.length === 0 ? (
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-xl text-center text-slate-500 dark:text-slate-400 shadow-sm border border-slate-200 dark:border-slate-700">
                         {filterWorkerId ? 'Este técnico no tiene órdenes.' : 'No tienes órdenes asignadas.'}
@@ -249,13 +385,19 @@ const MobileOrdenes = () => {
                 ) : (
                     displayOrdenes.map(orden => {
                         const isLastActive = orden.id === lastActiveId;
+                        const isWorkerAssignment = currentUserRole === 'Trabajador' && Boolean(orden.asignacion_id);
+                        const isNewAssignment = isWorkerAssignment && isCreatedToday(orden.asignacion_creada_en);
                         return (
                             <Link 
                                 to={`/m/ordenes/${orden.id}`} 
-                                key={orden.id} 
+                                key={orden.asignacion_id || orden.id}
                                 className={`block bg-white dark:bg-slate-900 rounded-xl shadow-sm border p-4 active:scale-[0.98] transition-all relative overflow-hidden ${isLastActive ? 'border-primary border-l-[6px] ring-2 ring-primary/5 shadow-md' : 'border-slate-200 dark:border-slate-700'}`}
                             >
-                                {isLastActive && (
+                                {isNewAssignment ? (
+                                    <div className="absolute top-0 right-0 bg-primary text-white text-[8px] font-black px-2 py-0.5 rounded-bl uppercase tracking-tighter">
+                                        NUEVA ASIGNACIÓN
+                                    </div>
+                                ) : isLastActive && (
                                     <div className="absolute top-0 right-0 bg-primary text-white text-[8px] font-black px-2 py-0.5 rounded-bl uppercase tracking-tighter">
                                         RECIENTE
                                     </div>
@@ -290,17 +432,26 @@ const MobileOrdenes = () => {
                                                 </div>
                                             </div>
                                         );
-                                    } else if (orden.tecnico) {
-                                        // Fallback to name string if ID mapping fails
-                                        return (
-                                            <div className="mt-2 flex items-center gap-2 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
-                                                <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500">person</span>
-                                                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase leading-none">{orden.tecnico}</span>
-                                            </div>
-                                        );
                                     }
                                     return null;
                                 })()}
+
+                                {isWorkerAssignment && (
+                                    <div className="mt-3 rounded-lg border border-primary/15 bg-primary/5 dark:bg-primary/10 p-3 space-y-2">
+                                        <p className="text-xs font-black text-primary">
+                                            Tu asignación: {formatLocalDate(orden.fecha_asignacion)} · {orden.hora_asignacion || '--:--'}
+                                        </p>
+                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                                            Estado de tu asignación: {assignmentStatusLabel[orden.estado_asignacion as keyof typeof assignmentStatusLabel]}
+                                        </p>
+                                        {orden.notas_asignacion?.trim() && (
+                                            <div className="pt-2 border-t border-primary/10">
+                                                <p className="text-[10px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Instrucciones</p>
+                                                <p className="mt-1 text-xs text-slate-700 dark:text-slate-200 whitespace-pre-wrap">{orden.notas_asignacion}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                 {orden.direccion && (
                                     <p className="text-[12px] font-medium text-slate-600 dark:text-slate-300 mt-3 flex items-start gap-1.5 leading-tight">
@@ -312,15 +463,17 @@ const MobileOrdenes = () => {
                                 <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
                                     <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
                                         <span className="material-symbols-outlined text-[16px]">event</span> 
-                                        {(() => {
-                                            if (!orden.fecha_programada) return 'S/F';
-                                            const d = new Date(orden.fecha_programada);
-                                            return isNaN(d.getTime()) ? 'S/F' : d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
-                                        })()}
+                                        {isWorkerAssignment
+                                            ? `Fecha original de la obra: ${formatLocalDate(orden.fecha_programada)}`
+                                            : (() => {
+                                                if (!orden.fecha_programada) return 'S/F';
+                                                const d = new Date(orden.fecha_programada);
+                                                return isNaN(d.getTime()) ? 'S/F' : d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+                                            })()}
                                     </p>
                                     <p className="text-[11px] font-black text-primary bg-primary/10 dark:bg-primary/20 px-2 py-1 rounded-md flex items-center gap-1.5">
                                         <span className="material-symbols-outlined text-[16px]">schedule</span> 
-                                        {orden.hora_programada || '--:--'}
+                                        {(isWorkerAssignment ? orden.hora_asignacion : orden.hora_programada) || '--:--'}
                                     </p>
                                 </div>
                             </Link>
