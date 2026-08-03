@@ -9,6 +9,7 @@ interface Reporte {
   tecnico_id: string;
   horas_trabajadas: number;
   creado_en: string;
+  fecha_trabajo: string | null;
   estado_liquidacion: string;
   ordenes: { id_legible: string; cliente: string; estado: string } | null;
   perfiles: { nombre_completo: string; tarifa_hora: number } | null;
@@ -35,8 +36,30 @@ type TabType = 'obra' | 'trabajador' | 'global';
 const fmtCurrency = (n: number) =>
   new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n);
 
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+const formatWorkDate = (fechaTrabajo: string | null) => {
+  const match = fechaTrabajo?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return 'Fecha no informada';
+
+  const [, year, month, day] = match;
+  // fecha_trabajo is a calendar date, not a UTC timestamp. Formatting in UTC
+  // prevents a browser timezone from moving the displayed day.
+  return new Intl.DateTimeFormat('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))));
+};
+
+const isFutureWorkDate = (fechaTrabajo: string | null) => {
+  if (!fechaTrabajo) return false;
+  const today = new Date();
+  const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  return fechaTrabajo > localToday;
+};
+
+const sortByWorkDateDesc = (a: Reporte, b: Reporte) =>
+  (b.fecha_trabajo || '').localeCompare(a.fecha_trabajo || '');
 
 const getInitials = (name: string) =>
   name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
@@ -79,6 +102,7 @@ export default function Liquidaciones() {
         tecnico_id: row.tecnico_id,
         horas_trabajadas: row.horas_trabajadas ?? 0,
         creado_en: row.creado_en,
+        fecha_trabajo: row.fecha_trabajo,
         estado_liquidacion: row.estado_liquidacion ?? 'Pendiente',
         ordenes: {
           id_legible: row.id_legible ?? '',
@@ -110,19 +134,22 @@ export default function Liquidaciones() {
 
   // ─── Filtered data ───────────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    return reportes.filter(r => {
-      if (desde && r.creado_en < desde) return false;
-      if (hasta && r.creado_en > hasta + 'T23:59:59') return false;
-      if (trabajadorFilter && r.tecnico_id !== trabajadorFilter) return false;
-      if (obraFilter) {
-        const q = obraFilter.toLowerCase();
-        const ref = r.ordenes?.id_legible?.toLowerCase() || '';
-        const obra = r.ordenes?.cliente?.toLowerCase() || '';
-        if (!ref.includes(q) && !obra.includes(q)) return false;
-      }
-      if (estadoFilter && r.estado_liquidacion !== estadoFilter) return false;
-      return true;
-    });
+    return reportes
+      .filter(r => {
+        // Liquidation periods are based on the day worked, never the audit timestamp.
+        if (desde && (!r.fecha_trabajo || r.fecha_trabajo < desde)) return false;
+        if (hasta && (!r.fecha_trabajo || r.fecha_trabajo > hasta)) return false;
+        if (trabajadorFilter && r.tecnico_id !== trabajadorFilter) return false;
+        if (obraFilter) {
+          const q = obraFilter.toLowerCase();
+          const ref = r.ordenes?.id_legible?.toLowerCase() || '';
+          const obra = r.ordenes?.cliente?.toLowerCase() || '';
+          if (!ref.includes(q) && !obra.includes(q)) return false;
+        }
+        if (estadoFilter && r.estado_liquidacion !== estadoFilter) return false;
+        return true;
+      })
+      .sort(sortByWorkDateDesc);
   }, [reportes, desde, hasta, trabajadorFilter, obraFilter, estadoFilter]);
 
   // ─── Aggregations ─────────────────────────────────────────────────────────
@@ -166,7 +193,7 @@ export default function Liquidaciones() {
       'Nº': i + 1,
       'Referencia': r.ordenes?.id_legible || '-',
       'Obra': r.ordenes?.cliente || '-',
-      'Fecha Intervención': fmtDate(r.creado_en),
+      'Fecha Intervención': formatWorkDate(r.fecha_trabajo),
       'Trabajador': r.perfiles?.nombre_completo || '-',
       'Horas': r.horas_trabajadas || 0,
       'Tarifa €/h': r.perfiles?.tarifa_hora || 0,
@@ -384,7 +411,12 @@ export default function Liquidaciones() {
                                       <span className="font-medium">{r.perfiles?.nombre_completo || 'Desconocido'}</span>
                                     </div>
                                   </td>
-                                  <td className="px-6 py-3.5 text-slate-500">{fmtDate(r.creado_en)}</td>
+                                  <td className="px-6 py-3.5 text-slate-500">
+                                    {formatWorkDate(r.fecha_trabajo)}
+                                    {isFutureWorkDate(r.fecha_trabajo) && (
+                                      <span className="ml-2 text-[10px] font-bold text-amber-600" title="Review the work date">Fecha de trabajo futura</span>
+                                    )}
+                                  </td>
                                   <td className="px-6 py-3.5 text-center font-bold">{(r.horas_trabajadas || 0).toFixed(1)}</td>
                                   <td className="px-6 py-3.5 text-right text-slate-500">{fmtCurrency(r.perfiles?.tarifa_hora || 0)}</td>
                                   <td className="px-6 py-3.5 text-right font-bold">{fmtCurrency((r.horas_trabajadas || 0) * (r.perfiles?.tarifa_hora || 0))}</td>
@@ -452,7 +484,7 @@ export default function Liquidaciones() {
                         <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-2 max-h-48 overflow-y-auto">
                           {w.reportes.map(r => (
                             <div key={r.id} className="flex items-center justify-between gap-2 text-xs">
-                              <span className="text-slate-500 truncate flex-1">{r.ordenes?.id_legible || '-'} · {fmtDate(r.creado_en)}</span>
+                              <span className="text-slate-500 truncate flex-1">{r.ordenes?.id_legible || '-'} · {formatWorkDate(r.fecha_trabajo)}</span>
                               <span className="font-bold shrink-0">{(r.horas_trabajadas || 0).toFixed(1)}h</span>
                               <EstadoBadge estado={r.estado_liquidacion || 'Pendiente'} id={r.id} />
                             </div>
@@ -498,7 +530,12 @@ export default function Liquidaciones() {
                             </td>
                             <td className="px-5 py-3.5 text-primary font-medium">{r.ordenes?.id_legible || '-'}</td>
                             <td className="px-5 py-3.5 text-slate-600 dark:text-slate-400 max-w-[180px] truncate">{r.ordenes?.cliente || '-'}</td>
-                            <td className="px-5 py-3.5 text-slate-500 whitespace-nowrap">{fmtDate(r.creado_en)}</td>
+                            <td className="px-5 py-3.5 text-slate-500 whitespace-nowrap">
+                              {formatWorkDate(r.fecha_trabajo)}
+                              {isFutureWorkDate(r.fecha_trabajo) && (
+                                <span className="ml-2 text-[10px] font-bold text-amber-600" title="Review the work date">Fecha de trabajo futura</span>
+                              )}
+                            </td>
                             <td className="px-5 py-3.5 text-center font-bold">{(r.horas_trabajadas || 0).toFixed(1)}</td>
                             <td className="px-5 py-3.5 text-right text-slate-500">{fmtCurrency(r.perfiles?.tarifa_hora || 0)}</td>
                             <td className="px-5 py-3.5 text-right font-bold">{fmtCurrency((r.horas_trabajadas || 0) * (r.perfiles?.tarifa_hora || 0))}</td>
