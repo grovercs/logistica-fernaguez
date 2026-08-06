@@ -21,29 +21,43 @@ type Redaction = { table: string; field: string; reason: string };
 
 let backupInProgress = false;
 
+const ADMIN_PRODUCTION_ORIGIN = 'https://admin.appvielha.com';
+const ADMIN_PREVIEW_HOST = /^deploy-preview-\d+--logistica-fernaguez-admin\.netlify\.app$/;
+
+const isAllowedAdminOriginUrl = (url: URL) => {
+  if (url.origin === ADMIN_PRODUCTION_ORIGIN) return true;
+  if (url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) return true;
+  return url.protocol === 'https:' && url.port === '' && ADMIN_PREVIEW_HOST.test(url.hostname);
+};
+
 const allowedOrigin = (origin: string | undefined) => {
   if (!origin) return false;
-  if (origin === 'https://admin.appvielha.com') return true;
   try {
     const url = new URL(origin);
-    if (url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) return true;
-    return Boolean(process.env.DEPLOY_PRIME_URL && new URL(process.env.DEPLOY_PRIME_URL).origin === origin);
+    if (url.origin !== origin) return false;
+    const deployPrimeUrl = process.env.DEPLOY_PRIME_URL;
+    try {
+      if (deployPrimeUrl && new URL(deployPrimeUrl).origin === url.origin) return isAllowedAdminOriginUrl(url);
+    } catch { /* DEPLOY_PRIME_URL is advisory; strict hostname validation remains authoritative. */ }
+    return isAllowedAdminOriginUrl(url);
   } catch { return false; }
 };
 
 const allowedRequestHost = (host: string | undefined) => {
-  const hostname = host?.split(':')[0]?.toLowerCase();
-  if (hostname === 'admin.appvielha.com' || hostname === 'localhost' || hostname === '127.0.0.1') return true;
-  try { return Boolean(hostname && process.env.DEPLOY_PRIME_URL && new URL(process.env.DEPLOY_PRIME_URL).hostname === hostname); }
-  catch { return false; }
+  const hostname = host?.replace(/:\d+$/, '').toLowerCase();
+  return hostname === 'admin.appvielha.com'
+    || hostname === 'localhost'
+    || hostname === '127.0.0.1'
+    || Boolean(hostname && ADMIN_PREVIEW_HOST.test(hostname));
 };
 
 const isVerifiedSameOriginRequest = (event: Parameters<Handler>[0]) => {
   const site = event.headers['sec-fetch-site']?.toLowerCase();
   if (site && site !== 'same-origin' && site !== 'none') return false;
-  let rawHost: string | undefined;
-  try { rawHost = event.rawUrl ? new URL(event.rawUrl).host : undefined; } catch { rawHost = undefined; }
-  return allowedRequestHost(rawHost || event.headers['x-forwarded-host'] || event.headers.host);
+  try {
+    if (event.rawUrl) return isAllowedAdminOriginUrl(new URL(event.rawUrl));
+  } catch { return false; }
+  return allowedRequestHost(event.headers['x-forwarded-host'] || event.headers.host);
 };
 
 const jsonResponse = (statusCode: number, body: unknown, origin?: string) => ({

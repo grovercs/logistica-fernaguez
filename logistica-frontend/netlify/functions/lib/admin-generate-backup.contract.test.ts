@@ -5,6 +5,17 @@ import { resolve } from 'node:path';
 const source = readFileSync(resolve(process.cwd(), 'netlify/functions/admin-generate-backup.ts'), 'utf8');
 const uiSource = readFileSync(resolve(process.cwd(), 'src/pages/BackupCenter.tsx'), 'utf8');
 
+const previewHost = /^deploy-preview-\d+--logistica-fernaguez-admin\.netlify\.app$/;
+assert.ok(previewHost.test('deploy-preview-11--logistica-fernaguez-admin.netlify.app'));
+assert.ok(previewHost.test('deploy-preview-987--logistica-fernaguez-admin.netlify.app'));
+assert.ok(!previewHost.test('deploy-preview-11--logistica-fernaguez-mobile.netlify.app'));
+assert.ok(!previewHost.test('deploy-preview-11--logistica-fernaguez-admin.netlify.app.evil.example'));
+assert.match(source, /ADMIN_PRODUCTION_ORIGIN = 'https:\/\/admin\.appvielha\.com'/);
+assert.match(source, /ADMIN_PREVIEW_HOST = \/\^deploy-preview-\\d\+--logistica-fernaguez-admin\\\.netlify\\\.app\$\//);
+assert.match(source, /url\.protocol === 'https:' && url\.port === '' && ADMIN_PREVIEW_HOST\.test\(url\.hostname\)/);
+assert.match(source, /url\.protocol === 'http:' && \(url\.hostname === 'localhost' \|\| url\.hostname === '127\.0\.0\.1'\)/);
+assert.match(source, /deployPrimeUrl = process\.env\.DEPLOY_PRIME_URL/);
+assert.doesNotMatch(source, /\*\.netlify\.app/);
 assert.match(source, /event\.httpMethod !== 'POST'/);
 assert.match(source, /parseJsonBody\(event, \[\]\)/);
 assert.match(source, /requireActiveAdministrator\(event\)/);
