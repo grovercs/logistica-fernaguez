@@ -101,6 +101,16 @@ const safeIntegerEnv = (name: string, fallback: number, maximum: number) => {
 const stableRows = (rows: JsonRecord[]) => [...rows].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
 const fileTimestamp = (date: Date) => date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, '');
 const errorCode = (value: unknown) => String(value || 'unknown').replace(/[^a-z0-9_:.-]/gi, '').slice(0, 80) || 'unknown';
+const uniqueRedactions = (redactions: Redaction[]) => {
+  const seen = new Set<string>();
+  return redactions.filter((item) => {
+    const key = item.table + '\u0000' + item.field + '\u0000' + item.reason;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+const applicationVersion = () => process.env.COMMIT_REF || process.env.DEPLOY_ID || process.env.BUILD_ID || null;
 
 async function exportTable(admin: SupabaseClient, table: BackupTable): Promise<JsonRecord[]> {
   const rows: JsonRecord[] = [];
@@ -214,6 +224,7 @@ export const handler: Handler = async (event) => {
     exported.admin_user_audit_log = redactAuditLog(exported.admin_user_audit_log || [], redactions);
     const reports = redactReportMediaReferences(exported.reportes || [], redactions);
     exported.reportes = reports.rows;
+    const manifestRedactions = uniqueRedactions(redactions);
 
     const zip = new JSZip();
     const checksums: Record<string, { sha256: string; size_bytes: number }> = {};
@@ -230,15 +241,15 @@ export const handler: Handler = async (event) => {
     const manifest = {
       tipo_copia: 'datos', version_formato: '1.0', generado_en: generatedAt.toISOString(), generado_por: context.actorUserId,
       entorno: process.env.CONTEXT || 'unknown', proyecto_supabase: new URL(process.env.SUPABASE_URL || 'https://unknown.invalid').hostname,
-      version_aplicacion: process.env.COMMIT_REF || null, tablas_exportadas: BACKUP_TABLES, filas_por_tabla: rowsByTable,
-      campos_redactados: redactions, tablas_con_redaccion: [...new Set(redactions.map((item) => item.table))],
+      version_aplicacion: applicationVersion(), tablas_exportadas: BACKUP_TABLES, filas_por_tabla: rowsByTable,
+      campos_redactados: manifestRedactions, tablas_con_redaccion: [...new Set(manifestRedactions.map((item) => item.table))],
       referencias_de_medios_detectadas: reports.detected, medios_incluidos: false,
       motivo_medios_no_incluidos: 'Fase 1 exporta exclusivamente datos; los medios se incorporarán mediante un trabajo asíncrono en una fase posterior.',
       tamano_total_bytes: dataBytes, definicion_tamano_total: 'Suma sin comprimir de database/*.json; el tamaño del ZIP se informa sólo en la respuesta administrativa.',
       checksum_global: checksumGlobal,
       algoritmo_checksum_global: 'SHA-256 de la concatenación UTF-8 ordenada por ruta de ruta + salto de línea + SHA-256 + salto de línea + tamaño en bytes + salto de línea para database/*.json.',
       checksum_del_zip_final: null,
-      errores_y_advertencias: redactions.length ? ['Se redactaron campos sensibles; revisa campos_redactados.'] : [],
+      errores_y_advertencias: manifestRedactions.length ? ['Se redactaron campos sensibles; revisa campos_redactados.'] : [],
       auditoria_redactada: 'admin_user_audit_log excluye old_values, new_values y error_message; conserva sólo identificadores, resultado, fecha y nombres allowlisted de campos modificados.',
     };
     addFile('manifest.json', JSON.stringify(manifest, null, 2));
@@ -251,11 +262,11 @@ export const handler: Handler = async (event) => {
     const summary = {
       filename, generated_at: generatedAt.toISOString(), tables: rowsByTable,
       total_rows: Object.values(rowsByTable).reduce((total, count) => total + count, 0),
-      size_bytes: archive.length, checksum_global: checksumGlobal, warnings: redactions.length,
+      size_bytes: archive.length, checksum_global: checksumGlobal, warnings: manifestRedactions.length,
     };
     await auditBackup(context.admin, context.actorUserId, {
       tablas: BACKUP_TABLES, total_filas: summary.total_rows, tamano_bytes: archive.length,
-      checksum_global: checksumGlobal, advertencias: redactions.length,
+      checksum_global: checksumGlobal, advertencias: manifestRedactions.length,
     });
     return zipResponse(archive, filename, summary, permittedOrigin);
   } catch (error) {

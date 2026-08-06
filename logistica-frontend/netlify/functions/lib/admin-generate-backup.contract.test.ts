@@ -25,6 +25,33 @@ for (const table of [
   'trabajadores', 'perfiles', 'roles', 'permisos', 'permisos_roles',
   'tareas_frecuentes', 'configuracion_sistema', 'contadores', 'admin_user_audit_log',
 ]) assert.match(source, new RegExp("'" + table + "'"));
+const deduplicateRedactions = <T extends { table: string; field: string; reason: string }>(rows: T[]) => {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const key = row.table + '\u0000' + row.field + '\u0000' + row.reason;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+const repeatedRedactions = [
+  { table: 'configuracion_sistema', field: 'valor', reason: 'configuration_key_not_allowlisted' },
+  { table: 'admin_user_audit_log', field: 'old_values', reason: 'audit_values_redacted' },
+  { table: 'configuracion_sistema', field: 'valor', reason: 'configuration_key_not_allowlisted' },
+  { table: 'admin_user_audit_log', field: 'old_values', reason: 'audit_values_redacted' },
+];
+assert.deepEqual(deduplicateRedactions(repeatedRedactions), repeatedRedactions.slice(0, 2));
+const selectApplicationVersion = (env: Record<string, string | undefined>) => env.COMMIT_REF || env.DEPLOY_ID || env.BUILD_ID || null;
+assert.equal(selectApplicationVersion({ COMMIT_REF: 'commit', DEPLOY_ID: 'deploy', BUILD_ID: 'build' }), 'commit');
+assert.equal(selectApplicationVersion({ DEPLOY_ID: 'deploy', BUILD_ID: 'build' }), 'deploy');
+assert.equal(selectApplicationVersion({ BUILD_ID: 'build' }), 'build');
+assert.equal(selectApplicationVersion({}), null);
+assert.match(source, /const uniqueRedactions/);
+assert.match(source, /const manifestRedactions = uniqueRedactions\(redactions\)/);
+assert.match(source, /campos_redactados: manifestRedactions/);
+assert.match(source, /const applicationVersion = \(\) => process\.env\.COMMIT_REF \|\| process\.env\.DEPLOY_ID \|\| process\.env\.BUILD_ID \|\| null/);
+assert.match(source, /entorno: process\.env\.CONTEXT \|\| 'unknown'/);
+assert.match(source, /version_aplicacion: applicationVersion\(\)/);
 assert.match(source, /SAFE_CONFIGURATION_KEYS/);
 assert.match(source, /metodo_notificacion/);
 assert.match(source, /redactConfiguration/);
