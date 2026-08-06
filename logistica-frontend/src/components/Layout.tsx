@@ -301,7 +301,7 @@ const Layout = () => {
                   }
                 >
                   <Database className="w-5 h-5 mr-3" />
-                  Gestión BD
+                  Copias de seguridad
                 </NavLink>
 
                 <NavLink
