@@ -15,6 +15,7 @@ import Especialidades from './pages/Especialidades';
 import Ayuda from './pages/Ayuda';
 import AdminMaintenance from './pages/AdminMaintenance';
 import Usuarios from './pages/Usuarios';
+import BackupCenter from './pages/BackupCenter';
 
 function App() {
   return (
@@ -36,7 +37,7 @@ function App() {
           <Route path="aseguradoras" element={<RequireRole><Aseguradoras /></RequireRole>} />
           <Route path="tareas-frecuentes" element={<RequireRole><TareasFrecuentes /></RequireRole>} />
           <Route path="especialidades" element={<RequireRole><Especialidades /></RequireRole>} />
-          <Route path="bd" element={<RequireRole><AdminMaintenance /></RequireRole>} />
+          <Route path="bd" element={<RequireRole><BackupCenter /></RequireRole>} />
           <Route path="rbac" element={<RequireRole><AdminMaintenance /></RequireRole>} />
           <Route path="roles" element={<RequireRole><AdminMaintenance /></RequireRole>} />
           <Route path="permisos" element={<RequireRole><AdminMaintenance /></RequireRole>} />
