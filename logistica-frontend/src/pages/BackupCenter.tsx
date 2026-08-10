@@ -1,23 +1,11 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Archive, CheckCircle2, Download, LoaderCircle, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-type BackupSummary = {
-  filename: string;
-  generated_at: string;
-  tables: Record<string, number>;
-  total_rows: number;
-  size_bytes: number;
-  checksum_global: string;
-  warnings: number;
-};
+type Tab = 'backup' | 'restaurar' | 'compactar' | 'archivados';
+type BackupSummary = { filename: string; generated_at: string; tables: Record<string, number>; total_rows: number; size_bytes: number; checksum_global: string; warnings: number };
 
 const phases = ['Verificando permisos', 'Exportando datos', 'Redactando campos sensibles', 'Generando manifiesto', 'Calculando integridad', 'Preparando descarga'];
-
-const formatBytes = (bytes: number) => bytes >= 1024 * 1024
-  ? (bytes / (1024 * 1024)).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' MB'
-  : Math.max(1, Math.round(bytes / 1024)).toLocaleString('es-ES') + ' KB';
-
+const formatBytes = (bytes: number) => bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toLocaleString('es-ES', { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024)).toLocaleString('es-ES')} KB`;
 const decodeSummary = (value: string): BackupSummary => {
   const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
   const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
@@ -25,6 +13,8 @@ const decodeSummary = (value: string): BackupSummary => {
 };
 
 export default function BackupCenter() {
+  const [activeTab, setActiveTab] = useState<Tab>('backup');
+  const [showDriveConfig, setShowDriveConfig] = useState(false);
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState<number | null>(null);
   const [summary, setSummary] = useState<BackupSummary | null>(null);
@@ -32,14 +22,6 @@ export default function BackupCenter() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => () => { if (downloadUrl) URL.revokeObjectURL(downloadUrl); }, [downloadUrl]);
-
-  const releaseDownloadAfterStart = () => {
-    if (!downloadUrl) return;
-    window.setTimeout(() => {
-      URL.revokeObjectURL(downloadUrl);
-      setDownloadUrl((current) => current === downloadUrl ? null : current);
-    }, 1000);
-  };
 
   const generateBackup = async () => {
     if (loading) return;
@@ -49,11 +31,7 @@ export default function BackupCenter() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('La sesión ha caducado. Inicia sesión de nuevo.');
-      const result = await fetch('/.netlify/functions/admin-generate-backup', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
-        body: '{}',
-      });
+      const result = await fetch('/.netlify/functions/admin-generate-backup', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: '{}' });
       if (!result.ok) {
         const payload = await result.json().catch(() => ({})) as { error?: string };
         throw new Error(payload.error || 'No se pudo generar la copia de datos.');
@@ -70,37 +48,34 @@ export default function BackupCenter() {
     }
   };
 
-  return (
-    <main className="mx-auto w-full max-w-5xl space-y-6 p-5 sm:p-8">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex gap-4">
-          <div className="rounded-xl bg-blue-100 p-3 text-blue-700 dark:bg-blue-950 dark:text-blue-300"><ShieldCheck className="h-7 w-7" /></div>
-          <div><h1 className="text-2xl font-bold text-slate-900 dark:text-white">Centro de copias de seguridad</h1><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">Esta copia incluye los datos operativos y de configuración permitidos. Las fotografías, firmas y documentos se incorporarán en una fase posterior.</p></div>
-        </div>
-      </section>
+  const releaseDownloadAfterStart = () => {
+    if (!downloadUrl) return;
+    window.setTimeout(() => { URL.revokeObjectURL(downloadUrl); setDownloadUrl((current) => current === downloadUrl ? null : current); }, 1000);
+  };
+  const tabs: Array<{ id: Tab; label: string; icon: string }> = [
+    { id: 'backup', label: 'Protección', icon: 'shield_lock' },
+    { id: 'restaurar', label: 'Rescate', icon: 'medical_services' },
+    { id: 'compactar', label: 'Optimizar', icon: 'cleaning_services' },
+    { id: 'archivados', label: 'Historial', icon: 'inventory_2' },
+  ];
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <article className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><Archive className="h-5 w-5 text-blue-600" /><h2 className="mt-3 font-semibold">Datos operativos</h2><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Órdenes, intervenciones, asignaciones, trabajadores, permisos, catálogos y configuración permitida.</p></article>
-        <article className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><ShieldCheck className="h-5 w-5 text-blue-600" /><h2 className="mt-3 font-semibold">Información redactada</h2><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Secretos de configuración y valores personales de auditoría no se incluyen en el archivo.</p></article>
-        <article className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><CheckCircle2 className="h-5 w-5 text-blue-600" /><h2 className="mt-3 font-semibold">Verificable</h2><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">El ZIP incorpora manifiesto y hashes SHA-256. Guárdalo fuera del sistema de forma segura.</p></article>
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="text-lg font-bold">Generar copia</h2><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">La descarga se genera sólo para Administradores activos. No se conserva en una URL pública ni incluye medios.</p><p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">Esta copia contiene datos personales y debe almacenarse de forma segura.</p>
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <button type="button" onClick={() => void generateBackup()} disabled={loading} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"><LoaderCircle className={'h-5 w-5 ' + (loading ? 'animate-spin' : 'hidden')} />Generar copia de datos</button>
-          {summary && <span className="text-sm text-slate-600 dark:text-slate-300">Generada en esta sesión: {new Date(summary.generated_at).toLocaleString('es-ES')}</span>}
-        </div>
-        {loading && <ol className="mt-6 space-y-2 text-sm">{phases.map((item, index) => <li key={item} className={index <= (phase ?? -1) ? 'font-medium text-blue-700 dark:text-blue-300' : 'text-slate-400'}>{index <= (phase ?? -1) ? '●' : '○'} {item}</li>)}</ol>}
-        {error && <div role="alert" className="mt-5 flex gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"><AlertTriangle className="h-5 w-5 shrink-0" />{error}</div>}
-        {summary && <div className={'mt-5 rounded-xl border p-5 ' + (summary.warnings ? 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30' : 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30')}>
-          <h3 className="font-semibold">{summary.warnings ? 'Copia generada con advertencias' : 'Copia de datos generada correctamente'}</h3>
-          <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2"><div><dt className="text-slate-500">Archivo</dt><dd className="break-all font-medium">{summary.filename}</dd></div><div><dt className="text-slate-500">Tamaño ZIP</dt><dd className="font-medium">{formatBytes(summary.size_bytes)}</dd></div><div><dt className="text-slate-500">Filas exportadas</dt><dd className="font-medium">{summary.total_rows}</dd></div><div><dt className="text-slate-500">Checksum global</dt><dd className="break-all font-mono text-xs">{summary.checksum_global}</dd></div></dl>
-          {summary.warnings > 0 && <p className="mt-3 text-sm">El manifiesto detalla los campos redactados.</p>}
-          {downloadUrl && <a href={downloadUrl} download={summary.filename} onClick={releaseDownloadAfterStart} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 font-semibold text-white dark:bg-slate-100 dark:text-slate-900"><Download className="h-5 w-5" />Descargar copia de datos</a>}
+  return <div className="flex h-full flex-1 flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    {showDriveConfig && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-6 backdrop-blur-sm"><div className="w-full max-w-md space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"><div className="flex items-center justify-between border-b pb-4 dark:border-slate-800"><h3 className="text-lg font-bold">Ajustes de Google Drive</h3><button type="button" onClick={() => setShowDriveConfig(false)} className="text-slate-400" aria-label="Cerrar"><span className="material-symbols-outlined">close</span></button></div><div className="space-y-4"><div><label className="text-xs font-medium text-slate-500">Google Client ID</label><input disabled placeholder="Ingrese su Client ID" className="mt-1 w-full rounded-lg border-none bg-slate-50 px-4 py-2 text-sm opacity-60 dark:bg-slate-800" /></div><div><label className="text-xs font-medium text-slate-500">URL o ID de Carpeta</label><input disabled placeholder="Pegue la URL completa..." className="mt-1 w-full rounded-lg border-none bg-slate-50 px-4 py-2 text-sm opacity-60 dark:bg-slate-800" /></div><p className="text-xs text-slate-400">Próximamente. La conexión con Drive permanece protegida hasta su implementación segura.</p><div className="grid grid-cols-2 gap-3"><button disabled className="rounded-lg bg-slate-100 py-2 text-xs font-bold text-slate-400 dark:bg-slate-800">CREAR CARPETA</button><button disabled className="rounded-lg bg-primary py-2 text-xs font-bold text-white opacity-40">GUARDAR TODO</button></div></div></div></div>}
+    <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white backdrop-blur-md dark:border-slate-800 dark:bg-slate-900"><div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-8"><div className="flex items-center gap-3"><div className="flex size-9 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary"><span className="material-symbols-outlined text-xl">database</span></div><h2 className="text-lg font-black tracking-tight">Base de Datos</h2></div><span className="hidden items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 sm:flex"><span className="size-1.5 animate-pulse rounded-full bg-emerald-500" /> SISTEMA ACTIVO</span></div></header>
+    <div className="flex-1 overflow-y-auto"><div className="sticky top-0 z-40 border-b border-slate-200 bg-white backdrop-blur-md dark:border-slate-800 dark:bg-slate-900"><div className="mx-auto max-w-7xl px-4 sm:px-8"><nav className="no-scrollbar flex space-x-6 overflow-x-auto sm:space-x-8">{tabs.map((tab) => <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={`flex shrink-0 items-center gap-2 border-b-2 py-4 text-xs font-black uppercase tracking-widest ${activeTab === tab.id ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'}`}><span className="material-symbols-outlined text-lg">{tab.icon}</span>{tab.label}</button>)}</nav></div></div>
+      <div className="mx-auto w-full max-w-7xl space-y-8 p-8">
+        {activeTab === 'backup' && <div className="animate-in fade-in space-y-8 duration-500"><div className="flex flex-col items-center justify-between gap-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:flex-row"><div><h2 className="text-2xl font-bold">Seguridad y Respaldo de Datos</h2><p className="text-sm italic text-slate-500">Blindaje operativo de activos digitales frente a cualquier amenaza.</p></div><button type="button" onClick={() => setShowDriveConfig(true)} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"><span className="material-symbols-outlined text-lg">settings</span> CONFIGURAR DRIVE</button></div>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <article className="flex min-h-[340px] flex-col justify-between rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"><div className="space-y-6"><div className="flex items-start justify-between"><div className="flex size-12 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30"><span className="material-symbols-outlined text-3xl">cloud</span></div><span className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-1 text-[10px] font-bold text-slate-400">PENDIENTE</span></div><div><h3 className="text-lg font-bold">Respaldo en Nube</h3><p className="text-sm leading-relaxed text-slate-500">Sincroniza la estructura de la base de datos (JSON) en su cuenta de Google Drive.</p></div><p className="text-xs text-slate-400">Próximamente</p></div><button disabled className="w-full rounded-lg bg-slate-100 py-3 text-sm font-bold text-slate-300 dark:bg-slate-800">SINCRONIZAR AHORA</button></article>
+            <article className="flex min-h-[340px] flex-col justify-between rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"><div className="space-y-5"><div className="flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary"><span className="material-symbols-outlined text-3xl">database</span></div><div><h3 className="text-lg font-bold">Descarga Manual</h3><p className="text-sm leading-relaxed text-slate-500">Obtenga una copia física del sistema para almacenamiento externo offline.</p></div><div className="inline-flex items-center gap-2 text-3xl font-bold text-primary">{summary ? formatBytes(summary.size_bytes) : '—'} <span className="text-[10px] font-medium uppercase tracking-widest text-slate-400">Aprox.</span></div><p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">Esta copia contiene datos personales y debe almacenarse de forma segura.</p></div><div className="mt-4 space-y-3"><button type="button" onClick={() => void generateBackup()} disabled={loading} className="w-full rounded-lg bg-primary py-3 text-sm font-bold text-white shadow-md shadow-primary/10 disabled:opacity-60">{loading ? 'CREANDO...' : 'DESCARGAR JSON'}</button>{loading && <div className="space-y-1 text-[10px] font-bold uppercase text-primary">{phases.map((item, index) => <p key={item} className={index <= (phase ?? -1) ? '' : 'text-slate-300'}>{index <= (phase ?? -1) ? '●' : '○'} {item}</p>)}</div>}{error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</p>}{summary && <div className="space-y-1 rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-[10px] text-emerald-800"><p className="font-bold">{summary.warnings ? 'COPIA CON ADVERTENCIAS' : 'COPIA GENERADA CORRECTAMENTE'}</p><p className="break-all">Archivo: {summary.filename}</p><p>Filas: {summary.total_rows} · Tamaño: {formatBytes(summary.size_bytes)}</p><p className="break-all">Checksum: {summary.checksum_global}</p>{downloadUrl && <a href={downloadUrl} download={summary.filename} onClick={releaseDownloadAfterStart} className="mt-2 inline-flex rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white">DESCARGAR COPIA ZIP</a>}</div>}</div></article>
+            <article className="flex min-h-[340px] flex-col justify-between rounded-xl bg-slate-900 p-6 shadow-sm"><div className="space-y-6"><div className="flex size-12 items-center justify-center rounded-lg bg-white/10 text-white"><span className="material-symbols-outlined text-3xl">folder_zip</span></div><div><h3 className="text-lg font-bold text-white">Galería Multimedia</h3><p className="text-sm leading-relaxed text-slate-400">Archivo comprimido de todas las evidencias táctiles y fotográficas.</p></div><div className="rounded-lg border border-white/5 bg-white/10 p-4 text-center"><p className="text-[10px] font-bold uppercase text-blue-400">PRÓXIMAMENTE</p><p className="mt-2 text-3xl font-bold text-white">— <span className="text-[10px] font-medium uppercase tracking-widest text-slate-500">Evidencias</span></p><p className="mt-3 text-[9px] font-bold uppercase text-rose-400">NO CIERRE LA VENTANA</p></div></div><div className="grid grid-cols-2 gap-3"><button disabled className="rounded-lg bg-blue-900 py-2 text-[10px] font-bold uppercase tracking-widest text-white opacity-60">☁ DRIVE</button><button disabled className="rounded-lg bg-white py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 opacity-50">📁 ZIP LOCAL</button></div></article>
+          </div>
+          <div className="flex justify-around rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900"><div><p className="text-[10px] font-bold uppercase text-slate-400">Total Obras</p><p className="text-xl font-bold">—</p></div><div className="h-10 w-px bg-slate-100 dark:bg-slate-800" /><div><p className="text-[10px] font-bold uppercase text-slate-400">Pend. Optimización</p><p className="text-xl font-bold text-amber-500">—</p></div><div className="h-10 w-px bg-slate-100 dark:bg-slate-800" /><div><p className="text-[10px] font-bold uppercase text-slate-400">Conexión Drive</p><p className="text-xl font-bold text-slate-300">INACTIVA</p></div></div>
         </div>}
-      </section>
-      <p className="text-xs leading-5 text-slate-500">Fase 1: datos y metadatos seguros. Fase 2 incorporará medios mediante una generación asíncrona en almacenamiento privado temporal.</p>
-    </main>
-  );
+        {activeTab === 'restaurar' && <div className="animate-in slide-in-from-bottom-5 space-y-8"><div className="flex items-center gap-8 rounded-xl bg-rose-600 p-8 text-white shadow-lg"><div className="flex size-16 items-center justify-center rounded-lg bg-white/20"><span className="material-symbols-outlined text-4xl">medical_services</span></div><div><h2 className="text-2xl font-bold">Estrategia de Rescate</h2><p className="text-sm font-medium text-rose-100 opacity-80">Restauración de infraestructura en caso de incidencia operacional severa.</p></div></div><div className="grid grid-cols-1 gap-8 text-center md:grid-cols-2"><div className="space-y-4 rounded-xl border-2 border-dashed border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900"><h4 className="text-lg font-bold uppercase">Vincular Archivo Maestro</h4><p className="text-sm text-slate-500">Repone la estructura de datos administrativa (.JSON).</p><button disabled className="w-full rounded-lg bg-slate-100 py-2 text-xs font-bold text-slate-400 dark:bg-slate-800">PROTEGIDO POR ADMIN</button></div><div className="space-y-4 rounded-xl border-2 border-dashed border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900"><h4 className="text-lg font-bold uppercase">Cargar Galería ZIP</h4><p className="text-sm text-slate-500">Reconstituye el carrete multimedia global (.ZIP).</p><button disabled className="w-full rounded-lg bg-slate-100 py-2 text-xs font-bold text-slate-400 dark:bg-slate-800">PROTEGIDO POR ADMIN</button></div></div></div>}
+        {activeTab === 'compactar' && <div className="animate-in slide-in-from-bottom-5 space-y-8"><div className="flex items-center gap-8 rounded-xl bg-amber-500 p-8 text-slate-950 shadow-md"><div className="flex size-16 items-center justify-center rounded-lg bg-white/20"><span className="material-symbols-outlined text-4xl">cleaning_services</span></div><div><h2 className="text-2xl font-bold">Optimización de Registros</h2><p className="text-sm font-medium text-amber-950 opacity-70">Seleccione las obras finalizadas que desea mover al historial administrativo.</p></div></div><div className="space-y-4"><div className="flex items-center justify-between"><div className="flex items-center gap-4"><h3 className="text-lg font-bold">Órdenes Finalizadas</h3><span className="rounded-lg bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">0 DISPONIBLES</span></div><div className="flex gap-3"><button disabled className="text-xs font-bold text-slate-300">SELECCIONAR TODO</button><button disabled className="rounded-lg bg-amber-500 px-6 py-2 text-xs font-bold opacity-30 grayscale">ARCHIVAR 0 SELECCIONADAS</button></div></div><div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"><table className="w-full text-left text-sm"><thead className="border-b bg-slate-50 text-slate-500 dark:bg-slate-800/50"><tr><th className="px-6 py-3"><input disabled type="checkbox" /></th><th className="px-4 py-3">Fecha</th><th className="px-4 py-3">ID OT</th><th className="px-4 py-3">Cliente</th><th className="px-4 py-3">Aseguradora</th><th className="px-4 py-3 text-right">Estado</th></tr></thead><tbody><tr><td colSpan={6} className="px-6 py-20 text-center italic text-slate-400">No hay órdenes finalizadas pendientes de optimización.</td></tr></tbody></table></div><p className="text-center text-[10px] italic text-slate-400">Optimizar registros ayuda a mantener la rapidez del sistema al mover datos operativos pesados al historial administrativo.</p></div></div>}
+        {activeTab === 'archivados' && <div className="animate-in slide-in-from-bottom-5 space-y-6"><div className="flex flex-col items-center justify-between gap-4 md:flex-row"><h2 className="text-lg font-bold">Historial Maestro</h2><div className="relative w-full md:w-80"><span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-lg text-slate-400">search</span><input disabled placeholder="Buscar por ID o cliente..." className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm opacity-60 dark:border-slate-800 dark:bg-slate-900" /></div></div><div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"><table className="w-full text-left text-sm"><thead className="border-b bg-slate-50 text-slate-500 dark:bg-slate-800/50"><tr><th className="px-6 py-3">Fecha</th><th className="px-6 py-3">ID OT</th><th className="px-6 py-3">Cliente</th><th className="px-6 py-3 text-right">Información</th></tr></thead><tbody><tr><td colSpan={4} className="px-6 py-20 text-center text-slate-400">Sin registros archivados.</td></tr></tbody></table></div><div className="flex justify-end gap-2 text-[10px] font-bold"><button disabled className="flex items-center gap-1 rounded-lg border border-primary/10 bg-primary/5 px-2 py-1 text-primary opacity-40"><span className="material-symbols-outlined text-sm">visibility</span>VER DETALLE</button><button disabled className="flex items-center gap-1 rounded-lg border border-amber-100 bg-amber-50 px-2 py-1 text-amber-600 opacity-40"><span className="material-symbols-outlined text-sm">settings_backup_restore</span>RESTAURAR</button></div></div>}
+      </div>
+    </div>
+  </div>;
 }
