@@ -35,6 +35,22 @@ export function isAllowedMediaRequest(event: Pick<HandlerEvent, 'headers' | 'raw
   } catch { return false; }
 }
 
+/**
+ * Resolve the internal worker target from the URL that reached this Function.
+ * Netlify's runtime URL is the site's primary URL, which can point to production
+ * while a Deploy Preview is running. The request URL is therefore the only
+ * deploy-specific base that is safe to use for an internal dispatch.
+ */
+export function internalMediaDispatchOrigin(event: Pick<HandlerEvent, 'rawUrl'>): string | undefined {
+  if (!event.rawUrl) return undefined;
+  try {
+    const url = new URL(event.rawUrl);
+    return allowedMediaOrigin(url.origin) === url.origin ? url.origin : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function mediaResponse(statusCode: number, body: unknown, origin?: string) {
   return { statusCode, headers: { 'Content-Type': 'application/json', ...(origin ? { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' } : {}) }, body: JSON.stringify(body) };
 }
