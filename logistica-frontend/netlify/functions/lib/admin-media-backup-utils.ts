@@ -79,3 +79,17 @@ export function verifyMediaBytes(mime: string, bytes: Buffer): boolean {
   return false;
 }
 export const extensionForMime = (mime: string) => ({ 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[mime.split(';')[0].trim().toLowerCase()] || 'bin');
+
+export type MediaReferenceType = 'fotos' | 'facturas' | 'firmas';
+
+export const mediaFileTypeLabel = (type: MediaReferenceType) => ({ fotos: 'FOTO', facturas: 'FACTURA', firmas: 'FIRMA' }[type]);
+
+/** A date-only field is copied as a calendar label; no Date conversion is used. */
+export const mediaWorkDateLabel = (fechaTrabajo: string | null | undefined) => /^\d{4}-\d{2}-\d{2}$/.test(fechaTrabajo || '') ? fechaTrabajo! : 'SIN_FECHA';
+
+export const mediaZipFilename = ({ idLegible, fechaTrabajo, type, sequence, mime }: { idLegible: string | null; fechaTrabajo: string | null | undefined; type: MediaReferenceType; sequence: number; mime: string }) => {
+  const orderLabel = sanitizeSegment(idLegible, 'SIN_OBRA');
+  const dateLabel = mediaWorkDateLabel(fechaTrabajo);
+  const number = String(sequence).padStart(2, '0');
+  return `${orderLabel}_${dateLabel}_${mediaFileTypeLabel(type)}_${number}.${extensionForMime(mime)}`;
+};

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import JSZip from 'jszip';
-import { internalMediaDispatchOrigin, validWorkerSignature, verifyMediaBytes, workerInvocationSignature } from './admin-media-backup-utils';
+import { internalMediaDispatchOrigin, mediaZipFilename, validWorkerSignature, verifyMediaBytes, workerInvocationSignature } from './admin-media-backup-utils';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -29,6 +29,10 @@ assert.match(background, /validWorkerSignature\(workerSecret, body\.job_id, body
 assert.match(background, /eq\('actor_user_id', body\.actor_user_id\)\.eq\('estado', 'pending'\)/);
 assert.match(background, /fotos-reportes\\\/firmas/);
 assert.match(background, /storage\.from\(SIGNATURE_BUCKET\)\.download/);
+assert.match(background, /fecha_trabajo, fotos_urls/);
+assert.match(background, /mediaZipFilename/);
+assert.match(background, /references\.sort/);
+assert.match(background, /fecha_trabajo: ref\.fecha_trabajo/);
 assert.doesNotMatch(background, /image\/gif/);
 assert.doesNotMatch(utils, /image\/gif/);
 for (const mime of ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']) assert.match(background, new RegExp(mime));
@@ -47,6 +51,13 @@ assert.equal(internalMediaDispatchOrigin({ rawUrl: 'https://deploy-preview-12--l
 assert.equal(internalMediaDispatchOrigin({ rawUrl: 'https://admin.appvielha.com/.netlify/functions/admin-start-media-backup' } as any), 'https://admin.appvielha.com');
 assert.equal(internalMediaDispatchOrigin({ rawUrl: 'https://app.appvielha.com/.netlify/functions/admin-start-media-backup' } as any), undefined);
 assert.equal(internalMediaDispatchOrigin({ rawUrl: 'https://other--logistica-fernaguez-admin.netlify.app/.netlify/functions/admin-start-media-backup' } as any), undefined);
+assert.equal(mediaZipFilename({ idLegible: 'OB-2026-0005', fechaTrabajo: '2026-08-07', type: 'fotos', sequence: 1, mime: 'image/jpeg' }), 'OB-2026-0005_2026-08-07_FOTO_01.jpg');
+assert.equal(mediaZipFilename({ idLegible: 'OB-2026-0005', fechaTrabajo: '2026-08-07', type: 'fotos', sequence: 2, mime: 'image/jpeg' }), 'OB-2026-0005_2026-08-07_FOTO_02.jpg');
+assert.equal(mediaZipFilename({ idLegible: 'OB-2026-0005', fechaTrabajo: '2026-08-07', type: 'facturas', sequence: 2, mime: 'application/pdf' }), 'OB-2026-0005_2026-08-07_FACTURA_02.pdf');
+assert.equal(mediaZipFilename({ idLegible: 'OB-2026-0005', fechaTrabajo: '2026-08-07', type: 'firmas', sequence: 1, mime: 'image/png' }), 'OB-2026-0005_2026-08-07_FIRMA_01.png');
+assert.equal(mediaZipFilename({ idLegible: 'OB-2026-0005', fechaTrabajo: null, type: 'fotos', sequence: 1, mime: 'image/webp' }), 'OB-2026-0005_SIN_FECHA_FOTO_01.webp');
+assert.doesNotMatch(mediaZipFilename({ idLegible: 'OB-2026-0005', fechaTrabajo: '2026-08-07', type: 'fotos', sequence: 1, mime: 'image/jpeg' }), /71d7e24b-adca-4fb9-a7a8-fcbf36e06e5c/);
+assert.equal(mediaZipFilename({ idLegible: '../OB-2026-0005', fechaTrabajo: '2026-08-07', type: 'fotos', sequence: 1, mime: 'image/jpeg' }).includes('/'), false);
 assert.equal(verifyMediaBytes('image/gif', Buffer.from('GIF89a')), false);
 assert.equal(verifyMediaBytes('image/jpeg', Buffer.from([0xff, 0xd8, 0xff, 0xd9])), true);
 assert.equal(verifyMediaBytes('image/png', Buffer.from([137,80,78,71,13,10,26,10])), true);

@@ -2,10 +2,10 @@ import type { BackgroundHandler } from '@netlify/functions';
 import { createHash } from 'node:crypto';
 import JSZip from 'jszip';
 import { createClient } from '@supabase/supabase-js';
-import { extensionForMime, MAX_FILE_BYTES, MAX_JOB_BYTES, MEDIA_BUCKET, SIGNATURE_BUCKET, safeErrorCode, safeErrorSummary, sanitizeSegment, validWorkerSignature, verifyMediaBytes } from './lib/admin-media-backup-utils';
+import { MAX_FILE_BYTES, MAX_JOB_BYTES, MEDIA_BUCKET, mediaWorkDateLabel, mediaZipFilename, SIGNATURE_BUCKET, safeErrorCode, safeErrorSummary, sanitizeSegment, validWorkerSignature, verifyMediaBytes } from './lib/admin-media-backup-utils';
 
-type MediaReference = { order_id: string | null; id_legible: string | null; reporte_id: string; tipo: 'fotos' | 'facturas' | 'firmas'; source: string };
-type ManifestFile = { order_id: string | null; id_legible: string | null; reporte_id: string; tipo: string; source_provider: string; source_reference_normalized: string; zip_path: string | null; mime: string | null; size_bytes: number | null; sha256: string | null; status: 'downloaded' | 'deduplicated' | 'failed'; error_code?: string };
+type MediaReference = { order_id: string | null; id_legible: string | null; reporte_id: string; fecha_trabajo: string | null; tipo: 'fotos' | 'facturas' | 'firmas'; source: string; source_index: number };
+type ManifestFile = { order_id: string | null; id_legible: string | null; reporte_id: string; fecha_trabajo: string | null; tipo: string; source_provider: string; source_reference_normalized: string; zip_path: string | null; mime: string | null; size_bytes: number | null; sha256: string | null; status: 'downloaded' | 'deduplicated' | 'failed'; error_code?: string };
 const MIME_ALLOWED = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
 const stateOptions = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
 
@@ -61,7 +61,7 @@ export const handler: BackgroundHandler = async (event) => {
     if (claimError) throw new Error('BACKUP_JOB_CLAIM_FAILED');
     if (!job) return;
     const [{ data: reports, error: reportsError }, { data: orders, error: ordersError }] = await Promise.all([
-      admin.from('reportes').select('id, orden_id, fotos_urls, facturas_urls, firma_url').range(0, 100000),
+      admin.from('reportes').select('id, orden_id, fecha_trabajo, fotos_urls, facturas_urls, firma_url').order('fecha_trabajo', { ascending: true }).order('id', { ascending: true }).range(0, 100000),
       admin.from('ordenes').select('id, id_legible').range(0, 100000),
     ]);
     if (reportsError || ordersError) throw new Error('BACKUP_SCHEMA_ACCESS_FAILED');
@@ -69,12 +69,15 @@ export const handler: BackgroundHandler = async (event) => {
     const references: MediaReference[] = [];
     for (const row of ((reports || []) as any[])) {
       const orderId = typeof row.orden_id === 'string' ? row.orden_id : null;
-      for (const source of asStrings(row.fotos_urls)) references.push({ order_id: orderId, id_legible: orderId ? orderIds.get(orderId) || null : null, reporte_id: String(row.id), tipo: 'fotos', source });
-      for (const source of asStrings(row.facturas_urls)) references.push({ order_id: orderId, id_legible: orderId ? orderIds.get(orderId) || null : null, reporte_id: String(row.id), tipo: 'facturas', source });
-      if (typeof row.firma_url === 'string' && row.firma_url) references.push({ order_id: orderId, id_legible: orderId ? orderIds.get(orderId) || null : null, reporte_id: String(row.id), tipo: 'firmas', source: row.firma_url });
+      const fechaTrabajo = typeof row.fecha_trabajo === 'string' ? row.fecha_trabajo : null;
+      const base = { order_id: orderId, id_legible: orderId ? orderIds.get(orderId) || null : null, reporte_id: String(row.id), fecha_trabajo: fechaTrabajo };
+      for (const [source_index, source] of asStrings(row.fotos_urls).entries()) references.push({ ...base, tipo: 'fotos', source, source_index });
+      for (const [source_index, source] of asStrings(row.facturas_urls).entries()) references.push({ ...base, tipo: 'facturas', source, source_index });
+      if (typeof row.firma_url === 'string' && row.firma_url) references.push({ ...base, tipo: 'firmas', source: row.firma_url, source_index: 0 });
     }
+    references.sort((left, right) => [left.id_legible || '', left.fecha_trabajo || '', left.tipo, left.reporte_id, left.source_index].join('\u0000').localeCompare([right.id_legible || '', right.fecha_trabajo || '', right.tipo, right.reporte_id, right.source_index].join('\u0000')));
     await admin.from('backup_jobs').update({ estado: 'downloading', total_items: references.length, heartbeat_at: new Date().toISOString() }).eq('id', jobId);
-    const zip = new JSZip(); const manifest: ManifestFile[] = []; const known = new Map<string, string>();
+    const zip = new JSZip(); const manifest: ManifestFile[] = []; const known = new Map<string, string>(); const sequences = new Map<string, number>();
     let processedBytes = 0; let failed = 0;
     for (let index = 0; index < references.length; index += 1) {
       const ref = references[index];
@@ -84,12 +87,15 @@ export const handler: BackgroundHandler = async (event) => {
         const sha = createHash('sha256').update(file.bytes).digest('hex');
         const existing = known.get(sha);
         const folder = ref.id_legible ? sanitizeSegment(ref.id_legible, 'sin_obra') : 'sin_obra';
-        const path = existing || `media/${folder}/${ref.tipo}/${sanitizeSegment(ref.reporte_id, 'reporte')}-${ref.tipo}-${index + 1}.${extensionForMime(file.mime)}`;
+        const sequenceGroup = [folder, mediaWorkDateLabel(ref.fecha_trabajo), ref.tipo].join('\u0000');
+        const sequence = existing ? 0 : (sequences.get(sequenceGroup) || 0) + 1;
+        if (!existing) sequences.set(sequenceGroup, sequence);
+        const path = existing || `media/${folder}/${ref.tipo}/${mediaZipFilename({ idLegible: ref.id_legible, fechaTrabajo: ref.fecha_trabajo, type: ref.tipo, sequence, mime: file.mime })}`;
         if (!existing) { zip.file(path, file.bytes); known.set(sha, path); processedBytes += file.bytes.length; }
-        manifest.push({ order_id: ref.order_id, id_legible: ref.id_legible, reporte_id: ref.reporte_id, tipo: ref.tipo, source_provider: file.provider, source_reference_normalized: file.normalized, zip_path: path, mime: file.mime, size_bytes: file.bytes.length, sha256: sha, status: existing ? 'deduplicated' : 'downloaded' });
+        manifest.push({ order_id: ref.order_id, id_legible: ref.id_legible, reporte_id: ref.reporte_id, fecha_trabajo: ref.fecha_trabajo, tipo: ref.tipo, source_provider: file.provider, source_reference_normalized: file.normalized, zip_path: path, mime: file.mime, size_bytes: file.bytes.length, sha256: sha, status: existing ? 'deduplicated' : 'downloaded' });
       } catch (error) {
         failed += 1; const code = safeErrorCode(error, 'media_download_failed');
-        manifest.push({ order_id: ref.order_id, id_legible: ref.id_legible, reporte_id: ref.reporte_id, tipo: ref.tipo, source_provider: 'unknown', source_reference_normalized: 'redacted_invalid_reference', zip_path: null, mime: null, size_bytes: null, sha256: null, status: 'failed', error_code: code });
+        manifest.push({ order_id: ref.order_id, id_legible: ref.id_legible, reporte_id: ref.reporte_id, fecha_trabajo: ref.fecha_trabajo, tipo: ref.tipo, source_provider: 'unknown', source_reference_normalized: 'redacted_invalid_reference', zip_path: null, mime: null, size_bytes: null, sha256: null, status: 'failed', error_code: code });
       }
       await admin.from('backup_jobs').update({ processed_items: index + 1, processed_bytes: processedBytes, failed_items: failed, heartbeat_at: new Date().toISOString() }).eq('id', jobId);
     }
