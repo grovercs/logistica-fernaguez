@@ -100,8 +100,11 @@ export default function Usuarios() {
   const passwordResetInFlight = useRef(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const successMessageRef = useRef<HTMLDivElement>(null);
+  const [successMessage, setSuccessMessage] = useState<{ id: number; text: string } | null>(null);
+  const successMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const successMessageSequenceRef = useRef(0);
+
+  const showSuccessMessage = (text: string) => setSuccessMessage({ id: ++successMessageSequenceRef.current, text });
 
   const loadData = async () => {
     setLoading(true);
@@ -133,7 +136,16 @@ export default function Usuarios() {
   }, []);
 
   useEffect(() => {
-    if (successMessage) successMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (!successMessage) return;
+    if (successMessageTimerRef.current) clearTimeout(successMessageTimerRef.current);
+    successMessageTimerRef.current = setTimeout(() => {
+      setSuccessMessage(null);
+      successMessageTimerRef.current = null;
+    }, 5000);
+    return () => {
+      if (successMessageTimerRef.current) clearTimeout(successMessageTimerRef.current);
+      successMessageTimerRef.current = null;
+    };
   }, [successMessage]);
 
   const filteredUsuarios = useMemo(() => {
@@ -146,7 +158,7 @@ export default function Usuarios() {
   const openEditProfile = (user: ManagedUser) => { setEditConfirmation(null); setEditProfileOperation({ user, nombre: user.nombre || '', rolId: user.rol_id || '', activo: user.activo, trabajadorId: user.trabajador?.id || '', confirmAssignments: false, activeAssignmentsCount: 0 }); };
   const openPasswordReset = (user: ManagedUser) => { setError(null); setPasswordResetOperation({ user, newPassword: '', confirmPassword: '', showNewPassword: false, showConfirmPassword: false }); };
   const editHasChanges = (e: EditProfileOperation) => e.nombre.trim() !== (e.user.nombre || '').trim() || e.rolId !== e.user.rol_id || e.activo !== e.user.activo || e.trabajadorId !== (e.user.trabajador?.id || '');
-  const submitEditProfile = async (confirmAssignments = false) => { if (!editProfileOperation || savingId) return; const e=editProfileOperation; setSavingId(e.user.auth_user_id); try { await adminRequest('admin-update-user-profile','POST',{target_user_id:e.user.auth_user_id,nombre_completo:e.nombre.trim()||null,rol_id:e.rolId,activo:e.activo,trabajador_id:e.trabajadorId||null,confirm_active_assignments:confirmAssignments}); setEditConfirmation(null); setEditProfileOperation(null); setSuccessMessage('Perfil actualizado correctamente.'); await loadData(); } catch (error) { const message=error instanceof Error?error.message:'No se pudo actualizar el perfil.'; if ((error as Error & { requiresConfirmation?: boolean; activeAssignments?: number }).requiresConfirmation) { setEditProfileOperation({...e,confirmAssignments:true,activeAssignmentsCount:(error as Error & { activeAssignments?: number }).activeAssignments || 0}); setEditConfirmation('assignments'); } else setError(message); } finally { setSavingId(null); } };
+  const submitEditProfile = async (confirmAssignments = false) => { if (!editProfileOperation || savingId) return; const e=editProfileOperation; setSavingId(e.user.auth_user_id); try { await adminRequest('admin-update-user-profile','POST',{target_user_id:e.user.auth_user_id,nombre_completo:e.nombre.trim()||null,rol_id:e.rolId,activo:e.activo,trabajador_id:e.trabajadorId||null,confirm_active_assignments:confirmAssignments}); setEditConfirmation(null); setEditProfileOperation(null); showSuccessMessage('Perfil actualizado correctamente.'); await loadData(); } catch (error) { const message=error instanceof Error?error.message:'No se pudo actualizar el perfil.'; if ((error as Error & { requiresConfirmation?: boolean; activeAssignments?: number }).requiresConfirmation) { setEditProfileOperation({...e,confirmAssignments:true,activeAssignmentsCount:(error as Error & { activeAssignments?: number }).activeAssignments || 0}); setEditConfirmation('assignments'); } else setError(message); } finally { setSavingId(null); } };
   const saveEditProfile = () => { if (!editProfileOperation || savingId || !editHasChanges(editProfileOperation)) return; const e=editProfileOperation; if (!e.rolId) { setError('Debes seleccionar un rol.'); return; } const sensitive=e.rolId!==e.user.rol_id||e.activo!==e.user.activo||e.trabajadorId!==(e.user.trabajador?.id||''); if(sensitive){setEditConfirmation('changes');return;} void submitEditProfile(false); };
 
   const openCreateProfile = (user: ManagedUser) => {
@@ -178,7 +190,7 @@ export default function Usuarios() {
         activo,
       });
       setPendingProfileOperation(null);
-      setSuccessMessage('Perfil creado correctamente. Ya puedes vincular la cuenta a un trabajador.');
+      showSuccessMessage('Perfil creado correctamente. Ya puedes vincular la cuenta a un trabajador.');
       await loadData();
     } catch (createError) {
       console.error('Error creating user profile:', createError);
@@ -214,7 +226,7 @@ export default function Usuarios() {
         confirmation_email: confirmationEmail,
       });
       setDeleteTestUserOperation(null);
-      setSuccessMessage('Cuenta de prueba eliminada definitivamente.');
+      showSuccessMessage('Cuenta de prueba eliminada definitivamente.');
       await loadData();
     } catch (deleteError) {
       console.error('Error deleting test account:', deleteError);
@@ -246,7 +258,7 @@ export default function Usuarios() {
       });
       setPasswordResetOperation(null);
       setEditProfileOperation(null);
-      setSuccessMessage('La contraseña se ha actualizado. El usuario deberá iniciar sesión de nuevo.');
+      showSuccessMessage('La contraseña se ha actualizado. El usuario deberá iniciar sesión de nuevo.');
     } catch (resetError) {
       setError(resetError instanceof Error ? resetError.message : 'No se pudo actualizar la contraseña.');
     } finally {
@@ -271,7 +283,7 @@ export default function Usuarios() {
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-8 max-w-7xl mx-auto w-full space-y-6">
         {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex justify-between gap-4"><span>{error}</span><button onClick={() => setError(null)} aria-label="Cerrar error">&times;</button></div>}
-        {successMessage && <div ref={successMessageRef} role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex justify-between gap-4"><span>{successMessage}</span><button onClick={() => setSuccessMessage(null)} aria-label="Cerrar confirmaci?n">&times;</button></div>}
+        {successMessage && <div role="status" className="fixed right-4 top-4 z-[80] flex w-[min(24rem,calc(100vw-2rem))] justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 shadow-lg"><span>{successMessage.text}</span><button onClick={() => setSuccessMessage(null)} aria-label="Cerrar confirmaci?n">&times;</button></div>}
         <div className="flex flex-col sm:flex-row gap-4 justify-between">
           <div className="relative w-full max-w-md">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>

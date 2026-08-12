@@ -44,4 +44,13 @@ assert.match(source, /passwordResetInFlight\.current/);
 assert.match(source, /CAMBIAR CONTRASEÑA/);
 assert.match(source, /La contraseña se ha actualizado\. El usuario deberá iniciar sesión de nuevo\./);
 
+assert.match(source, /successMessageTimerRef/);
+assert.match(source, /successMessageSequenceRef/);
+assert.match(source, /showSuccessMessage/);
+assert.match(source, /setTimeout\(\(\) => \{/);
+assert.match(source, /\}, 5000\)/);
+assert.match(source, /clearTimeout\(successMessageTimerRef\.current\)/);
+assert.match(source, /role="status" className="fixed right-4 top-4 z-\[80\]/);
+assert.doesNotMatch(source, /scrollIntoView\(/);
+
 console.log('Usuarios edit profile UI contract tests passed');
