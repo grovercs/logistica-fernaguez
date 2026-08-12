@@ -101,6 +101,7 @@ export default function Usuarios() {
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const successMessageRef = useRef<HTMLDivElement>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -130,6 +131,10 @@ export default function Usuarios() {
   useEffect(() => {
     void supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
   }, []);
+
+  useEffect(() => {
+    if (successMessage) successMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [successMessage]);
 
   const filteredUsuarios = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -266,7 +271,7 @@ export default function Usuarios() {
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-8 max-w-7xl mx-auto w-full space-y-6">
         {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex justify-between gap-4"><span>{error}</span><button onClick={() => setError(null)} aria-label="Cerrar error">&times;</button></div>}
-        {successMessage && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex justify-between gap-4"><span>{successMessage}</span><button onClick={() => setSuccessMessage(null)} aria-label="Cerrar confirmaci?n">&times;</button></div>}
+        {successMessage && <div ref={successMessageRef} role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex justify-between gap-4"><span>{successMessage}</span><button onClick={() => setSuccessMessage(null)} aria-label="Cerrar confirmaci?n">&times;</button></div>}
         <div className="flex flex-col sm:flex-row gap-4 justify-between">
           <div className="relative w-full max-w-md">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
