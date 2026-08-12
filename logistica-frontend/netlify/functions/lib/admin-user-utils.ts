@@ -1,17 +1,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { HandlerEvent } from '@netlify/functions';
 
-const allowedProductionOrigins = new Set([
-  'https://admin.appvielha.com',
-  'https://deploy-preview-6--logistica-fernaguez-admin.netlify.app',
-  'https://deploy-preview-7--logistica-fernaguez-admin.netlify.app',
-]);
-
-const allowedProductionHosts = new Set([
-  'admin.appvielha.com',
-  'deploy-preview-6--logistica-fernaguez-admin.netlify.app',
-  'deploy-preview-7--logistica-fernaguez-admin.netlify.app',
-]);
+const administrativePreviewHost = /^deploy-preview-\d+--logistica-fernaguez-admin\.netlify\.app$/;
+const administrativeProductionHost = 'admin.appvielha.com';
 
 const isDevelopmentHost = (hostname: string) => hostname === 'localhost' || hostname === '127.0.0.1';
 
@@ -38,8 +29,10 @@ const hostnameFromHeader = (value: string | undefined): string | undefined => {
   }
 };
 
+const isAdministrativePreviewHost = (hostname: string): boolean => administrativePreviewHost.test(hostname);
+
 const allowedRequestHost = (hostname: string | undefined): boolean =>
-  Boolean(hostname && (allowedProductionHosts.has(hostname) || isDevelopmentHost(hostname)));
+  Boolean(hostname && (hostname === administrativeProductionHost || isAdministrativePreviewHost(hostname) || isDevelopmentHost(hostname)));
 
 const serverClientAuthOptions = {
   auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -56,9 +49,9 @@ export const isUuid = (value: unknown): value is string =>
 
 export const allowedOrigin = (origin: string | undefined): origin is string => {
   if (!origin) return false;
-  if (allowedProductionOrigins.has(origin)) return true;
   try {
     const url = new URL(origin);
+    if (url.protocol === 'https:' && (url.hostname === administrativeProductionHost || isAdministrativePreviewHost(url.hostname))) return true;
     return url.protocol === 'http:' && isDevelopmentHost(url.hostname);
   } catch {
     return false;

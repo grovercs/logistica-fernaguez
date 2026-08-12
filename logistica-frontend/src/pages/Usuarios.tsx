@@ -48,6 +48,14 @@ interface DeleteTestUserOperation {
   confirmSignedInAccount: boolean;
 }
 
+interface PasswordResetOperation {
+  user: ManagedUser;
+  newPassword: string;
+  confirmPassword: string;
+  showNewPassword: boolean;
+  showConfirmPassword: boolean;
+}
+
 const ROLE_COLORS: Record<string, string> = {
   Administrador: 'bg-primary/10 text-primary border-primary/20',
   Editor: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 border-blue-200 dark:border-blue-500/30',
@@ -80,16 +88,23 @@ export default function Usuarios() {
   const [usuarios, setUsuarios] = useState<ManagedUser[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [availableWorkers, setAvailableWorkers] = useState<WorkerOption[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [pendingProfileOperation, setPendingProfileOperation] = useState<PendingProfileOperation | null>(null);
   const [editProfileOperation, setEditProfileOperation] = useState<EditProfileOperation | null>(null);
   const [editConfirmation, setEditConfirmation] = useState<'changes' | 'assignments' | null>(null);
   const [deleteTestUserOperation, setDeleteTestUserOperation] = useState<DeleteTestUserOperation | null>(null);
+  const [passwordResetOperation, setPasswordResetOperation] = useState<PasswordResetOperation | null>(null);
   const deleteTestUserInFlight = useRef(false);
+  const passwordResetInFlight = useRef(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<{ id: number; text: string } | null>(null);
+  const successMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const successMessageSequenceRef = useRef(0);
+
+  const showSuccessMessage = (text: string) => setSuccessMessage({ id: ++successMessageSequenceRef.current, text });
 
   const loadData = async () => {
     setLoading(true);
@@ -116,6 +131,23 @@ export default function Usuarios() {
     void loadData();
   }, []);
 
+  useEffect(() => {
+    void supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
+  }, []);
+
+  useEffect(() => {
+    if (!successMessage) return;
+    if (successMessageTimerRef.current) clearTimeout(successMessageTimerRef.current);
+    successMessageTimerRef.current = setTimeout(() => {
+      setSuccessMessage(null);
+      successMessageTimerRef.current = null;
+    }, 5000);
+    return () => {
+      if (successMessageTimerRef.current) clearTimeout(successMessageTimerRef.current);
+      successMessageTimerRef.current = null;
+    };
+  }, [successMessage]);
+
   const filteredUsuarios = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return usuarios;
@@ -124,8 +156,9 @@ export default function Usuarios() {
   }, [searchTerm, usuarios]);
 
   const openEditProfile = (user: ManagedUser) => { setEditConfirmation(null); setEditProfileOperation({ user, nombre: user.nombre || '', rolId: user.rol_id || '', activo: user.activo, trabajadorId: user.trabajador?.id || '', confirmAssignments: false, activeAssignmentsCount: 0 }); };
+  const openPasswordReset = (user: ManagedUser) => { setError(null); setPasswordResetOperation({ user, newPassword: '', confirmPassword: '', showNewPassword: false, showConfirmPassword: false }); };
   const editHasChanges = (e: EditProfileOperation) => e.nombre.trim() !== (e.user.nombre || '').trim() || e.rolId !== e.user.rol_id || e.activo !== e.user.activo || e.trabajadorId !== (e.user.trabajador?.id || '');
-  const submitEditProfile = async (confirmAssignments = false) => { if (!editProfileOperation || savingId) return; const e=editProfileOperation; setSavingId(e.user.auth_user_id); try { await adminRequest('admin-update-user-profile','POST',{target_user_id:e.user.auth_user_id,nombre_completo:e.nombre.trim()||null,rol_id:e.rolId,activo:e.activo,trabajador_id:e.trabajadorId||null,confirm_active_assignments:confirmAssignments}); setEditConfirmation(null); setEditProfileOperation(null); setSuccessMessage('Perfil actualizado correctamente.'); await loadData(); } catch (error) { const message=error instanceof Error?error.message:'No se pudo actualizar el perfil.'; if ((error as Error & { requiresConfirmation?: boolean; activeAssignments?: number }).requiresConfirmation) { setEditProfileOperation({...e,confirmAssignments:true,activeAssignmentsCount:(error as Error & { activeAssignments?: number }).activeAssignments || 0}); setEditConfirmation('assignments'); } else setError(message); } finally { setSavingId(null); } };
+  const submitEditProfile = async (confirmAssignments = false) => { if (!editProfileOperation || savingId) return; const e=editProfileOperation; setSavingId(e.user.auth_user_id); try { await adminRequest('admin-update-user-profile','POST',{target_user_id:e.user.auth_user_id,nombre_completo:e.nombre.trim()||null,rol_id:e.rolId,activo:e.activo,trabajador_id:e.trabajadorId||null,confirm_active_assignments:confirmAssignments}); setEditConfirmation(null); setEditProfileOperation(null); showSuccessMessage('Perfil actualizado correctamente.'); await loadData(); } catch (error) { const message=error instanceof Error?error.message:'No se pudo actualizar el perfil.'; if ((error as Error & { requiresConfirmation?: boolean; activeAssignments?: number }).requiresConfirmation) { setEditProfileOperation({...e,confirmAssignments:true,activeAssignmentsCount:(error as Error & { activeAssignments?: number }).activeAssignments || 0}); setEditConfirmation('assignments'); } else setError(message); } finally { setSavingId(null); } };
   const saveEditProfile = () => { if (!editProfileOperation || savingId || !editHasChanges(editProfileOperation)) return; const e=editProfileOperation; if (!e.rolId) { setError('Debes seleccionar un rol.'); return; } const sensitive=e.rolId!==e.user.rol_id||e.activo!==e.user.activo||e.trabajadorId!==(e.user.trabajador?.id||''); if(sensitive){setEditConfirmation('changes');return;} void submitEditProfile(false); };
 
   const openCreateProfile = (user: ManagedUser) => {
@@ -157,7 +190,7 @@ export default function Usuarios() {
         activo,
       });
       setPendingProfileOperation(null);
-      setSuccessMessage('Perfil creado correctamente. Ya puedes vincular la cuenta a un trabajador.');
+      showSuccessMessage('Perfil creado correctamente. Ya puedes vincular la cuenta a un trabajador.');
       await loadData();
     } catch (createError) {
       console.error('Error creating user profile:', createError);
@@ -193,13 +226,43 @@ export default function Usuarios() {
         confirmation_email: confirmationEmail,
       });
       setDeleteTestUserOperation(null);
-      setSuccessMessage('Cuenta de prueba eliminada definitivamente.');
+      showSuccessMessage('Cuenta de prueba eliminada definitivamente.');
       await loadData();
     } catch (deleteError) {
       console.error('Error deleting test account:', deleteError);
       setError(deleteError instanceof Error ? deleteError.message : 'No se pudo eliminar la cuenta de prueba.');
     } finally {
       deleteTestUserInFlight.current = false;
+      setSavingId(null);
+    }
+  };
+
+  const resetUserPassword = async () => {
+    if (!passwordResetOperation || savingId || passwordResetInFlight.current) return;
+    const { user, newPassword, confirmPassword } = passwordResetOperation;
+    if (newPassword.length < 10) {
+      setError('La nueva contraseña debe tener al menos 10 caracteres.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
+    passwordResetInFlight.current = true;
+    setSavingId(user.auth_user_id);
+    setError(null);
+    try {
+      await adminRequest('admin-reset-user-password', 'POST', {
+        target_user_id: user.auth_user_id,
+        new_password: newPassword,
+      });
+      setPasswordResetOperation(null);
+      setEditProfileOperation(null);
+      showSuccessMessage('La contraseña se ha actualizado. El usuario deberá iniciar sesión de nuevo.');
+    } catch (resetError) {
+      setError(resetError instanceof Error ? resetError.message : 'No se pudo actualizar la contraseña.');
+    } finally {
+      passwordResetInFlight.current = false;
       setSavingId(null);
     }
   };
@@ -220,13 +283,13 @@ export default function Usuarios() {
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-8 max-w-7xl mx-auto w-full space-y-6">
         {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex justify-between gap-4"><span>{error}</span><button onClick={() => setError(null)} aria-label="Cerrar error">&times;</button></div>}
-        {successMessage && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex justify-between gap-4"><span>{successMessage}</span><button onClick={() => setSuccessMessage(null)} aria-label="Cerrar confirmaci?n">&times;</button></div>}
+        {successMessage && <div role="status" className="fixed right-4 top-4 z-[80] flex w-[min(24rem,calc(100vw-2rem))] justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 shadow-lg"><span>{successMessage.text}</span><button onClick={() => setSuccessMessage(null)} aria-label="Cerrar confirmaci?n">&times;</button></div>}
         <div className="flex flex-col sm:flex-row gap-4 justify-between">
           <div className="relative w-full max-w-md">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
             <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Buscar por nombre, correo, rol o trabajador..." className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/30" />
           </div>
-          <p className="text-xs text-slate-500 self-center">Sin borrado de perfiles, contrase&ntilde;as ni acciones masivas.</p>
+          <p className="text-xs text-slate-500 self-center">Sin borrado de perfiles ni acciones masivas.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -264,7 +327,35 @@ export default function Usuarios() {
         </div>
       </div>
       {editConfirmation && editProfileOperation && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true"><div className="w-full max-w-md rounded-2xl bg-white p-6 dark:bg-slate-900"><h3 className="text-lg font-black">Confirmar cambios de perfil</h3><p className="mt-2 text-sm">{editProfileOperation.user.nombre || editProfileOperation.user.email}</p>{editConfirmation === 'assignments' ? <p className="mt-4 text-sm">Este trabajador tiene {editProfileOperation.activeAssignmentsCount} asignaciones activas. El cambio conservará sus asignaciones e historial, pero puede afectar su acceso. ¿Deseas continuar?</p> : <><p className="mt-4 text-sm">Rol: Anterior: {editProfileOperation.user.rol || 'Sin rol'} | Nuevo: {roles.find(r=>r.id===editProfileOperation.rolId)?.nombre || 'Sin rol'}<br/>Estado: Anterior: {editProfileOperation.user.activo?'Activo':'Inactivo'} | Nuevo: {editProfileOperation.activo?'Activo':'Inactivo'}<br/>Trabajador: Anterior: {editProfileOperation.user.trabajador?.nombre || 'Sin trabajador vinculado'} | Nuevo: {availableWorkers.find(w=>w.id===editProfileOperation.trabajadorId)?.nombre || (editProfileOperation.trabajadorId ? editProfileOperation.user.trabajador?.nombre : 'Sin trabajador vinculado')}</p>{(editProfileOperation.user.rol==='Administrador'||roles.find(r=>r.id===editProfileOperation.rolId)?.nombre==='Administrador')&&<p className="mt-3 text-sm font-bold text-amber-700">Este cambio modifica permisos administrativos.</p>}{editProfileOperation.user.activo&&!editProfileOperation.activo&&<p className="mt-3 text-sm">Este usuario perderá el acceso a la aplicación, pero conservará su historial, asignaciones e intervenciones.</p>}{editProfileOperation.trabajadorId!==(editProfileOperation.user.trabajador?.id||'')&&<p className="mt-3 text-sm">El cambio no borrará asignaciones, reportes ni historial.</p>}</>}<div className="mt-6 flex justify-end gap-3"><button disabled={Boolean(savingId)} onClick={()=>setEditConfirmation(null)}>Cancelar</button><button disabled={Boolean(savingId)} onClick={()=>void submitEditProfile(editConfirmation==='assignments')} className="rounded bg-primary px-4 py-2 text-white">Confirmar cambios</button></div></div></div>}
-      {editProfileOperation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true"><div className="w-full max-w-lg rounded-2xl bg-white p-6 dark:bg-slate-900"><h3 className="text-lg font-black">Editar perfil</h3><p className="mt-2 text-sm text-slate-500"><span>{editProfileOperation.user.email || 'Sin correo'}</span><span className="ml-2">Último acceso: {editProfileOperation.user.last_access_at ? new Date(editProfileOperation.user.last_access_at).toLocaleString('es-ES') : 'Nunca'}</span></p><label className="mt-4 block text-xs font-black">Nombre completo</label><input value={editProfileOperation.nombre} maxLength={120} onChange={e=>setEditProfileOperation({...editProfileOperation,nombre:e.target.value})} className="mt-1 w-full rounded border p-2"/><label className="mt-4 block text-xs font-black">Rol</label><select value={editProfileOperation.rolId} onChange={e=>setEditProfileOperation({...editProfileOperation,rolId:e.target.value})} className="mt-1 w-full rounded border p-2"><option value="" disabled>Selecciona un rol</option>{roles.map(r=><option key={r.id} value={r.id}>{r.nombre}</option>)}</select><label className="mt-4 flex gap-2"><input type="checkbox" checked={editProfileOperation.activo} onChange={e=>setEditProfileOperation({...editProfileOperation,activo:e.target.checked})}/> Activo</label><label className="mt-4 block text-xs font-black">Trabajador vinculado</label><select value={editProfileOperation.trabajadorId} onChange={e=>setEditProfileOperation({...editProfileOperation,trabajadorId:e.target.value,confirmAssignments:false})} className="mt-1 w-full rounded border p-2"><option value="">Sin trabajador vinculado</option>{editProfileOperation.user.trabajador && <option value={editProfileOperation.user.trabajador.id}>{editProfileOperation.user.trabajador.nombre} {editProfileOperation.user.trabajador.apellidos || ''}</option>}{availableWorkers.map(w=><option key={w.id} value={w.id}>{w.nombre} {w.apellidos || ''}</option>)}</select>{editProfileOperation.confirmAssignments && <label className="mt-4 flex gap-2 text-sm"><input type="checkbox" checked onChange={()=>{}} readOnly/> Confirmo el cambio de vínculo con asignaciones activas.</label>}<div className="mt-6 flex justify-end gap-3"><button disabled={Boolean(savingId)} onClick={()=>setEditProfileOperation(null)}>Cancelar</button><button disabled={Boolean(savingId)||!editHasChanges(editProfileOperation)} onClick={saveEditProfile} className="rounded bg-primary px-4 py-2 text-white">Guardar cambios</button></div></div></div>}
+      {editProfileOperation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true">
+        <div className="w-full max-w-lg rounded-2xl bg-white p-6 dark:bg-slate-900">
+          <h3 className="text-lg font-black">Editar perfil</h3>
+          <p className="mt-2 text-sm text-slate-500"><span>{editProfileOperation.user.email || 'Sin correo'}</span><span className="ml-2">Último acceso: {editProfileOperation.user.last_access_at ? new Date(editProfileOperation.user.last_access_at).toLocaleString('es-ES') : 'Nunca'}</span></p>
+          <label className="mt-4 block text-xs font-black">Nombre completo</label>
+          <input value={editProfileOperation.nombre} maxLength={120} onChange={e=>setEditProfileOperation({...editProfileOperation,nombre:e.target.value})} className="mt-1 w-full rounded border p-2"/>
+          <label className="mt-4 block text-xs font-black">Rol</label>
+          <select value={editProfileOperation.rolId} onChange={e=>setEditProfileOperation({...editProfileOperation,rolId:e.target.value})} className="mt-1 w-full rounded border p-2"><option value="" disabled>Selecciona un rol</option>{roles.map(r=><option key={r.id} value={r.id}>{r.nombre}</option>)}</select>
+          <label className="mt-4 flex gap-2"><input type="checkbox" checked={editProfileOperation.activo} onChange={e=>setEditProfileOperation({...editProfileOperation,activo:e.target.checked})}/> Activo</label>
+          <label className="mt-4 block text-xs font-black">Trabajador vinculado</label>
+          <select value={editProfileOperation.trabajadorId} onChange={e=>setEditProfileOperation({...editProfileOperation,trabajadorId:e.target.value,confirmAssignments:false})} className="mt-1 w-full rounded border p-2"><option value="">Sin trabajador vinculado</option>{editProfileOperation.user.trabajador && <option value={editProfileOperation.user.trabajador.id}>{editProfileOperation.user.trabajador.nombre} {editProfileOperation.user.trabajador.apellidos || ''}</option>}{availableWorkers.map(w=><option key={w.id} value={w.id}>{w.nombre} {w.apellidos || ''}</option>)}</select>
+          {editProfileOperation.confirmAssignments && <label className="mt-4 flex gap-2 text-sm"><input type="checkbox" checked onChange={()=>{}} readOnly/> Confirmo el cambio de vínculo con asignaciones activas.</label>}
+          {editProfileOperation.user.auth_status === 'active_auth_user' && editProfileOperation.user.profile_status === 'active_profile' && editProfileOperation.user.activo && editProfileOperation.user.rol !== 'Administrador' && editProfileOperation.user.auth_user_id !== currentUserId && <button type="button" disabled={Boolean(savingId)} onClick={() => openPasswordReset(editProfileOperation.user)} className="mt-6 rounded border border-slate-300 px-4 py-2 text-xs font-black uppercase tracking-widest text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200">CAMBIAR CONTRASEÑA</button>}
+          <div className="mt-6 flex justify-end gap-3"><button disabled={Boolean(savingId)} onClick={()=>setEditProfileOperation(null)}>Cancelar</button><button disabled={Boolean(savingId)||!editHasChanges(editProfileOperation)} onClick={saveEditProfile} className="rounded bg-primary px-4 py-2 text-white">Guardar cambios</button></div>
+        </div>
+      </div>}
+      {passwordResetOperation && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="reset-password-title">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+          <h3 id="reset-password-title" className="text-lg font-black">Cambiar contraseña</h3>
+          <p className="mt-2 text-sm text-slate-500">{passwordResetOperation.user.nombre || passwordResetOperation.user.email || passwordResetOperation.user.auth_user_id}</p>
+          <p className="text-xs text-slate-500">{passwordResetOperation.user.email || 'Sin correo'}</p>
+          <label className="mt-5 block text-xs font-black uppercase tracking-widest text-slate-500">Nueva contraseña</label>
+          <div className="mt-2 flex gap-2"><input type={passwordResetOperation.showNewPassword ? 'text' : 'password'} value={passwordResetOperation.newPassword} onChange={(event) => setPasswordResetOperation({ ...passwordResetOperation, newPassword: event.target.value })} disabled={Boolean(savingId)} autoComplete="new-password" className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2 disabled:opacity-50 dark:border-slate-700"/><button type="button" disabled={Boolean(savingId)} onClick={() => setPasswordResetOperation({ ...passwordResetOperation, showNewPassword: !passwordResetOperation.showNewPassword })} className="rounded-lg border border-slate-300 px-3 text-xs font-bold disabled:opacity-50 dark:border-slate-700">{passwordResetOperation.showNewPassword ? 'Ocultar' : 'Mostrar'}</button></div>
+          <p className="mt-1 text-xs text-slate-500">Mínimo 10 caracteres.</p>
+          <label className="mt-4 block text-xs font-black uppercase tracking-widest text-slate-500">Repetir contraseña</label>
+          <div className="mt-2 flex gap-2"><input type={passwordResetOperation.showConfirmPassword ? 'text' : 'password'} value={passwordResetOperation.confirmPassword} onChange={(event) => setPasswordResetOperation({ ...passwordResetOperation, confirmPassword: event.target.value })} disabled={Boolean(savingId)} autoComplete="new-password" className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2 disabled:opacity-50 dark:border-slate-700"/><button type="button" disabled={Boolean(savingId)} onClick={() => setPasswordResetOperation({ ...passwordResetOperation, showConfirmPassword: !passwordResetOperation.showConfirmPassword })} className="rounded-lg border border-slate-300 px-3 text-xs font-bold disabled:opacity-50 dark:border-slate-700">{passwordResetOperation.showConfirmPassword ? 'Ocultar' : 'Mostrar'}</button></div>
+          <div className="mt-6 flex justify-end gap-3"><button type="button" disabled={Boolean(savingId)} onClick={() => setPasswordResetOperation(null)} className="rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-50">Cancelar</button><button type="button" disabled={Boolean(savingId) || passwordResetOperation.newPassword.length < 10 || passwordResetOperation.newPassword !== passwordResetOperation.confirmPassword} onClick={() => void resetUserPassword()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Guardar nueva contraseña</button></div>
+        </div>
+      </div>}
       {deleteTestUserOperation && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-test-user-title">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
           <h3 id="delete-test-user-title" className="text-lg font-black text-rose-700 dark:text-rose-300">Eliminar cuenta de prueba</h3>
