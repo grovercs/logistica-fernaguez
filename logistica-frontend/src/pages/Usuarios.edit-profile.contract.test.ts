@@ -37,5 +37,11 @@ assert.match(source, /Escribe exactamente el correo para confirmar/);
 assert.match(source, /Confirmaci?n final: esta cuenta tuvo actividad/);
 assert.match(source, /deleteTestUserOperation\.confirmationEmail !== deleteTestUserOperation\.user\.email/);
 assert.doesNotMatch(source, /admin-delete-test-user[\s\S]*?supabase\.from\('(?:perfiles|trabajadores)'\)\.(?:update|insert|delete)/);
+assert.match(source, /admin-reset-user-password/);
+assert.match(source, /newPassword\.length < 10/);
+assert.match(source, /newPassword !== confirmPassword/);
+assert.match(source, /passwordResetInFlight\.current/);
+assert.match(source, /CAMBIAR CONTRASEÑA/);
+assert.match(source, /La contraseña se ha actualizado\. El usuario deberá iniciar sesión de nuevo\./);
 
 console.log('Usuarios edit profile UI contract tests passed');
