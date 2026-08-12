@@ -236,8 +236,8 @@ export default function Usuarios() {
       });
       setDeleteUserOperation(null);
       setEditProfileOperation(null);
-      showSuccessMessage('Usuario eliminado correctamente.');
       await loadData();
+      showSuccessMessage('Usuario eliminado correctamente.');
     } catch (deleteError) {
       const errorCode = (deleteError as Error & { code?: string }).code;
       setError(errorCode === 'activity_associated'

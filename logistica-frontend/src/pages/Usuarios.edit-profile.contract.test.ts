@@ -50,6 +50,7 @@ assert.match(source, /Escribe el correo para confirmar/);
 assert.match(source, /activity_associated/);
 assert.match(source, /No se puede eliminar este usuario porque tiene actividad asociada\. Desactívalo en su lugar\./);
 assert.match(source, /Usuario eliminado correctamente\./);
+assert.match(source, /setDeleteUserOperation\(null\);[\s\S]*setEditProfileOperation\(null\);[\s\S]*await loadData\(\);[\s\S]*showSuccessMessage\('Usuario eliminado correctamente\.'\)/);
 assert.doesNotMatch(source, /admin-delete-user[\s\S]*?supabase\.from\('(?:perfiles|trabajadores)'\)\.(?:update|insert|delete)/);
 assert.match(source, /admin-reset-user-password/);
 assert.match(source, /newPassword\.length < 10/);
