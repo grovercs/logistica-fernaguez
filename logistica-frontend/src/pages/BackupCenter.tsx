@@ -32,7 +32,6 @@ export default function BackupCenter() {
   const [mediaRecoveryLoading, setMediaRecoveryLoading] = useState(true);
   const mediaStartLock = useRef(false);
   const mediaDownloadLock = useRef(false);
-  const autoDownloadAttemptedRef = useRef<string | null>(null);
 
   const mediaRequest = async <T,>(path: string, payload: Record<string, unknown>): Promise<T> => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -67,16 +66,15 @@ export default function BackupCenter() {
     } finally { mediaStartLock.current = false; setMediaStartInFlight(false); setMediaBusy(false); }
   };
 
-  const downloadMediaBackup = async (jobId: string): Promise<boolean> => {
-    if (mediaBusy || mediaDownloadLock.current || !jobId) return false;
+  const downloadMediaBackup = async (jobId: string) => {
+    if (mediaBusy || mediaDownloadLock.current || !jobId) return;
     mediaDownloadLock.current = true;
     setMediaBusy(true);
     try {
       const { url } = await mediaRequest<{ url: string }>('/.netlify/functions/admin-media-backup-download', { job_id: jobId });
       const anchor = document.createElement('a'); anchor.href = url; anchor.download = ''; anchor.rel = 'noopener'; document.body.appendChild(anchor); anchor.click(); anchor.remove();
-      return true;
-    } catch (mediaError) {
-      return false;
+    } catch {
+      // El job terminado se conserva para que el usuario pueda reintentar la descarga manual.
     } finally { mediaDownloadLock.current = false; setMediaBusy(false); }
   };
 
@@ -94,12 +92,6 @@ export default function BackupCenter() {
     void refresh();
     const timer = window.setInterval(() => void refresh(), 3000);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [mediaJob?.id, mediaJob?.estado]);
-
-  useEffect(() => {
-    if (!mediaJob?.id || mediaJob.estado !== 'completed' || autoDownloadAttemptedRef.current === mediaJob.id) return;
-    autoDownloadAttemptedRef.current = mediaJob.id;
-    void downloadMediaBackup(mediaJob.id);
   }, [mediaJob?.id, mediaJob?.estado]);
 
   useEffect(() => {
@@ -147,6 +139,22 @@ export default function BackupCenter() {
     if (!downloadUrl) return;
     window.setTimeout(() => { URL.revokeObjectURL(downloadUrl); setDownloadUrl((current) => current === downloadUrl ? null : current); }, 1000);
   };
+  const mediaStatusTitle: Record<MediaBackupJob['estado'], string> = {
+    pending: 'PREPARANDO COPIA...', preparing: 'PREPARANDO COPIA...', downloading: 'RECOPILANDO EVIDENCIAS', compressing: 'GENERANDO ZIP', verifying: 'PREPARANDO ARCHIVO FINAL', completed: 'COPIA MULTIMEDIA LISTA', failed: 'ERROR', expired: 'ERROR',
+  };
+  const mediaProgressRows = (job: MediaBackupJob) => {
+    const step = activeMediaStates.indexOf(job.estado);
+    const completed = job.estado === 'completed';
+    const row = (index: number, label: string) => <p key={label} className={completed || index <= step ? '' : 'text-slate-300'}>{completed || index <= step ? '●' : '○'} {label}</p>;
+    return <div className="space-y-1 text-[10px] font-bold uppercase text-primary">
+      {row(0, 'Preparando copia')}
+      {row(1, 'Evidencias localizadas')}
+      {row(2, `${job.processed_items} / ${job.total_items} evidencias copiadas`)}
+      {row(3, 'Generando ZIP')}
+      {row(4, 'Preparando archivo final')}
+      {row(5, 'Copia multimedia lista')}
+    </div>;
+  };
   const tabs: Array<{ id: Tab; label: string; icon: string }> = [
     { id: 'backup', label: 'Protección', icon: 'shield_lock' },
     { id: 'restaurar', label: 'Rescate', icon: 'medical_services' },
@@ -163,8 +171,9 @@ export default function BackupCenter() {
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             <article className="flex min-h-[340px] flex-col justify-between rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"><div className="space-y-6"><div className="flex items-start justify-between"><div className="flex size-12 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30"><span className="material-symbols-outlined text-3xl">cloud</span></div><span className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-1 text-[10px] font-bold text-slate-400">PENDIENTE</span></div><div><h3 className="text-lg font-bold">Respaldo en Nube</h3><p className="text-sm leading-relaxed text-slate-500">Sincroniza la estructura de la base de datos (JSON) en su cuenta de Google Drive.</p></div><p className="text-xs text-slate-400">Próximamente</p></div><button disabled className="w-full rounded-lg bg-slate-100 py-3 text-sm font-bold text-slate-300 dark:bg-slate-800">SINCRONIZAR AHORA</button></article>
             <article className="flex min-h-[340px] flex-col justify-between rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"><div className="space-y-5"><div className="flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary"><span className="material-symbols-outlined text-3xl">database</span></div><div><h3 className="text-lg font-bold">Descarga Manual</h3><p className="text-sm leading-relaxed text-slate-500">Obtenga una copia física del sistema para almacenamiento externo offline.</p></div><div className="inline-flex items-center gap-2 text-3xl font-bold text-primary">{summary ? formatBytes(summary.size_bytes) : '—'} <span className="text-[10px] font-medium uppercase tracking-widest text-slate-400">Aprox.</span></div><p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">Esta copia contiene datos personales y debe almacenarse de forma segura.</p></div><div className="mt-4 space-y-3"><button type="button" onClick={() => void generateBackup()} disabled={loading} className="w-full rounded-lg bg-primary py-3 text-sm font-bold text-white shadow-md shadow-primary/10 disabled:opacity-60">{loading ? 'CREANDO...' : 'DESCARGAR JSON'}</button>{loading && <div className="space-y-1 text-[10px] font-bold uppercase text-primary">{phases.map((item, index) => <p key={item} className={index <= (phase ?? -1) ? '' : 'text-slate-300'}>{index <= (phase ?? -1) ? '●' : '○'} {item}</p>)}</div>}{error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</p>}{summary && <div className="space-y-1 rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-[10px] text-emerald-800"><p className="font-bold">{summary.warnings ? 'COPIA CON ADVERTENCIAS' : 'COPIA GENERADA CORRECTAMENTE'}</p><p className="break-all">Archivo: {summary.filename}</p><p>Filas: {summary.total_rows} · Tamaño: {formatBytes(summary.size_bytes)}</p><p className="break-all">Checksum: {summary.checksum_global}</p>{downloadUrl && <a href={downloadUrl} download={summary.filename} onClick={releaseDownloadAfterStart} className="mt-2 inline-flex rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white">DESCARGAR COPIA ZIP</a>}</div>}</div></article>
-            <article className="flex min-h-[340px] flex-col justify-between rounded-xl bg-slate-900 p-6 shadow-sm"><div className="space-y-6"><div className="flex size-12 items-center justify-center rounded-lg bg-white/10 text-white"><span className="material-symbols-outlined text-3xl">folder_zip</span></div><div><h3 className="text-lg font-bold text-white">Galería Multimedia</h3><p className="text-sm leading-relaxed text-slate-400">Archivo comprimido de todas las evidencias táctiles y fotográficas.</p></div><div className="rounded-lg border border-white/5 bg-white/10 p-4 text-center"><p className="text-[10px] font-bold uppercase text-blue-400">{mediaJob ? ({ pending: 'PREPARANDO COPIA...', preparing: 'PREPARANDO COPIA...', downloading: `${mediaJob.processed_items} / ${mediaJob.total_items} EVIDENCIAS COPIADAS`, compressing: 'COMPRIMIENDO', verifying: 'VERIFICANDO', completed: 'COPIA MULTIMEDIA LISTA', failed: 'ERROR', expired: 'ERROR' }[mediaJob.estado]) : 'PRÓXIMAMENTE'}</p><p className="mt-2 text-3xl font-bold text-white">{mediaJob ? `${mediaJob.progreso}%` : '—'} <span className="text-[10px] font-medium uppercase tracking-widest text-slate-500">{mediaJob && mediaJob.total_items > 0 ? `${mediaJob.processed_items} / ${mediaJob.total_items} EVIDENCIAS COPIADAS` : 'Evidencias'}</span></p><p className="mt-3 text-[9px] font-bold uppercase text-rose-400">NO CIERRE LA VENTANA</p></div></div><div className="grid grid-cols-2 gap-3"><button disabled className="rounded-lg bg-blue-900 py-2 text-[10px] font-bold uppercase tracking-widest text-white opacity-60">☁ DRIVE</button><button type="button" onClick={() => mediaJob?.estado === 'completed' ? void downloadMediaBackup(mediaJob.id) : void startMediaBackup()} disabled={mediaBusy || mediaStartInFlight || mediaRecoveryLoading || activeMediaStates.includes(mediaJob?.estado || 'completed')} className="cursor-pointer rounded-lg bg-white py-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 opacity-50 disabled:cursor-not-allowed">{mediaJob?.estado === 'completed' ? '📁 DESCARGAR COPIA' : '📁 ZIP LOCAL'}</button></div>{mediaJob?.estado === 'failed' && <p role="alert" className="mt-3 text-[10px] text-rose-300">{mediaJob.error_summary}</p>}</article>
+            <article className="flex min-h-[340px] flex-col justify-between rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"><div className="space-y-6"><div className="flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary"><span className="material-symbols-outlined text-3xl">folder_zip</span></div><div><h3 className="text-lg font-bold">Galería Multimedia</h3><p className="text-sm leading-relaxed text-slate-500">Archivo comprimido de todas las evidencias táctiles y fotográficas.</p></div><p className="text-[9px] font-bold uppercase text-rose-400">NO CIERRE LA VENTANA</p></div><div className="grid grid-cols-2 gap-3"><button disabled className="rounded-lg bg-blue-900 py-2 text-[10px] font-bold uppercase tracking-widest text-white opacity-60">☁ DRIVE</button><button type="button" onClick={() => mediaJob?.estado === 'completed' ? void downloadMediaBackup(mediaJob.id) : void startMediaBackup()} disabled={mediaBusy || mediaStartInFlight || mediaRecoveryLoading || activeMediaStates.includes(mediaJob?.estado || 'completed')} className="cursor-pointer rounded-lg border border-slate-200 bg-slate-100 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">{mediaJob?.estado === 'completed' ? '📁 DESCARGAR COPIA' : '📁 ZIP LOCAL'}</button></div></article>
           </div>
+          {mediaJob && <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">{mediaJob.estado === 'completed' ? <div className="space-y-1 rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-[10px] text-emerald-800"><p className="font-bold">COPIA MULTIMEDIA LISTA</p><p>Evidencias: {mediaJob.processed_items} / {mediaJob.total_items}</p>{mediaJob.processed_bytes > 0 && <p>Tamaño: {formatBytes(mediaJob.processed_bytes)}</p>}<p>Estado: {mediaJob.estado}</p><button type="button" onClick={() => void downloadMediaBackup(mediaJob.id)} disabled={mediaBusy} className="mt-2 inline-flex rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:opacity-60">DESCARGAR COPIA ZIP</button></div> : <><p className="text-[10px] font-bold uppercase text-primary">{mediaStatusTitle[mediaJob.estado]}</p>{mediaProgressRows(mediaJob)}{mediaJob.estado === 'failed' && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{mediaJob.error_summary}</p>}</>}</div>}
           <div className="flex justify-around rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900"><div><p className="text-[10px] font-bold uppercase text-slate-400">Total Obras</p><p className="text-xl font-bold">—</p></div><div className="h-10 w-px bg-slate-100 dark:bg-slate-800" /><div><p className="text-[10px] font-bold uppercase text-slate-400">Pend. Optimización</p><p className="text-xl font-bold text-amber-500">—</p></div><div className="h-10 w-px bg-slate-100 dark:bg-slate-800" /><div><p className="text-[10px] font-bold uppercase text-slate-400">Conexión Drive</p><p className="text-xl font-bold text-slate-300">INACTIVA</p></div></div>
         </div>}
         {activeTab === 'restaurar' && <div className="animate-in slide-in-from-bottom-5 space-y-8"><div className="flex items-center gap-8 rounded-xl bg-rose-600 p-8 text-white shadow-lg"><div className="flex size-16 items-center justify-center rounded-lg bg-white/20"><span className="material-symbols-outlined text-4xl">medical_services</span></div><div><h2 className="text-2xl font-bold">Estrategia de Rescate</h2><p className="text-sm font-medium text-rose-100 opacity-80">Restauración de infraestructura en caso de incidencia operacional severa.</p></div></div><div className="grid grid-cols-1 gap-8 text-center md:grid-cols-2"><div className="space-y-4 rounded-xl border-2 border-dashed border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900"><h4 className="text-lg font-bold uppercase">Vincular Archivo Maestro</h4><p className="text-sm text-slate-500">Repone la estructura de datos administrativa (.JSON).</p><button disabled className="w-full rounded-lg bg-slate-100 py-2 text-xs font-bold text-slate-400 dark:bg-slate-800">PROTEGIDO POR ADMIN</button></div><div className="space-y-4 rounded-xl border-2 border-dashed border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900"><h4 className="text-lg font-bold uppercase">Cargar Galería ZIP</h4><p className="text-sm text-slate-500">Reconstituye el carrete multimedia global (.ZIP).</p><button disabled className="w-full rounded-lg bg-slate-100 py-2 text-xs font-bold text-slate-400 dark:bg-slate-800">PROTEGIDO POR ADMIN</button></div></div></div>}
