@@ -412,8 +412,8 @@ export default function Usuarios() {
         </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[1100px] text-left">
               <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <tr><th className="px-5 py-4">Usuario</th><th className="px-5 py-4">Rol real</th><th className="px-5 py-4">Estado</th><th className="px-5 py-4">Trabajador vinculado</th><th className="px-5 py-4">&Uacute;ltimo acceso</th><th className="px-5 py-4 text-right">Acciones</th></tr>
               </thead>
