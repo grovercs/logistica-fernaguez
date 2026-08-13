@@ -9,9 +9,20 @@ type ActiveMediaStatusResponse = (MediaBackupJob & { active_job: true }) | { act
 type ArchiveOrder = { id: string; id_legible: string | null; cliente: string | null; aseguradora: string | null; estado: string; estado_previo: string | null; fecha_cierre: string | null; creado_en: string | null };
 type HistoricalReport = { id: string; fecha_trabajo: string | null; trabajos_realizados: string | null; tecnico_id: string | null; tecnico_nombre: string | null };
 type HistoricalOrderDetail = ArchiveOrder & { direccion: string | null; codigo_postal: string | null; localidad: string | null; poliza: string | null; reportes: HistoricalReport[] };
+type HistoricalDetailStage = 'order' | 'reports' | 'profiles' | 'transform';
+type HistoricalDetailError = { code?: string | null; message?: string | null; details?: string | null; hint?: string | null };
 const activeMediaStates: MediaBackupJob['estado'][] = ['pending', 'preparing', 'downloading', 'compressing', 'verifying'];
 const provisionalMediaJob = (): MediaBackupJob => ({ id: '', estado: 'pending', total_items: 0, processed_items: 0, failed_items: 0, total_bytes: 0, processed_bytes: 0, progreso: 0, disponibilidad: false, error_code: null, error_summary: null, created_at: null, started_at: null, finished_at: null, expires_at: null });
-const isUuid = (value: string | null | undefined) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+const logHistoricalDetailError = (stage: HistoricalDetailStage, error: unknown) => {
+  const safeError = (error && typeof error === 'object' ? error : {}) as HistoricalDetailError;
+  console.error('historical_order_detail_failed', {
+    stage,
+    code: safeError.code || null,
+    message: safeError.message || null,
+    details: safeError.details || null,
+    hint: safeError.hint || null,
+  });
+};
 
 const phases = ['Verificando permisos', 'Exportando datos', 'Redactando campos sensibles', 'Generando manifiesto', 'Calculando integridad', 'Preparando descarga'];
 const formatBytes = (bytes: number) => bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toLocaleString('es-ES', { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024)).toLocaleString('es-ES')} KB`;
@@ -204,39 +215,41 @@ export default function BackupCenter() {
     try {
       const { data: order, error: orderError } = await supabase
         .from('ordenes')
-        .select('id, id_legible, cliente, aseguradora, poliza, estado, estado_previo, fecha_cierre, creado_en, direccion, codigo_postal, localidad')
+        .select('id, id_legible, cliente, aseguradora, poliza, estado, estado_previo, fecha_cierre, creado_en, direccion')
         .eq('id', orderId)
-        .single();
-      if (orderError || !order || order.estado !== 'Archivado') throw orderError || new Error('ORDER_NOT_ARCHIVED');
+        .maybeSingle();
+      if (orderError || !order || order.estado !== 'Archivado') {
+        logHistoricalDetailError('order', orderError || { code: 'ORDER_NOT_ARCHIVED', message: 'Archived order was not found' });
+        setArchiveError('No se pudieron cargar los detalles de la obra archivada. Inténtalo de nuevo.');
+        return;
+      }
 
       const reportsByOrderId = await supabase
         .from('reportes')
         .select('id, orden_id, fecha_trabajo, trabajos_realizados, tecnico_id')
         .eq('orden_id', order.id);
-      let reports = reportsByOrderId.error ? [] : reportsByOrderId.data || [];
+      if (reportsByOrderId.error) logHistoricalDetailError('reports', reportsByOrderId.error);
+      const reports = reportsByOrderId.data || [];
 
-      // `reportes.orden_id` is a UUID foreign key. Do not compare it with an
-      // OB-YYYY-NNNN id_legible; only retain a safe legacy retry for UUID data.
-      if (!reports.length && isUuid(order.id_legible)) {
-        const legacyReports = await supabase
-          .from('reportes')
-          .select('id, orden_id, fecha_trabajo, trabajos_realizados, tecnico_id')
-          .eq('orden_id', order.id_legible);
-        if (!legacyReports.error) reports = legacyReports.data || [];
-      }
-
-      const technicianIds = [...new Set((reports || []).map((report) => report.tecnico_id).filter((id): id is string => Boolean(id)))];
+      const technicianIds = [...new Set(reports.map((report) => report.tecnico_id).filter((id): id is string => Boolean(id)))];
       const technicianNames = new Map<string, string>();
       if (technicianIds.length) {
         const { data: profiles, error: profilesError } = await supabase.from('perfiles').select('id, nombre_completo').in('id', technicianIds);
-        if (!profilesError) profiles?.forEach((profile) => technicianNames.set(profile.id, profile.nombre_completo || 'Técnico Externo'));
+        if (profilesError) logHistoricalDetailError('profiles', profilesError);
+        else profiles?.forEach((profile) => technicianNames.set(profile.id, profile.nombre_completo || 'Técnico Externo'));
       }
 
-      const historicalReports = (reports || [])
-        .map((report) => ({ ...report, tecnico_nombre: report.tecnico_id ? technicianNames.get(report.tecnico_id) || 'Técnico Externo' : 'Técnico Externo' }))
-        .sort((left, right) => (right.fecha_trabajo || '').localeCompare(left.fecha_trabajo || ''));
-      setSelectedHistoricalOrder({ ...order, reportes: historicalReports });
-    } catch {
+      try {
+        const historicalReports = reports
+          .map((report) => ({ ...report, tecnico_nombre: report.tecnico_id ? technicianNames.get(report.tecnico_id) || 'Técnico Externo' : 'Técnico Externo' }))
+          .sort((left, right) => (right.fecha_trabajo || '').localeCompare(left.fecha_trabajo || ''));
+        setSelectedHistoricalOrder({ ...order, codigo_postal: null, localidad: null, reportes: historicalReports });
+      } catch (transformError) {
+        logHistoricalDetailError('transform', transformError);
+        setSelectedHistoricalOrder({ ...order, codigo_postal: null, localidad: null, reportes: [] });
+      }
+    } catch (unexpectedError) {
+      logHistoricalDetailError('order', unexpectedError);
       setArchiveError('No se pudieron cargar los detalles de la obra archivada. Inténtalo de nuevo.');
     } finally {
       setHistoricalDetailLoading(false);
