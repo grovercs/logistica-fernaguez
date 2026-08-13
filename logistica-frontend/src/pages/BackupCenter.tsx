@@ -7,6 +7,8 @@ type MediaBackupJob = { id: string; estado: 'pending' | 'preparing' | 'downloadi
 type MediaStatusResponse = MediaBackupJob & { active_job: boolean };
 type ActiveMediaStatusResponse = (MediaBackupJob & { active_job: true }) | { active_job: null };
 type ArchiveOrder = { id: string; id_legible: string | null; cliente: string | null; aseguradora: string | null; estado: string; estado_previo: string | null; fecha_cierre: string | null; creado_en: string | null };
+type HistoricalReport = { id: string; fecha_trabajo: string | null; trabajos_realizados: string | null; tecnico_id: string | null; tecnico_nombre: string | null };
+type HistoricalOrderDetail = ArchiveOrder & { direccion: string | null; codigo_postal: string | null; localidad: string | null; poliza: string | null; reportes: HistoricalReport[] };
 const activeMediaStates: MediaBackupJob['estado'][] = ['pending', 'preparing', 'downloading', 'compressing', 'verifying'];
 const provisionalMediaJob = (): MediaBackupJob => ({ id: '', estado: 'pending', total_items: 0, processed_items: 0, failed_items: 0, total_bytes: 0, processed_bytes: 0, progreso: 0, disponibilidad: false, error_code: null, error_summary: null, created_at: null, started_at: null, finished_at: null, expires_at: null });
 
@@ -33,6 +35,8 @@ export default function BackupCenter() {
   const [archiveBusy, setArchiveBusy] = useState(false);
   const [restoringOrderId, setRestoringOrderId] = useState<string | null>(null);
   const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [selectedHistoricalOrder, setSelectedHistoricalOrder] = useState<HistoricalOrderDetail | null>(null);
+  const [historicalDetailLoading, setHistoricalDetailLoading] = useState(false);
 
   const [mediaJob, setMediaJob] = useState<MediaBackupJob | null>(null);
   const [mediaBusy, setMediaBusy] = useState(false);
@@ -182,6 +186,7 @@ export default function BackupCenter() {
     try {
       const { error: restoreError } = await supabase.rpc('admin_restore_order', { p_order_id: orderId });
       if (restoreError) throw restoreError;
+      setSelectedHistoricalOrder(null);
       await loadArchiveData();
     } catch {
       setArchiveError('No se pudo restaurar la orden. Inténtalo de nuevo.');
@@ -191,6 +196,51 @@ export default function BackupCenter() {
   };
 
   const orderDate = (order: ArchiveOrder) => (order.fecha_cierre || order.creado_en || '').slice(0, 10);
+
+  const loadHistoricalOrderDetail = async (orderId: string) => {
+    setHistoricalDetailLoading(true);
+    setArchiveError(null);
+    try {
+      const { data: order, error: orderError } = await supabase
+        .from('ordenes')
+        .select('id, id_legible, cliente, aseguradora, poliza, estado, estado_previo, fecha_cierre, creado_en, direccion, codigo_postal, localidad')
+        .eq('id', orderId)
+        .single();
+      if (orderError || !order || order.estado !== 'Archivado') throw orderError || new Error('ORDER_NOT_ARCHIVED');
+
+      let { data: reports, error: reportsError } = await supabase
+        .from('reportes')
+        .select('id, orden_id, fecha_trabajo, trabajos_realizados, tecnico_id')
+        .eq('orden_id', order.id);
+      if (reportsError) throw reportsError;
+
+      if (!reports?.length && order.id_legible) {
+        const legacyReports = await supabase
+          .from('reportes')
+          .select('id, orden_id, fecha_trabajo, trabajos_realizados, tecnico_id')
+          .eq('orden_id', order.id_legible);
+        if (legacyReports.error) throw legacyReports.error;
+        reports = legacyReports.data || [];
+      }
+
+      const technicianIds = [...new Set((reports || []).map((report) => report.tecnico_id).filter((id): id is string => Boolean(id)))];
+      const technicianNames = new Map<string, string>();
+      if (technicianIds.length) {
+        const { data: profiles, error: profilesError } = await supabase.from('perfiles').select('id, nombre_completo').in('id', technicianIds);
+        if (profilesError) throw profilesError;
+        profiles?.forEach((profile) => technicianNames.set(profile.id, profile.nombre_completo || 'Técnico Externo'));
+      }
+
+      const historicalReports = (reports || [])
+        .map((report) => ({ ...report, tecnico_nombre: report.tecnico_id ? technicianNames.get(report.tecnico_id) || 'Técnico Externo' : 'Técnico Externo' }))
+        .sort((left, right) => (right.fecha_trabajo || '').localeCompare(left.fecha_trabajo || ''));
+      setSelectedHistoricalOrder({ ...order, reportes: historicalReports });
+    } catch {
+      setArchiveError('No se pudieron cargar los detalles de la obra archivada. Inténtalo de nuevo.');
+    } finally {
+      setHistoricalDetailLoading(false);
+    }
+  };
 
   const generateBackup = async () => {
     if (loading) return;
@@ -237,6 +287,25 @@ export default function BackupCenter() {
       {row(5, 'Copia multimedia lista')}
     </div>;
   };
+  const historyContent = <div className="animate-in slide-in-from-bottom-5 space-y-6">
+    <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
+      <h2 className="text-lg font-bold">Historial Maestro</h2>
+      <div className="relative w-full md:w-80"><span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-lg text-slate-400">search</span><input disabled placeholder="Buscar por ID o cliente..." className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm opacity-60 dark:border-slate-800 dark:bg-slate-900" /></div>
+    </div>
+    {archiveError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{archiveError}</p>}
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <table className="w-full text-left text-sm"><thead className="border-b bg-slate-50 text-slate-500 dark:bg-slate-800/50"><tr><th className="px-6 py-3">Fecha</th><th className="px-6 py-3">ID OT</th><th className="px-6 py-3">Cliente</th><th className="px-6 py-3 text-right">Información</th></tr></thead><tbody>
+        {archiveLoading ? <tr><td colSpan={4} className="px-6 py-20 text-center text-slate-400">Cargando archivo histórico...</td></tr> : archivedOrders.length === 0 ? <tr><td colSpan={4} className="px-6 py-20 text-center text-slate-400">Sin registros archivados.</td></tr> : archivedOrders.map((order) => <tr key={order.id} className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30"><td className="px-6 py-4 text-xs text-slate-400">{orderDate(order)}</td><td className="px-6 py-4 font-bold uppercase text-slate-900 dark:text-white">{order.id_legible || '—'}</td><td className="px-6 py-4 text-slate-500">{order.cliente || 'Sin Cliente'}</td><td className="px-6 py-4 text-right"><div className="inline-flex items-center gap-2 text-[10px] font-bold"><button type="button" onClick={() => void loadHistoricalOrderDetail(order.id)} disabled={historicalDetailLoading || archiveBusy} className="inline-flex items-center gap-1 rounded-lg border border-primary/10 bg-primary/5 px-2 py-1 text-primary transition-all hover:bg-primary/10 disabled:opacity-40 dark:bg-primary/20"><span className="material-symbols-outlined text-sm">visibility</span>VER DETALLE</button><button type="button" onClick={() => void restoreArchivedOrder(order.id)} disabled={restoringOrderId === order.id || archiveBusy} className="inline-flex items-center gap-1 rounded-lg border border-amber-100 bg-amber-50 px-2 py-1 text-amber-600 transition-all hover:bg-amber-100/50 disabled:opacity-40 dark:border-amber-800 dark:bg-amber-900/20"><span className="material-symbols-outlined text-sm">settings_backup_restore</span>{restoringOrderId === order.id ? 'RESTAURANDO...' : 'RESTAURAR'}</button></div></td></tr>)}
+      </tbody></table>
+    </div>
+  </div>;
+  const historicalDetailModal = selectedHistoricalOrder && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="historical-order-title">
+    <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex items-center justify-between rounded-t-xl border-b bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-800/50"><div><h3 id="historical-order-title" className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white"><span className="material-symbols-outlined text-primary">inventory_2</span>Resumen de Obra Histórica</h3><p className="text-xs font-bold uppercase tracking-wider text-slate-500">{selectedHistoricalOrder.id_legible}</p></div><button type="button" onClick={() => setSelectedHistoricalOrder(null)} disabled={Boolean(restoringOrderId)} className="flex size-8 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-slate-200 disabled:opacity-40 dark:hover:bg-slate-800" aria-label="Cerrar"><span className="material-symbols-outlined">close</span></button></div>
+      <div className="flex-1 space-y-8 overflow-y-auto p-8"><div className="grid grid-cols-1 gap-8 sm:grid-cols-2"><div className="space-y-4"><h4 className="border-b pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Información del Cliente</h4><div className="space-y-2"><p className="text-sm font-bold">{selectedHistoricalOrder.cliente || 'Sin nombre'}</p><p className="text-xs text-slate-500">{selectedHistoricalOrder.direccion || 'Sin dirección registrada'}</p><p className="text-xs text-slate-500">CP: {selectedHistoricalOrder.codigo_postal || '---'} | {selectedHistoricalOrder.localidad || '---'}</p></div></div><div className="space-y-4"><h4 className="border-b pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Datos Operativos</h4><div className="space-y-2 text-xs"><div className="flex justify-between gap-4"><span className="text-slate-400">Estado:</span><span className="font-bold">{selectedHistoricalOrder.estado}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Estado previo:</span><span className="font-bold">{selectedHistoricalOrder.estado_previo || 'Finalizada (legado)'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Aseguradora:</span><span className="font-bold">{selectedHistoricalOrder.aseguradora || '—'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Póliza:</span><span className="font-bold">{selectedHistoricalOrder.poliza || '—'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Cierre:</span><span className="font-bold">{selectedHistoricalOrder.fecha_cierre?.slice(0, 10) || '—'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Creada el:</span><span className="font-bold">{selectedHistoricalOrder.creado_en?.slice(0, 10) || '—'}</span></div></div></div></div><div className="space-y-4"><div className="flex items-center justify-between border-b pb-1"><h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Intervenciones Realizadas</h4><span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">{selectedHistoricalOrder.reportes.length} Reportes</span></div><div className="space-y-3">{selectedHistoricalOrder.reportes.length === 0 ? <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-xs italic text-slate-400 dark:border-slate-800 dark:bg-slate-800/30">No se encontraron reportes registrados para esta obra.</p> : selectedHistoricalOrder.reportes.map((report) => <div key={report.id} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/30"><div className="space-y-1"><p className="text-xs font-bold text-slate-900 dark:text-white">{report.fecha_trabajo || 'Fecha no registrada'}</p><p className="line-clamp-1 text-[10px] italic text-slate-500">{report.trabajos_realizados || 'Sin descripción técnica'}</p></div><p className="text-[10px] font-bold uppercase text-primary">{report.tecnico_nombre}</p></div>)}</div></div></div>
+      <div className="flex items-center justify-between rounded-b-xl border-t bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-800/50"><p className="max-w-[250px] text-[10px] text-slate-400">Restaurar devolverá esta obra al circuito operativo.</p><button type="button" onClick={() => void restoreArchivedOrder(selectedHistoricalOrder.id)} disabled={Boolean(restoringOrderId) || archiveBusy} className="flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-2 text-xs font-bold text-slate-950 shadow-md transition-all hover:bg-amber-600 disabled:opacity-40"><span className="material-symbols-outlined text-lg">settings_backup_restore</span>{restoringOrderId === selectedHistoricalOrder.id ? 'RESTAURANDO...' : 'RESTAURAR AHORA'}</button></div>
+    </div>
+  </div>;
   const tabs: Array<{ id: Tab; label: string; icon: string }> = [
     { id: 'backup', label: 'Protección', icon: 'shield_lock' },
     { id: 'restaurar', label: 'Rescate', icon: 'medical_services' },
@@ -260,8 +329,9 @@ export default function BackupCenter() {
         </div>}
         {activeTab === 'restaurar' && <div className="animate-in slide-in-from-bottom-5 space-y-8"><div className="flex items-center gap-8 rounded-xl bg-rose-600 p-8 text-white shadow-lg"><div className="flex size-16 items-center justify-center rounded-lg bg-white/20"><span className="material-symbols-outlined text-4xl">medical_services</span></div><div><h2 className="text-2xl font-bold">Estrategia de Rescate</h2><p className="text-sm font-medium text-rose-100 opacity-80">Restauración de infraestructura en caso de incidencia operacional severa.</p></div></div><div className="grid grid-cols-1 gap-8 text-center md:grid-cols-2"><div className="space-y-4 rounded-xl border-2 border-dashed border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900"><h4 className="text-lg font-bold uppercase">Vincular Archivo Maestro</h4><p className="text-sm text-slate-500">Repone la estructura de datos administrativa (.JSON).</p><button disabled className="w-full rounded-lg bg-slate-100 py-2 text-xs font-bold text-slate-400 dark:bg-slate-800">PROTEGIDO POR ADMIN</button></div><div className="space-y-4 rounded-xl border-2 border-dashed border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900"><h4 className="text-lg font-bold uppercase">Cargar Galería ZIP</h4><p className="text-sm text-slate-500">Reconstituye el carrete multimedia global (.ZIP).</p><button disabled className="w-full rounded-lg bg-slate-100 py-2 text-xs font-bold text-slate-400 dark:bg-slate-800">PROTEGIDO POR ADMIN</button></div></div></div>}
         {activeTab === 'compactar' && <div className="animate-in slide-in-from-bottom-5 space-y-8"><div className="flex items-center gap-8 rounded-xl bg-amber-500 p-8 text-slate-950 shadow-md"><div className="flex size-16 items-center justify-center rounded-lg bg-white/20"><span className="material-symbols-outlined text-4xl">cleaning_services</span></div><div><h2 className="text-2xl font-bold">Optimización de Registros</h2><p className="text-sm font-medium text-amber-950 opacity-70">Seleccione las obras finalizadas que desea mover al historial administrativo.</p></div></div><div className="space-y-4"><div className="flex items-center justify-between"><div className="flex items-center gap-4"><h3 className="text-lg font-bold">Órdenes Finalizadas</h3><span className="rounded-lg bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">{finalizedOrders.length} DISPONIBLES</span></div><div className="flex gap-3"><button type="button" onClick={toggleAllArchiveOrders} disabled={archiveLoading || archiveBusy || finalizedOrders.length === 0} className="text-xs font-bold text-slate-300 disabled:opacity-60">SELECCIONAR TODO</button><button type="button" onClick={() => void archiveSelectedOrders()} disabled={archiveLoading || archiveBusy || selectedArchiveIds.size === 0} className="rounded-lg bg-amber-500 px-6 py-2 text-xs font-bold disabled:opacity-30 disabled:grayscale">ARCHIVAR {selectedArchiveIds.size} SELECCIONADAS</button></div></div>{archiveError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{archiveError}</p>}<div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"><table className="w-full text-left text-sm"><thead className="border-b bg-slate-50 text-slate-500 dark:bg-slate-800/50"><tr><th className="px-6 py-3"><input type="checkbox" checked={finalizedOrders.length > 0 && selectedArchiveIds.size === finalizedOrders.length} onChange={toggleAllArchiveOrders} disabled={archiveLoading || archiveBusy || finalizedOrders.length === 0} /></th><th className="px-4 py-3">Fecha</th><th className="px-4 py-3">ID OT</th><th className="px-4 py-3">Cliente</th><th className="px-4 py-3">Aseguradora</th><th className="px-4 py-3 text-right">Estado</th></tr></thead><tbody>{archiveLoading ? <tr><td colSpan={6} className="px-6 py-20 text-center italic text-slate-400">Cargando órdenes finalizadas...</td></tr> : finalizedOrders.length === 0 ? <tr><td colSpan={6} className="px-6 py-20 text-center italic text-slate-400">No hay órdenes finalizadas pendientes de optimización.</td></tr> : finalizedOrders.map((order) => <tr key={order.id} onClick={() => toggleArchiveOrder(order.id)} className={`cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30 ${selectedArchiveIds.has(order.id) ? 'bg-primary/5 dark:bg-primary/10' : ''}`}><td className="px-6 py-4"><input type="checkbox" checked={selectedArchiveIds.has(order.id)} onChange={() => toggleArchiveOrder(order.id)} onClick={(event) => event.stopPropagation()} disabled={archiveBusy} /></td><td className="px-4 py-4 text-xs text-slate-400">{orderDate(order)}</td><td className="px-4 py-4 font-bold uppercase text-slate-900 dark:text-white">{order.id_legible || '—'}</td><td className="px-4 py-4 text-slate-500">{order.cliente || 'Sin Cliente'}</td><td className="px-4 py-4 text-xs font-bold uppercase text-slate-400">{order.aseguradora || '—'}</td><td className="px-4 py-4 text-right"><span className="rounded bg-green-100 px-2 py-0.5 text-[10px] font-bold uppercase text-green-700 dark:bg-green-900/20">{order.estado}</span></td></tr>)}</tbody></table></div><p className="text-center text-[10px] italic text-slate-400">Optimizar registros ayuda a mantener la rapidez del sistema al mover datos operativos pesados al historial administrativo.</p></div></div>}
-        {activeTab === 'archivados' && <div className="animate-in slide-in-from-bottom-5 space-y-6"><div className="flex flex-col items-center justify-between gap-4 md:flex-row"><h2 className="text-lg font-bold">Historial Maestro</h2><div className="relative w-full md:w-80"><span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-lg text-slate-400">search</span><input disabled placeholder="Buscar por ID o cliente..." className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm opacity-60 dark:border-slate-800 dark:bg-slate-900" /></div></div>{archiveError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{archiveError}</p>}<div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"><table className="w-full text-left text-sm"><thead className="border-b bg-slate-50 text-slate-500 dark:bg-slate-800/50"><tr><th className="px-6 py-3">Fecha</th><th className="px-6 py-3">ID OT</th><th className="px-6 py-3">Cliente</th><th className="px-6 py-3 text-right">Información</th></tr></thead><tbody>{archiveLoading ? <tr><td colSpan={4} className="px-6 py-20 text-center text-slate-400">Cargando archivo histórico...</td></tr> : archivedOrders.length === 0 ? <tr><td colSpan={4} className="px-6 py-20 text-center text-slate-400">Sin registros archivados.</td></tr> : archivedOrders.map((order) => <tr key={order.id} className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30"><td className="px-6 py-4 text-xs text-slate-400">{orderDate(order)}</td><td className="px-6 py-4 font-bold uppercase text-slate-900 dark:text-white">{order.id_legible || '—'}</td><td className="px-6 py-4 text-slate-500">{order.cliente || 'Sin Cliente'}</td><td className="px-6 py-4 text-right"><button type="button" onClick={() => void restoreArchivedOrder(order.id)} disabled={restoringOrderId === order.id || archiveBusy} className="inline-flex items-center gap-1 rounded-lg border border-amber-100 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-600 transition-all hover:bg-amber-100/50 disabled:opacity-40 dark:border-amber-800 dark:bg-amber-900/20"><span className="material-symbols-outlined text-sm">settings_backup_restore</span>{restoringOrderId === order.id ? 'RESTAURANDO...' : 'RESTAURAR'}</button></td></tr>)}</tbody></table></div></div>}
+        {activeTab === 'archivados' && historyContent}
       </div>
     </div>
+    {historicalDetailModal}
   </div>;
 }
