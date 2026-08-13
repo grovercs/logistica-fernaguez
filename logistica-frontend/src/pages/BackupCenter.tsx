@@ -11,6 +11,7 @@ type HistoricalReport = { id: string; fecha_trabajo: string | null; trabajos_rea
 type HistoricalOrderDetail = ArchiveOrder & { direccion: string | null; codigo_postal: string | null; localidad: string | null; poliza: string | null; reportes: HistoricalReport[] };
 const activeMediaStates: MediaBackupJob['estado'][] = ['pending', 'preparing', 'downloading', 'compressing', 'verifying'];
 const provisionalMediaJob = (): MediaBackupJob => ({ id: '', estado: 'pending', total_items: 0, processed_items: 0, failed_items: 0, total_bytes: 0, processed_bytes: 0, progreso: 0, disponibilidad: false, error_code: null, error_summary: null, created_at: null, started_at: null, finished_at: null, expires_at: null });
+const isUuid = (value: string | null | undefined) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 const phases = ['Verificando permisos', 'Exportando datos', 'Redactando campos sensibles', 'Generando manifiesto', 'Calculando integridad', 'Preparando descarga'];
 const formatBytes = (bytes: number) => bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toLocaleString('es-ES', { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024)).toLocaleString('es-ES')} KB`;
@@ -208,27 +209,27 @@ export default function BackupCenter() {
         .single();
       if (orderError || !order || order.estado !== 'Archivado') throw orderError || new Error('ORDER_NOT_ARCHIVED');
 
-      let { data: reports, error: reportsError } = await supabase
+      const reportsByOrderId = await supabase
         .from('reportes')
         .select('id, orden_id, fecha_trabajo, trabajos_realizados, tecnico_id')
         .eq('orden_id', order.id);
-      if (reportsError) throw reportsError;
+      let reports = reportsByOrderId.error ? [] : reportsByOrderId.data || [];
 
-      if (!reports?.length && order.id_legible) {
+      // `reportes.orden_id` is a UUID foreign key. Do not compare it with an
+      // OB-YYYY-NNNN id_legible; only retain a safe legacy retry for UUID data.
+      if (!reports.length && isUuid(order.id_legible)) {
         const legacyReports = await supabase
           .from('reportes')
           .select('id, orden_id, fecha_trabajo, trabajos_realizados, tecnico_id')
           .eq('orden_id', order.id_legible);
-        if (legacyReports.error) throw legacyReports.error;
-        reports = legacyReports.data || [];
+        if (!legacyReports.error) reports = legacyReports.data || [];
       }
 
       const technicianIds = [...new Set((reports || []).map((report) => report.tecnico_id).filter((id): id is string => Boolean(id)))];
       const technicianNames = new Map<string, string>();
       if (technicianIds.length) {
         const { data: profiles, error: profilesError } = await supabase.from('perfiles').select('id, nombre_completo').in('id', technicianIds);
-        if (profilesError) throw profilesError;
-        profiles?.forEach((profile) => technicianNames.set(profile.id, profile.nombre_completo || 'Técnico Externo'));
+        if (!profilesError) profiles?.forEach((profile) => technicianNames.set(profile.id, profile.nombre_completo || 'Técnico Externo'));
       }
 
       const historicalReports = (reports || [])
