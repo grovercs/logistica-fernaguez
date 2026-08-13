@@ -48,6 +48,11 @@ interface DeleteTestUserOperation {
   confirmSignedInAccount: boolean;
 }
 
+interface DeleteUserOperation {
+  user: ManagedUser;
+  confirmationEmail: string;
+}
+
 interface PasswordResetOperation {
   user: ManagedUser;
   newPassword: string;
@@ -85,7 +90,8 @@ async function adminRequest<T>(path: string, method: 'GET' | 'POST', body?: unkn
   });
   const payload = await result.json().catch(() => ({})) as { error?: string; code?: string; requires_confirmation?: boolean; active_assignments?: number; active_assignments_count?: number } & T;
   if (!result.ok) {
-    const error = new Error(payload.error || 'No se pudo completar la operaci\u00f3n.') as Error & { requiresConfirmation?: boolean; activeAssignments?: number };
+    const error = new Error(payload.error || 'No se pudo completar la operaci\u00f3n.') as Error & { code?: string; requiresConfirmation?: boolean; activeAssignments?: number };
+    error.code = payload.code;
     error.requiresConfirmation = payload.requires_confirmation === true || payload.code === 'active_assignments_confirmation_required';
     error.activeAssignments = typeof payload.active_assignments_count === 'number' ? payload.active_assignments_count : typeof payload.active_assignments === 'number' ? payload.active_assignments : 0;
     throw error;
@@ -104,9 +110,11 @@ export default function Usuarios() {
   const [editProfileOperation, setEditProfileOperation] = useState<EditProfileOperation | null>(null);
   const [editConfirmation, setEditConfirmation] = useState<'changes' | 'assignments' | null>(null);
   const [deleteTestUserOperation, setDeleteTestUserOperation] = useState<DeleteTestUserOperation | null>(null);
+  const [deleteUserOperation, setDeleteUserOperation] = useState<DeleteUserOperation | null>(null);
   const [passwordResetOperation, setPasswordResetOperation] = useState<PasswordResetOperation | null>(null);
   const [createUserOperation, setCreateUserOperation] = useState<CreateUserOperation | null>(null);
   const deleteTestUserInFlight = useRef(false);
+  const deleteUserInFlight = useRef(false);
   const passwordResetInFlight = useRef(false);
   const createUserInFlight = useRef(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -271,6 +279,41 @@ export default function Usuarios() {
     setDeleteTestUserOperation({ user, confirmationEmail: '', confirmSignedInAccount: false });
   };
 
+  const openDeleteUser = (user: ManagedUser) => {
+    setError(null);
+    setDeleteUserOperation({ user, confirmationEmail: '' });
+  };
+
+  const deleteUser = async () => {
+    if (!deleteUserOperation || savingId || deleteUserInFlight.current) return;
+    const { user, confirmationEmail } = deleteUserOperation;
+    if (!user.email || confirmationEmail.normalize('NFKC').trim().toLocaleLowerCase('en-US') !== user.email.normalize('NFKC').trim().toLocaleLowerCase('en-US')) {
+      setError('Escribe exactamente el correo de la cuenta para confirmar la eliminaciÃ³n.');
+      return;
+    }
+    deleteUserInFlight.current = true;
+    setSavingId(user.auth_user_id);
+    setError(null);
+    try {
+      await adminRequest('admin-delete-user', 'POST', {
+        target_user_id: user.auth_user_id,
+        confirmation_email: confirmationEmail,
+      });
+      setDeleteUserOperation(null);
+      setEditProfileOperation(null);
+      await loadData();
+      showSuccessMessage('Usuario eliminado correctamente.');
+    } catch (deleteError) {
+      const errorCode = (deleteError as Error & { code?: string }).code;
+      setError(errorCode === 'activity_associated'
+        ? 'No se puede eliminar este usuario porque tiene actividad asociada. DesactÃ­valo en su lugar.'
+        : deleteError instanceof Error ? deleteError.message : 'No se pudo eliminar el usuario.');
+    } finally {
+      deleteUserInFlight.current = false;
+      setSavingId(null);
+    }
+  };
+
   const deleteTestUser = async () => {
     if (!deleteTestUserOperation || savingId || deleteTestUserInFlight.current) return;
     const { user, confirmationEmail, confirmSignedInAccount } = deleteTestUserOperation;
@@ -369,8 +412,8 @@ export default function Usuarios() {
         </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[1100px] text-left">
               <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <tr><th className="px-5 py-4">Usuario</th><th className="px-5 py-4">Rol real</th><th className="px-5 py-4">Estado</th><th className="px-5 py-4">Trabajador vinculado</th><th className="px-5 py-4">&Uacute;ltimo acceso</th><th className="px-5 py-4 text-right">Acciones</th></tr>
               </thead>
@@ -410,6 +453,7 @@ export default function Usuarios() {
           <select value={editProfileOperation.trabajadorId} onChange={e=>setEditProfileOperation({...editProfileOperation,trabajadorId:e.target.value,confirmAssignments:false})} className="mt-1 w-full rounded border p-2"><option value="">Sin trabajador vinculado</option>{editProfileOperation.user.trabajador && <option value={editProfileOperation.user.trabajador.id}>{editProfileOperation.user.trabajador.nombre} {editProfileOperation.user.trabajador.apellidos || ''}</option>}{availableWorkers.map(w=><option key={w.id} value={w.id}>{w.nombre} {w.apellidos || ''}</option>)}</select>
           {editProfileOperation.confirmAssignments && <label className="mt-4 flex gap-2 text-sm"><input type="checkbox" checked onChange={()=>{}} readOnly/> Confirmo el cambio de vínculo con asignaciones activas.</label>}
           {editProfileOperation.user.auth_status === 'active_auth_user' && editProfileOperation.user.profile_status === 'active_profile' && editProfileOperation.user.activo && editProfileOperation.user.rol !== 'Administrador' && editProfileOperation.user.auth_user_id !== currentUserId && <button type="button" disabled={Boolean(savingId)} onClick={() => openPasswordReset(editProfileOperation.user)} className="mt-6 rounded border border-slate-300 px-4 py-2 text-xs font-black uppercase tracking-widest text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200">CAMBIAR CONTRASEÑA</button>}
+          {currentUserId && editProfileOperation.user.auth_status === 'active_auth_user' && editProfileOperation.user.profile_status === 'active_profile' && editProfileOperation.user.rol !== 'Administrador' && editProfileOperation.user.auth_user_id !== currentUserId && <div className="mt-6 border-t border-rose-200 pt-5 dark:border-rose-900/70"><p className="text-xs font-black uppercase tracking-widest text-rose-700 dark:text-rose-300">Zona de peligro</p><p className="mt-1 text-xs text-slate-500">La eliminación sólo se permitirá si esta cuenta no tiene actividad asociada.</p><button type="button" disabled={Boolean(savingId)} onClick={() => openDeleteUser(editProfileOperation.user)} className="mt-3 rounded border border-rose-300 px-4 py-2 text-xs font-black uppercase tracking-widest text-rose-700 disabled:opacity-50 dark:border-rose-700 dark:text-rose-300">ELIMINAR USUARIO</button></div>}
           <div className="mt-6 flex justify-end gap-3"><button disabled={Boolean(savingId)} onClick={()=>setEditProfileOperation(null)}>Cancelar</button><button disabled={Boolean(savingId)||!editHasChanges(editProfileOperation)} onClick={saveEditProfile} className="rounded bg-primary px-4 py-2 text-white">Guardar cambios</button></div>
         </div>
       </div>}
@@ -458,6 +502,17 @@ export default function Usuarios() {
           {deleteTestUserOperation.user.last_access_at && deleteTestUserOperation.confirmationEmail === deleteTestUserOperation.user.email && !deleteTestUserOperation.confirmSignedInAccount && <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Esta cuenta ha iniciado sesi&oacute;n anteriormente. Al continuar se mostrar&aacute; una segunda confirmaci&oacute;n.</div>}
           {deleteTestUserOperation.user.last_access_at && deleteTestUserOperation.confirmSignedInAccount && <div className="mt-4 rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm text-rose-900">Confirmaci&oacute;n final: esta cuenta tuvo actividad. La eliminaci&oacute;n no se puede deshacer.</div>}
           <div className="mt-6 flex justify-end gap-3"><button type="button" disabled={Boolean(savingId)} onClick={() => setDeleteTestUserOperation(null)} className="rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-50">Cancelar</button><button type="button" disabled={Boolean(savingId) || deleteTestUserOperation.confirmationEmail !== deleteTestUserOperation.user.email} onClick={() => void deleteTestUser()} className="rounded-xl bg-rose-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{deleteTestUserOperation.user.last_access_at && !deleteTestUserOperation.confirmSignedInAccount ? 'Continuar' : 'Eliminar definitivamente'}</button></div>
+        </div>
+      </div>}
+      {deleteUserOperation && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-user-title">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+          <h3 id="delete-user-title" className="text-lg font-black text-rose-700 dark:text-rose-300">Eliminar usuario</h3>
+          <p className="mt-3 text-sm">Se eliminará <strong>{deleteUserOperation.user.nombre || deleteUserOperation.user.email}</strong>. Sólo se permitirá si no tiene actividad asociada.</p>
+          <p className="mt-2 text-sm text-slate-500">{deleteUserOperation.user.email || 'Sin correo'}</p>
+          {error && <p role="alert" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+          <label className="mt-5 block text-sm font-bold">Escribe el correo para confirmar</label>
+          <input value={deleteUserOperation.confirmationEmail} onChange={(event) => setDeleteUserOperation({ ...deleteUserOperation, confirmationEmail: event.target.value })} disabled={Boolean(savingId)} className="mt-2 w-full rounded-lg border border-slate-300 p-2 disabled:opacity-50 dark:border-slate-700" autoComplete="off" />
+          <div className="mt-6 flex justify-end gap-3"><button type="button" disabled={Boolean(savingId)} onClick={() => setDeleteUserOperation(null)} className="rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-50">Cancelar</button><button type="button" disabled={Boolean(savingId) || !deleteUserOperation.user.email || deleteUserOperation.confirmationEmail.normalize('NFKC').trim().toLocaleLowerCase('en-US') !== deleteUserOperation.user.email.normalize('NFKC').trim().toLocaleLowerCase('en-US')} onClick={() => void deleteUser()} className="rounded-xl bg-rose-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">ELIMINAR USUARIO</button></div>
         </div>
       </div>}
       {pendingProfileOperation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="create-profile-title">
