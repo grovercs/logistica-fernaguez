@@ -59,6 +59,19 @@ assert.match(source, /passwordResetInFlight\.current/);
 assert.match(source, /CAMBIAR CONTRASEÑA/);
 assert.match(source, /La contraseña se ha actualizado\. El usuario deberá iniciar sesión de nuevo\./);
 
+assert.match(source, /interface CreateUserOperation/);
+assert.match(source, /const availableCreationRoles = roles\.filter\(\(role\) => role\.nombre !== 'Administrador'\)/);
+assert.match(source, /AÑADIR USUARIO/);
+assert.match(source, /adminRequest\('admin-create-user', 'POST'/);
+assert.match(source, /nombre_completo: operation\.nombre\.trim\(\) \|\| null/);
+assert.match(source, /password: operation\.password/);
+assert.match(source, /operation\.password\.length < 10/);
+assert.match(source, /operation\.password !== operation\.confirmPassword/);
+assert.match(source, /createUserInFlight\.current/);
+assert.match(source, /showSuccessMessage\('Usuario creado correctamente\.'\)/);
+assert.match(source, /setCreateUserOperation\(null\);[\s\S]*await loadData\(\);[\s\S]*showSuccessMessage\('Usuario creado correctamente\.'\)/);
+assert.doesNotMatch(source, /admin-create-user[\s\S]*?(?:supabaseAdmin|user_metadata|trabajador_id|telefono)/);
+
 assert.match(source, /successMessageTimerRef/);
 assert.match(source, /successMessageSequenceRef/);
 assert.match(source, /showSuccessMessage/);

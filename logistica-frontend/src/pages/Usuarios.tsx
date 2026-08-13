@@ -61,6 +61,15 @@ interface PasswordResetOperation {
   showConfirmPassword: boolean;
 }
 
+interface CreateUserOperation {
+  email: string;
+  nombre: string;
+  rolId: string;
+  activo: boolean;
+  password: string;
+  confirmPassword: string;
+}
+
 const ROLE_COLORS: Record<string, string> = {
   Administrador: 'bg-primary/10 text-primary border-primary/20',
   Editor: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 border-blue-200 dark:border-blue-500/30',
@@ -103,9 +112,11 @@ export default function Usuarios() {
   const [deleteTestUserOperation, setDeleteTestUserOperation] = useState<DeleteTestUserOperation | null>(null);
   const [deleteUserOperation, setDeleteUserOperation] = useState<DeleteUserOperation | null>(null);
   const [passwordResetOperation, setPasswordResetOperation] = useState<PasswordResetOperation | null>(null);
+  const [createUserOperation, setCreateUserOperation] = useState<CreateUserOperation | null>(null);
   const deleteTestUserInFlight = useRef(false);
   const deleteUserInFlight = useRef(false);
   const passwordResetInFlight = useRef(false);
+  const createUserInFlight = useRef(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<{ id: number; text: string } | null>(null);
@@ -175,6 +186,60 @@ export default function Usuarios() {
       return;
     }
     setPendingProfileOperation({ user, rolId: '', activo: true, confirmAdministrator: false });
+  };
+
+  const availableCreationRoles = roles.filter((role) => role.nombre !== 'Administrador');
+  const openCreateUser = () => {
+    if (availableCreationRoles.length === 0) {
+      setError('No hay roles disponibles para crear el usuario.');
+      return;
+    }
+    setError(null);
+    setCreateUserOperation({ email: '', nombre: '', rolId: '', activo: true, password: '', confirmPassword: '' });
+  };
+
+  const createUser = async () => {
+    if (!createUserOperation || savingId || createUserInFlight.current) return;
+    const operation = createUserOperation;
+    const email = operation.email.normalize('NFKC').trim().toLocaleLowerCase('en-US');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Introduce un correo válido.');
+      return;
+    }
+    if (operation.password.length < 10) {
+      setError('La nueva contraseña debe tener al menos 10 caracteres.');
+      return;
+    }
+    if (operation.password !== operation.confirmPassword) {
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
+    const selectedRole = availableCreationRoles.find((role) => role.id === operation.rolId);
+    if (!selectedRole) {
+      setError('Debes seleccionar un rol permitido.');
+      return;
+    }
+
+    createUserInFlight.current = true;
+    setSavingId('create-user');
+    setError(null);
+    try {
+      await adminRequest('admin-create-user', 'POST', {
+        email,
+        nombre_completo: operation.nombre.trim() || null,
+        rol_id: selectedRole.id,
+        activo: operation.activo,
+        password: operation.password,
+      });
+      setCreateUserOperation(null);
+      await loadData();
+      showSuccessMessage('Usuario creado correctamente.');
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : 'No se pudo crear el usuario.');
+    } finally {
+      createUserInFlight.current = false;
+      setSavingId(null);
+    }
   };
 
   const createUserProfile = async () => {
@@ -318,9 +383,14 @@ export default function Usuarios() {
             <h2 className="text-2xl font-black tracking-tight">Gesti&oacute;n de Usuarios</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Accesos y v&iacute;nculos gestionados de forma segura por Administradores.</p>
           </div>
-          <button onClick={() => void loadData()} disabled={loading} className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 disabled:opacity-50">
-            Actualizar
-          </button>
+          <div className="flex gap-2">
+            <button type="button" onClick={openCreateUser} disabled={loading || Boolean(savingId)} className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-primary text-white hover:bg-primary/90 disabled:opacity-50">
+              AÑADIR USUARIO
+            </button>
+            <button type="button" onClick={() => void loadData()} disabled={loading || Boolean(savingId)} className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 disabled:opacity-50">
+              Actualizar
+            </button>
+          </div>
         </div>
       </header>
 
@@ -398,6 +468,28 @@ export default function Usuarios() {
           <label className="mt-4 block text-xs font-black uppercase tracking-widest text-slate-500">Repetir contraseña</label>
           <div className="mt-2 flex gap-2"><input type={passwordResetOperation.showConfirmPassword ? 'text' : 'password'} value={passwordResetOperation.confirmPassword} onChange={(event) => setPasswordResetOperation({ ...passwordResetOperation, confirmPassword: event.target.value })} disabled={Boolean(savingId)} autoComplete="new-password" className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2 disabled:opacity-50 dark:border-slate-700"/><button type="button" disabled={Boolean(savingId)} onClick={() => setPasswordResetOperation({ ...passwordResetOperation, showConfirmPassword: !passwordResetOperation.showConfirmPassword })} className="rounded-lg border border-slate-300 px-3 text-xs font-bold disabled:opacity-50 dark:border-slate-700">{passwordResetOperation.showConfirmPassword ? 'Ocultar' : 'Mostrar'}</button></div>
           <div className="mt-6 flex justify-end gap-3"><button type="button" disabled={Boolean(savingId)} onClick={() => setPasswordResetOperation(null)} className="rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-50">Cancelar</button><button type="button" disabled={Boolean(savingId) || passwordResetOperation.newPassword.length < 10 || passwordResetOperation.newPassword !== passwordResetOperation.confirmPassword} onClick={() => void resetUserPassword()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Guardar nueva contraseña</button></div>
+        </div>
+      </div>}
+      {createUserOperation && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="create-user-title">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+          <h3 id="create-user-title" className="text-lg font-black">Añadir usuario</h3>
+          <p className="mt-2 text-sm text-slate-500">Crea una cuenta de acceso. Podrás vincular un trabajador después desde Editar perfil.</p>
+          {error && <p role="alert" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+          <label className="mt-5 block text-xs font-black uppercase tracking-widest text-slate-500">Email</label>
+          <input type="email" value={createUserOperation.email} onChange={(event) => setCreateUserOperation({ ...createUserOperation, email: event.target.value })} disabled={Boolean(savingId)} autoComplete="off" className="mt-2 w-full rounded-lg border border-slate-300 p-2 disabled:opacity-50 dark:border-slate-700" />
+          <label className="mt-4 block text-xs font-black uppercase tracking-widest text-slate-500">Nombre completo</label>
+          <input value={createUserOperation.nombre} maxLength={120} onChange={(event) => setCreateUserOperation({ ...createUserOperation, nombre: event.target.value })} disabled={Boolean(savingId)} autoComplete="name" className="mt-2 w-full rounded-lg border border-slate-300 p-2 disabled:opacity-50 dark:border-slate-700" />
+          <label className="mt-4 block text-xs font-black uppercase tracking-widest text-slate-500">Rol</label>
+          <select value={createUserOperation.rolId} onChange={(event) => setCreateUserOperation({ ...createUserOperation, rolId: event.target.value })} disabled={Boolean(savingId)} className="mt-2 w-full rounded-lg border border-slate-300 p-2 disabled:opacity-50 dark:border-slate-700">
+            <option value="" disabled>Selecciona un rol...</option>{availableCreationRoles.map((role) => <option key={role.id} value={role.id}>{role.nombre}</option>)}
+          </select>
+          <label className="mt-4 flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={createUserOperation.activo} disabled={Boolean(savingId)} onChange={(event) => setCreateUserOperation({ ...createUserOperation, activo: event.target.checked })} /> Activar acceso</label>
+          <label className="mt-4 block text-xs font-black uppercase tracking-widest text-slate-500">Nueva contraseña</label>
+          <input type="password" value={createUserOperation.password} onChange={(event) => setCreateUserOperation({ ...createUserOperation, password: event.target.value })} disabled={Boolean(savingId)} autoComplete="new-password" className="mt-2 w-full rounded-lg border border-slate-300 p-2 disabled:opacity-50 dark:border-slate-700" />
+          <p className="mt-1 text-xs text-slate-500">Mínimo 10 caracteres.</p>
+          <label className="mt-4 block text-xs font-black uppercase tracking-widest text-slate-500">Repetir contraseña</label>
+          <input type="password" value={createUserOperation.confirmPassword} onChange={(event) => setCreateUserOperation({ ...createUserOperation, confirmPassword: event.target.value })} disabled={Boolean(savingId)} autoComplete="new-password" className="mt-2 w-full rounded-lg border border-slate-300 p-2 disabled:opacity-50 dark:border-slate-700" />
+          <div className="mt-6 flex justify-end gap-3"><button type="button" disabled={Boolean(savingId)} onClick={() => setCreateUserOperation(null)} className="rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-50">Cancelar</button><button type="button" disabled={Boolean(savingId) || !createUserOperation.email || !createUserOperation.rolId || createUserOperation.password.length < 10 || createUserOperation.password !== createUserOperation.confirmPassword} onClick={() => void createUser()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{savingId === 'create-user' ? 'Creando...' : 'CREAR USUARIO'}</button></div>
         </div>
       </div>}
       {deleteTestUserOperation && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-test-user-title">
