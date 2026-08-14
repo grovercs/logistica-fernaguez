@@ -30,6 +30,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
   const [formData, setFormData] = useState({
     referencia: '',
     cliente: '',
+    nombre_obra: '',
     aseguradora: '',
     tecnico: '',
     fecha: '',
@@ -47,13 +48,11 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
   });
 
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
-  const [aseguradoras, setAseguradoras] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
        fetchTecnicos();
-       fetchAseguradoras();
     }
   }, [isOpen]);
 
@@ -71,6 +70,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
        setFormData({
          referencia: ordenData.poliza || '',
          cliente: ordenData.cliente || '',
+         nombre_obra: ordenData.nombre_obra || '',
          aseguradora: ordenData.aseguradora || '',
          tecnico: matchedTecnico?.id || ordenData.tecnico_id || '',
          fecha: fecha,
@@ -131,11 +131,6 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
     setTecnicos(directory);
   };
 
-  const fetchAseguradoras = async () => {
-    const { data } = await supabase.from('aseguradoras').select('id, nombre').eq('estado', 'Activa');
-    if (data) setAseguradoras(data);
-  };
-
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,6 +145,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
       .update({
          cliente: formData.cliente,
          aseguradora: formData.aseguradora,
+         nombre_obra: formData.nombre_obra,
          poliza: formData.referencia,
          asegurado: formData.asegurado,
          telefono_asegurado: formData.telefono_asegurado,
@@ -291,11 +287,11 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[16px] text-slate-400">badge</span>
-                  {formData.aseguradora ? 'CIF de la Empresa' : 'DNI / NIF'}
+                  DNI / CIF
                 </label>
                 <input
                   type="text"
-                  placeholder={formData.aseguradora ? "Ej: B12345678" : "Ej: 12345678A"}
+                  placeholder="Ej: 12345678A o B12345678"
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.referencia}
                   onChange={(e) => setFormData({...formData, referencia: e.target.value})}
@@ -314,28 +310,6 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
                   value={formData.otras_ordenes}
                   onChange={(e) => setFormData({...formData, otras_ordenes: e.target.value})}
                 />
-              </div>
-
-              {/* Cliente / Empresa */}
-              <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px] text-slate-400">business</span>
-                  {formData.aseguradora ? 'Empresa' : 'Tipo de Cliente'}
-                </label>
-                <select
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
-                  value={formData.aseguradora}
-                  onChange={(e) => setFormData({...formData, aseguradora: e.target.value})}
-                >
-                  <option value="">Cliente Particular</option>
-                  {aseguradoras.map(a => (
-                     <option key={a.id} value={a.nombre}>{a.nombre}</option>
-                  ))}
-                  {/* Fallback si la empresa original ya no existe en aseguradoras */}
-                  {formData.aseguradora && !aseguradoras.some(a => a.nombre === formData.aseguradora) && (
-                    <option value={formData.aseguradora}>{formData.aseguradora} (empresa eliminada)</option>
-                  )}
-                </select>
               </div>
 
               <div className="space-y-1.5">
@@ -366,15 +340,29 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
               <div className="space-y-1.5 md:col-span-2">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[16px] text-slate-400">person</span>
-                  {formData.aseguradora ? 'Nombre de la Empresa' : 'Nombre Completo'} *
+                  CLIENTE / EMPRESA *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder={formData.aseguradora ? "Nombre de la empresa" : "Nombre y apellidos"}
+                  placeholder="Nombre del cliente o empresa"
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                   value={formData.cliente}
                   onChange={(e) => setFormData({...formData, cliente: e.target.value})}
+                />
+              </div>
+
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-slate-400">construction</span>
+                  NOMBRE DE LA OBRA
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Local Av. Castiero 15"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
+                  value={formData.nombre_obra}
+                  onChange={(e) => setFormData({ ...formData, nombre_obra: e.target.value })}
                 />
               </div>
 
@@ -382,10 +370,8 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
               <div className="space-y-1.5 md:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">
-                          {formData.aseguradora ? 'Persona Responsable' : 'Contacto en Domicilio'}
-                        </label>
-                        <input type="text" value={formData.asegurado} onChange={e => setFormData({...formData, asegurado: e.target.value})} placeholder={formData.aseguradora ? "Nombre de la persona de contacto" : "Persona en el domicilio"} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                        <label className="text-xs font-bold text-slate-500 uppercase">Persona responsable / Contacto</label>
+                        <input type="text" value={formData.asegurado} onChange={e => setFormData({...formData, asegurado: e.target.value})} placeholder="Nombre de la persona de contacto" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 uppercase">Teléfono</label>
@@ -397,7 +383,7 @@ export default function EditarOrdenModal({ isOpen, onClose, onUpdated, ordenData
               <div className="space-y-1.5 md:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Dirección Completa de Intervención</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">DIRECCIÓN COMPLETA DE INTERVENCIÓN</label>
                         <input type="text" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} placeholder="Ej: Calle Gran Vía 123, 1ºA, Madrid" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
                     </div>
                     <div className="space-y-1.5">

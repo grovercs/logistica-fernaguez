@@ -186,6 +186,7 @@ export default function Ordenes() {
 
     const matchesSearch = searchTerm === '' ||
       (o.id_legible && o.id_legible.toLowerCase().includes(searchLower)) ||
+      (o.nombre_obra && o.nombre_obra.toLowerCase().includes(searchLower)) ||
       (o.cliente && o.cliente.toLowerCase().includes(searchLower)) ||
       (o.direccion && o.direccion.toLowerCase().includes(searchLower));
 
@@ -653,7 +654,7 @@ export default function Ordenes() {
                 <tr>
                     <th className="px-4 sm:px-6 py-5">ID OT</th>
                     <th className="px-4 sm:px-6 py-5">Intervención</th>
-                    <th className="px-4 sm:px-6 py-5">Cliente / Dirección</th>
+                    <th className="px-4 sm:px-6 py-5">Obra / Dirección</th>
                     <th className="px-4 sm:px-6 py-5">Técnico</th>
                     <th className="px-4 sm:px-6 py-5 text-center">Estado</th>
                     <th className="px-4 sm:px-6 py-5">Creado</th>
@@ -677,7 +678,7 @@ export default function Ordenes() {
                             {orden.fecha_programada ? new Date(orden.fecha_programada).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }) : '---'}
                         </td>
                         <td className="px-4 sm:px-6 py-5">
-                            <div className="font-bold text-slate-700 dark:text-slate-200 truncate max-w-[150px] sm:max-w-[250px]">{orden.cliente}</div>
+                            <div className="font-bold text-slate-700 dark:text-slate-200 truncate max-w-[150px] sm:max-w-[250px]">{orden.nombre_obra || orden.cliente || orden.id_legible}</div>
                             <div className="text-[11px] text-slate-400 font-medium mt-0.5">{orden.direccion || 'Sin dirección'}</div>
                         </td>
                         <td className="px-4 sm:px-6 py-5">

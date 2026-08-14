@@ -16,6 +16,7 @@ interface MobileWorkerAssignmentCard {
     id_legible: string;
     estado: string;
     cliente: string | null;
+    nombre_obra: string | null;
     direccion: string | null;
     tecnico_id: string | null;
     fecha_programada: string | null;
@@ -159,6 +160,7 @@ const MobileOrdenes = () => {
                         id_legible,
                         estado,
                         cliente,
+                        nombre_obra,
                         direccion,
                         tecnico_id,
                         fecha_programada,
@@ -187,6 +189,7 @@ const MobileOrdenes = () => {
                         id_legible: orden.id_legible,
                         estado: orden.estado,
                         cliente: orden.cliente,
+                        nombre_obra: orden.nombre_obra,
                         direccion: orden.direccion,
                         tecnico_id: orden.tecnico_id,
                         fecha_programada: orden.fecha_programada,
@@ -415,7 +418,8 @@ const MobileOrdenes = () => {
                                         {orden.estado}
                                     </span>
                                 </div>
-                                 <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg leading-tight">{orden.cliente}</h3>
+                                 <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg leading-tight">{orden.nombre_obra || orden.cliente || orden.id_legible}</h3>
+                                 <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">Cliente: {orden.cliente || 'No especificado'}</p>
                                 
                                 {/* Technician Assigned */}
                                 {(() => {

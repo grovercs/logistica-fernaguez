@@ -807,8 +807,9 @@ const MobileDetalleOrden = () => {
             <div className="bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm border-b border-slate-200 dark:border-slate-700">
                  <div className="flex justify-between items-start">
                      <div>
-                         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-tight">Cliente Comercial / Títular</p>
-                         <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 leading-tight mt-1">{orden?.cliente}</h2>
+                         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-tight">Obra</p>
+                         <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 leading-tight mt-1">{orden?.nombre_obra || orden?.cliente || orden?.id_legible}</h2>
+                         <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">Cliente: {orden?.cliente || 'No especificado'}</p>
                      </div>
                      <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 text-[10px] font-black px-2 py-1 rounded-lg uppercase">
                          {orden?.aseguradora || orden?.cliente || 'Particular'}

@@ -30,6 +30,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
   const [formData, setFormData] = useState({
     referencia: '',
     cliente: '',
+    nombre_obra: '',
     cif_nif: '',
     tecnico: '',
     fecha: '',
@@ -59,7 +60,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
        fetchAseguradoras();
        fetchTareasFrecuentes();
        setFormData({
-         referencia: '', cliente: '', cif_nif: '', tecnico: '',
+         referencia: '', cliente: '', nombre_obra: '', cif_nif: '', tecnico: '',
          fecha: fechaInicial || new Date().toLocaleDateString('en-CA'),
          hora: '10:00', observaciones: '', esUrgente: false,
          asegurado: '', telefono_asegurado: '', email: '',
@@ -218,6 +219,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
          id_legible,
          cliente: formData.cliente,
          aseguradora: formData.cliente, // Usamos el nombre del cliente como aseguradora para compatibilidad
+         nombre_obra: formData.nombre_obra,
          poliza: formData.referencia,
          asegurado: formData.asegurado,
          telefono_asegurado: formData.telefono_asegurado,
@@ -390,7 +392,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
               <div className="space-y-1.5 md:col-span-2">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[16px] text-slate-400">corporate_fare</span>
-                  Nombre del Cliente o Empresa *
+                  CLIENTE / EMPRESA *
                 </label>
                 <input
                   type="text"
@@ -406,6 +408,21 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                     <option key={a.id} value={a.nombre} />
                   ))}
                 </datalist>
+              </div>
+
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-slate-400">construction</span>
+                  NOMBRE DE LA OBRA
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Local Av. Castiero 15"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm font-bold"
+                  value={formData.nombre_obra || ''}
+                  onChange={(e) => setFormData({ ...formData, nombre_obra: e.target.value })}
+                />
               </div>
 
               {/* DNI / CIF y Dirección Fiscal */}
