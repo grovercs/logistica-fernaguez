@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, CalendarClock, Briefcase, UserPlus,
-  Shield, Key, Database, ClipboardList, Settings, LogOut,
+  Database, ClipboardList, Settings, LogOut,
   ListChecks, Menu, X, Moon, Sun, Wrench, BookOpen
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -255,42 +255,6 @@ const Layout = () => {
                     Sistema
                   </p>
                 </div>
-
-                <NavLink
-                  to="/roles"
-                  className={({ isActive }) =>
-                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`
-                  }
-                >
-                  <Shield className="w-5 h-5 mr-3" />
-                  Gestión de Roles
-                </NavLink>
-
-                <NavLink
-                  to="/permisos"
-                  className={({ isActive }) =>
-                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`
-                  }
-                >
-                  <Key className="w-5 h-5 mr-3" />
-                  Lista de Permisos
-                </NavLink>
-
-                <NavLink
-                  to="/rbac"
-                  className={({ isActive }) =>
-                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`
-                  }
-                >
-                  <Settings className="w-5 h-5 mr-3" />
-                  Panel RBAC
-                </NavLink>
 
                 <NavLink
                   to="/bd"
