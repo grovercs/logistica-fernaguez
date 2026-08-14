@@ -311,6 +311,15 @@ export default function OrdenDetalle() {
   if (loading) return <div className="p-8 text-center text-slate-500 font-bold">Cargando reporte de orden...</div>;
   if (!orden) return <div className="p-8 text-center text-slate-500">No se encontró la orden.</div>;
 
+  const normalizeComparableText = (value: unknown) =>
+    String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('es-ES');
+  const legacyCompany = String(orden.aseguradora || '').trim();
+  const showLegacyCompany = Boolean(
+    legacyCompany && normalizeComparableText(legacyCompany) !== normalizeComparableText(orden.cliente),
+  );
+  const otherOrders = String(orden.otras_ordenes || '').trim();
+  const showOtherOrders = Boolean(otherOrders && otherOrders !== '-');
+
   return (
     <div className="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 w-full h-full">
       {/* Header */}
@@ -326,7 +335,12 @@ export default function OrdenDetalle() {
                 <h2 className="text-xl font-bold">Detalle de Intervención</h2>
               </div>
               <div className="flex items-center gap-3">
-                <p className="text-slate-500 text-sm font-medium">Reporte: <span className="text-primary font-bold">{orden.id_legible}</span></p>
+                <div>
+                  <p className="text-slate-500 text-sm font-medium">OT: <span className="text-primary font-bold">{orden.id_legible}</span></p>
+                  {orden.nombre_obra && (
+                    <p className="text-slate-700 dark:text-slate-200 text-sm font-semibold">{orden.nombre_obra}</p>
+                  )}
+                </div>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${orden.estado === 'Urgente' ? 'bg-red-100 text-red-700 dark:bg-red-900/30' :
                     orden.estado === 'En revisión' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30' :
                       orden.estado === 'Pendiente de firma' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30' :
@@ -389,9 +403,7 @@ export default function OrdenDetalle() {
                 <div className="p-4 flex flex-col gap-1">
                   <div className="flex items-center gap-2 text-slate-500">
                     <span className="material-symbols-outlined text-[16px]">person</span>
-                    <label className="text-xs font-bold uppercase tracking-wider">
-                      {orden.aseguradora ? 'Nombre Empresa' : 'Cliente'}
-                    </label>
+                    <label className="text-xs font-bold uppercase tracking-wider">Cliente</label>
                   </div>
                   <p className="text-sm font-medium pl-6">{orden.cliente}</p>
                 </div>
@@ -400,15 +412,13 @@ export default function OrdenDetalle() {
                 <div className="p-4 flex flex-col gap-1">
                   <div className="flex items-center gap-2 text-slate-500">
                     <span className="material-symbols-outlined text-[16px]">badge</span>
-                    <label className="text-xs font-bold uppercase tracking-wider">
-                      {orden.aseguradora ? 'CIF' : 'DNI / NIF'}
-                    </label>
+                    <label className="text-xs font-bold uppercase tracking-wider">Referencia</label>
                   </div>
                   <p className="text-sm font-medium pl-6">{orden.poliza || '-'}</p>
                 </div>
 
                 {/* Empresa (solo si hay) */}
-                {orden.aseguradora && (
+                {showLegacyCompany && (
                   <div className="p-4 flex flex-col gap-1">
                     <div className="flex items-center gap-2 text-slate-500">
                       <span className="material-symbols-outlined text-[16px]">business</span>
@@ -422,25 +432,16 @@ export default function OrdenDetalle() {
                   </div>
                 )}
 
-                {/* Trabajo */}
-                <div className="p-4 flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <span className="material-symbols-outlined text-[16px]">edit</span>
-                    <label className="text-xs font-bold uppercase tracking-wider">Trabajo</label>
-                  </div>
-                  <div className="pl-6">
-                    <span className="inline-flex px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 uppercase">yes</span>
-                  </div>
-                </div>
-
                 {/* Otras Órdenes */}
-                <div className="p-4 flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <span className="material-symbols-outlined text-[16px]">description</span>
-                    <label className="text-xs font-bold uppercase tracking-wider">Otras Órdenes (Vinculadas)</label>
+                {showOtherOrders && (
+                  <div className="p-4 flex flex-col gap-1">
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <span className="material-symbols-outlined text-[16px]">description</span>
+                      <label className="text-xs font-bold uppercase tracking-wider">Otras Órdenes / Notas</label>
+                    </div>
+                    <p className="text-sm font-medium pl-6 text-slate-700 dark:text-slate-300">{otherOrders}</p>
                   </div>
-                  <p className="text-sm font-medium pl-6 text-slate-700 dark:text-slate-300">{orden.otras_ordenes || '-'}</p>
-                </div>
+                )}
 
                 {/* Contacto */}
                 <div className="p-4 flex flex-col gap-1">
