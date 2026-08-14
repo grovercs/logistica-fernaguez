@@ -22,6 +22,12 @@ interface Tecnico extends TrabajadorDirectoryRow {
   telegram_chat_id?: string | null;
 }
 
+const getOrderNumber = (idLegible: string | null | undefined) => {
+  if (!idLegible) return 0;
+  const match = idLegible.match(/(\d+)$/);
+  return match ? parseInt(match[1], 10) : 0;
+};
+
 export default function Ordenes() {
   const { isEditor, isTrabajador } = useUserRole();
   const [ordenes, setOrdenes] = useState<any[]>([]);
@@ -116,15 +122,11 @@ export default function Ordenes() {
       });
 
       // Ordenación estricta por número de orden (id_legible) decreciente
-      const getOrderNumber = (idLegible: string | null) => {
-        if (!idLegible) return 0;
-        const match = idLegible.match(/(\d+)$/);
-        return match ? parseInt(match[1], 10) : 0;
-      };
       mergedData.sort((a, b) => {
         const numA = getOrderNumber(a.id_legible);
         const numB = getOrderNumber(b.id_legible);
-        return numB - numA;
+        if (numA !== numB) return numB - numA;
+        return (b.id_legible || '').localeCompare(a.id_legible || '', 'es');
       });
 
       setOrdenes(mergedData);
@@ -170,17 +172,6 @@ export default function Ordenes() {
     setTecnicos(await fetchDirectorioTecnicos());
   };
 
-  const statusPriority: Record<string, number> = {
-    'Urgente': 1,
-    'En Curso': 2,
-    'Pendiente de firma': 3,
-    'En revisión': 4,
-    'Pendiente': 5,
-    'Finalizada': 6,
-    'Cancelada': 7,
-    'Archivado': 8,
-  };
-
   const filteredOrdenes = ordenes.filter(o => {
     const searchLower = searchTerm.toLowerCase();
 
@@ -219,12 +210,10 @@ export default function Ordenes() {
 
     return matchesSearch && matchesEstado && matchesTecnico && matchesFecha;
   }).sort((a, b) => {
-    const prioA = statusPriority[a.estado] || 99;
-    const prioB = statusPriority[b.estado] || 99;
-    if (prioA !== prioB) return prioA - prioB;
-    const timeA = a.creado_en ? new Date(a.creado_en).getTime() : 0;
-    const timeB = b.creado_en ? new Date(b.creado_en).getTime() : 0;
-    return timeB - timeA;
+    const numA = getOrderNumber(a.id_legible);
+    const numB = getOrderNumber(b.id_legible);
+    if (numA !== numB) return numB - numA;
+    return (b.id_legible || '').localeCompare(a.id_legible || '', 'es');
   });
 
   const clearFilters = () => {

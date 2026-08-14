@@ -32,5 +32,10 @@ assert.match(calendarSource, /orden\.nombre_obra \|\| orden\.cliente \|\| orden\
 assert.match(calendarSource, /\(o\.nombre_obra \|\| ''\)\.toLowerCase\(\)\.includes\(lower\)/);
 assert.match(ordersSource, /orden\.nombre_obra \|\| orden\.cliente \|\| orden\.id_legible/);
 assert.match(ordersSource, /o\.nombre_obra/);
+assert.match(ordersSource, /\.order\('id_legible', \{ ascending: false, nullsFirst: false \}\)/);
+assert.match(ordersSource, /const getOrderNumber = \(idLegible: string \| null \| undefined\)/);
+assert.match(ordersSource, /const numA = getOrderNumber\(a\.id_legible\)/);
+assert.match(ordersSource, /const numB = getOrderNumber\(b\.id_legible\)/);
+assert.doesNotMatch(ordersSource, /\.order\('fecha_programada'/);
 
 console.log('order work name contract tests passed');
