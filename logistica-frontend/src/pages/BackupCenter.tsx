@@ -7,9 +7,10 @@ type MediaBackupJob = { id: string; estado: 'pending' | 'preparing' | 'downloadi
 type MediaStatusResponse = MediaBackupJob & { active_job: boolean };
 type ActiveMediaStatusResponse = (MediaBackupJob & { active_job: true }) | { active_job: null };
 type ArchiveOrder = { id: string; id_legible: string | null; cliente: string | null; aseguradora: string | null; estado: string; estado_previo: string | null; fecha_cierre: string | null; creado_en: string | null };
-type HistoricalReport = { id: string; fecha_trabajo: string | null; trabajos_realizados: string | null; tecnico_id: string | null; tecnico_nombre: string | null };
-type HistoricalOrderDetail = ArchiveOrder & { direccion: string | null; codigo_postal: string | null; localidad: string | null; poliza: string | null; reportes: HistoricalReport[] };
-type HistoricalDetailStage = 'order' | 'reports' | 'profiles' | 'transform';
+type HistoricalReport = { id: string; fecha_trabajo: string | null; horas_trabajadas: number | null; notas: string | null; trabajo_realizado: string | null; material_utilizado: string | null; fotos_urls: string[] | null; creado_en: string | null; tecnico_id: string | null; tecnico_nombre: string | null };
+type HistoricalOrderDetail = ArchiveOrder & { direccion: string | null; codigo_postal: string | null; localidad: string | null; reportes: HistoricalReport[] };
+type TrabajadorDirectoryRow = { trabajador_id: string; auth_user_id: string | null; nombre: string; apellidos: string };
+type HistoricalDetailStage = 'order' | 'reports' | 'directory' | 'transform';
 type HistoricalDetailError = { code?: string | null; message?: string | null; details?: string | null; hint?: string | null };
 const activeMediaStates: MediaBackupJob['estado'][] = ['pending', 'preparing', 'downloading', 'compressing', 'verifying'];
 const provisionalMediaJob = (): MediaBackupJob => ({ id: '', estado: 'pending', total_items: 0, processed_items: 0, failed_items: 0, total_bytes: 0, processed_bytes: 0, progreso: 0, disponibilidad: false, error_code: null, error_summary: null, created_at: null, started_at: null, finished_at: null, expires_at: null });
@@ -26,6 +27,12 @@ const logHistoricalDetailError = (stage: HistoricalDetailStage, error: unknown) 
 
 const phases = ['Verificando permisos', 'Exportando datos', 'Redactando campos sensibles', 'Generando manifiesto', 'Calculando integridad', 'Preparando descarga'];
 const formatBytes = (bytes: number) => bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toLocaleString('es-ES', { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024)).toLocaleString('es-ES')} KB`;
+const formatWorkDate = (value: string | null) => {
+  if (!value) return 'Fecha no registrada';
+  const [year, month, day] = value.slice(0, 10).split('-');
+  return year && month && day ? `${day}/${month}/${year}` : value;
+};
+const formatWorkHours = (value: number | null) => `${Number(value || 0).toLocaleString('es-ES', { maximumFractionDigits: 2 })} h`;
 const decodeSummary = (value: string): BackupSummary => {
   const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
   const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
@@ -226,23 +233,29 @@ export default function BackupCenter() {
 
       const reportsByOrderId = await supabase
         .from('reportes')
-        .select('id, orden_id, fecha_trabajo, trabajos_realizados, tecnico_id')
+        .select('id, orden_id, tecnico_id, fecha_trabajo, horas_trabajadas, notas, trabajo_realizado, material_utilizado, fotos_urls, creado_en')
         .eq('orden_id', order.id);
-      if (reportsByOrderId.error) logHistoricalDetailError('reports', reportsByOrderId.error);
+      if (reportsByOrderId.error) {
+        logHistoricalDetailError('reports', reportsByOrderId.error);
+        setArchiveError('No se pudieron cargar las intervenciones de la obra archivada. Inténtalo de nuevo.');
+      }
       const reports = reportsByOrderId.data || [];
 
-      const technicianIds = [...new Set(reports.map((report) => report.tecnico_id).filter((id): id is string => Boolean(id)))];
       const technicianNames = new Map<string, string>();
-      if (technicianIds.length) {
-        const { data: profiles, error: profilesError } = await supabase.from('perfiles').select('id, nombre_completo').in('id', technicianIds);
-        if (profilesError) logHistoricalDetailError('profiles', profilesError);
-        else profiles?.forEach((profile) => technicianNames.set(profile.id, profile.nombre_completo || 'Técnico Externo'));
+      if (reports.length) {
+        const { data: directoryRows, error: directoryError } = await supabase.rpc('get_trabajadores_directory');
+        if (directoryError) logHistoricalDetailError('directory', directoryError);
+        else (directoryRows as TrabajadorDirectoryRow[] || []).forEach((worker) => {
+          const workerName = `${worker.nombre || ''} ${worker.apellidos || ''}`.trim() || 'Técnico Externo';
+          technicianNames.set(worker.trabajador_id, workerName);
+          if (worker.auth_user_id) technicianNames.set(worker.auth_user_id, workerName);
+        });
       }
 
       try {
         const historicalReports = reports
           .map((report) => ({ ...report, tecnico_nombre: report.tecnico_id ? technicianNames.get(report.tecnico_id) || 'Técnico Externo' : 'Técnico Externo' }))
-          .sort((left, right) => (right.fecha_trabajo || '').localeCompare(left.fecha_trabajo || ''));
+          .sort((left, right) => ((left.fecha_trabajo || '').localeCompare(right.fecha_trabajo || '') || (left.creado_en || '').localeCompare(right.creado_en || '')));
         setSelectedHistoricalOrder({ ...order, codigo_postal: null, localidad: null, reportes: historicalReports });
       } catch (transformError) {
         logHistoricalDetailError('transform', transformError);
@@ -313,10 +326,24 @@ export default function BackupCenter() {
       </tbody></table>
     </div>
   </div>;
+  const historicalTotalHours = selectedHistoricalOrder?.reportes.reduce((total, report) => total + Number(report.horas_trabajadas || 0), 0) || 0;
+  const historicalReportsContent = selectedHistoricalOrder && <div className="space-y-3">
+    {selectedHistoricalOrder.reportes.length === 0 ? (
+      <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-xs italic text-slate-400 dark:border-slate-800 dark:bg-slate-800/30">No se encontraron reportes registrados para esta obra.</p>
+    ) : selectedHistoricalOrder.reportes.map((report) => (
+      <article key={report.id} className="space-y-3 rounded-lg border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/30">
+        <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs font-bold text-slate-900 dark:text-white">{formatWorkDate(report.fecha_trabajo)}</p><p className="text-[10px] font-bold uppercase text-primary">{report.tecnico_nombre}</p></div><p className="text-xs font-bold text-slate-700 dark:text-slate-200">{formatWorkHours(report.horas_trabajadas)}</p></div>
+        <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300"><p><span className="font-bold text-slate-700 dark:text-slate-200">Trabajo realizado: </span>{report.trabajo_realizado || report.notas || 'Sin descripción técnica'}</p><p><span className="font-bold text-slate-700 dark:text-slate-200">Materiales: </span>{report.material_utilizado || 'Sin materiales registrados'}</p><p><span className="font-bold text-slate-700 dark:text-slate-200">Fotos: </span>{report.fotos_urls?.length || 0} {(report.fotos_urls?.length || 0) === 1 ? 'foto' : 'fotos'}</p></div>
+      </article>
+    ))}
+  </div>;
   const historicalDetailModal = selectedHistoricalOrder && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="historical-order-title">
     <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-center justify-between rounded-t-xl border-b bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-800/50"><div><h3 id="historical-order-title" className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white"><span className="material-symbols-outlined text-primary">inventory_2</span>Resumen de Obra Histórica</h3><p className="text-xs font-bold uppercase tracking-wider text-slate-500">{selectedHistoricalOrder.id_legible}</p></div><button type="button" onClick={() => setSelectedHistoricalOrder(null)} disabled={Boolean(restoringOrderId)} className="flex size-8 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-slate-200 disabled:opacity-40 dark:hover:bg-slate-800" aria-label="Cerrar"><span className="material-symbols-outlined">close</span></button></div>
-      <div className="flex-1 space-y-8 overflow-y-auto p-8"><div className="grid grid-cols-1 gap-8 sm:grid-cols-2"><div className="space-y-4"><h4 className="border-b pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Información del Cliente</h4><div className="space-y-2"><p className="text-sm font-bold">{selectedHistoricalOrder.cliente || 'Sin nombre'}</p><p className="text-xs text-slate-500">{selectedHistoricalOrder.direccion || 'Sin dirección registrada'}</p><p className="text-xs text-slate-500">CP: {selectedHistoricalOrder.codigo_postal || '---'} | {selectedHistoricalOrder.localidad || '---'}</p></div></div><div className="space-y-4"><h4 className="border-b pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Datos Operativos</h4><div className="space-y-2 text-xs"><div className="flex justify-between gap-4"><span className="text-slate-400">Estado:</span><span className="font-bold">{selectedHistoricalOrder.estado}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Estado previo:</span><span className="font-bold">{selectedHistoricalOrder.estado_previo || 'Finalizada (legado)'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Aseguradora:</span><span className="font-bold">{selectedHistoricalOrder.aseguradora || '—'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Póliza:</span><span className="font-bold">{selectedHistoricalOrder.poliza || '—'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Cierre:</span><span className="font-bold">{selectedHistoricalOrder.fecha_cierre?.slice(0, 10) || '—'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Creada el:</span><span className="font-bold">{selectedHistoricalOrder.creado_en?.slice(0, 10) || '—'}</span></div></div></div></div><div className="space-y-4"><div className="flex items-center justify-between border-b pb-1"><h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Intervenciones Realizadas</h4><span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">{selectedHistoricalOrder.reportes.length} Reportes</span></div><div className="space-y-3">{selectedHistoricalOrder.reportes.length === 0 ? <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-xs italic text-slate-400 dark:border-slate-800 dark:bg-slate-800/30">No se encontraron reportes registrados para esta obra.</p> : selectedHistoricalOrder.reportes.map((report) => <div key={report.id} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/30"><div className="space-y-1"><p className="text-xs font-bold text-slate-900 dark:text-white">{report.fecha_trabajo || 'Fecha no registrada'}</p><p className="line-clamp-1 text-[10px] italic text-slate-500">{report.trabajos_realizados || 'Sin descripción técnica'}</p></div><p className="text-[10px] font-bold uppercase text-primary">{report.tecnico_nombre}</p></div>)}</div></div></div>
+      <div className="flex-1 space-y-8 overflow-y-auto p-8">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2"><div className="space-y-4"><h4 className="border-b pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Información del Cliente</h4><div className="space-y-2"><p className="text-sm font-bold">{selectedHistoricalOrder.cliente || 'Sin nombre'}</p><p className="text-xs text-slate-500">{selectedHistoricalOrder.direccion || 'Sin dirección registrada'}</p><p className="text-xs text-slate-500">CP: {selectedHistoricalOrder.codigo_postal || '---'} | {selectedHistoricalOrder.localidad || '---'}</p></div></div><div className="space-y-4"><h4 className="border-b pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Datos Operativos</h4><div className="space-y-2 text-xs"><div className="flex justify-between gap-4"><span className="text-slate-400">Estado:</span><span className="font-bold">{selectedHistoricalOrder.estado}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Estado previo:</span><span className="font-bold">{selectedHistoricalOrder.estado_previo || 'Finalizada (legado)'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Cliente:</span><span className="font-bold">{selectedHistoricalOrder.cliente || '—'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Cierre:</span><span className="font-bold">{selectedHistoricalOrder.fecha_cierre?.slice(0, 10) || '—'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Creada el:</span><span className="font-bold">{selectedHistoricalOrder.creado_en?.slice(0, 10) || '—'}</span></div></div></div></div>
+        <section className="space-y-4"><div className="flex items-center justify-between border-b pb-1"><h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Intervenciones Realizadas</h4><span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">{selectedHistoricalOrder.reportes.length} Reportes</span></div><p className="text-xs font-bold text-slate-700 dark:text-slate-200">Tiempo total: {formatWorkHours(historicalTotalHours)}</p>{historicalReportsContent}</section>
+      </div>
       <div className="flex items-center justify-between rounded-b-xl border-t bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-800/50"><p className="max-w-[250px] text-[10px] text-slate-400">Restaurar devolverá esta obra al circuito operativo.</p><button type="button" onClick={() => void restoreArchivedOrder(selectedHistoricalOrder.id)} disabled={Boolean(restoringOrderId) || archiveBusy} className="flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-2 text-xs font-bold text-slate-950 shadow-md transition-all hover:bg-amber-600 disabled:opacity-40"><span className="material-symbols-outlined text-lg">settings_backup_restore</span>{restoringOrderId === selectedHistoricalOrder.id ? 'RESTAURANDO...' : 'RESTAURAR AHORA'}</button></div>
     </div>
   </div>;
