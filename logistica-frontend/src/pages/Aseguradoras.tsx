@@ -3,11 +3,14 @@ import AltaAseguradoraModal from '../components/modals/AltaAseguradoraModal';
 import EditarAseguradoraModal from '../components/modals/EditarAseguradoraModal';
 import { supabase } from '../lib/supabase';
 
+const normalizeSearchTerm = (value: unknown) => String(value || '').normalize('NFKC').trim().toLocaleLowerCase('es-ES');
+
 export default function Aseguradoras() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [aseguradoraToEdit, setAseguradoraToEdit] = useState<any>(null);
   const [aseguradoras, setAseguradoras] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({
     intervencionesActivas: 0,
@@ -130,6 +133,12 @@ export default function Aseguradoras() {
       }
   };
 
+  const normalizedSearchTerm = normalizeSearchTerm(searchTerm);
+  const filteredAseguradoras = normalizedSearchTerm
+    ? aseguradoras.filter((aseguradora) => [aseguradora.nombre, aseguradora.persona_contacto, aseguradora.email]
+      .some((value) => normalizeSearchTerm(value).includes(normalizedSearchTerm)))
+    : aseguradoras;
+
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 h-full">
       {/* Header */}
@@ -183,6 +192,8 @@ export default function Aseguradoras() {
                className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border min-h-[40px] border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-primary placeholder:text-slate-400" 
                placeholder="Buscar por nombre, contacto o email..." 
                type="text"
+               value={searchTerm}
+               onChange={(event) => setSearchTerm(event.target.value)}
             />
           </div>
           <div className="flex gap-2 shrink-0 overflow-x-auto pb-1 lg:pb-0">
@@ -216,12 +227,12 @@ export default function Aseguradoras() {
                     <tr>
                        <td colSpan={5} className="text-center py-12 text-slate-400 font-bold animate-pulse">Cargando clientes...</td>
                     </tr>
-                ) : aseguradoras.length === 0 ? (
+                ) : filteredAseguradoras.length === 0 ? (
                     <tr>
                        <td colSpan={5} className="text-center py-12 text-slate-400 font-medium italic">No hay clientes registrados.</td>
                     </tr>
                 ) : (
-                    aseguradoras.map(aseguradora => (
+                    filteredAseguradoras.map(aseguradora => (
                         <tr key={aseguradora.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
                           <td className="px-4 sm:px-6 py-4">
                             <div className="flex items-center gap-3">

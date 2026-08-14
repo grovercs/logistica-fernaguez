@@ -8,9 +8,9 @@ type MediaStatusResponse = MediaBackupJob & { active_job: boolean };
 type ActiveMediaStatusResponse = (MediaBackupJob & { active_job: true }) | { active_job: null };
 type ArchiveOrder = { id: string; id_legible: string | null; cliente: string | null; aseguradora: string | null; estado: string; estado_previo: string | null; fecha_cierre: string | null; creado_en: string | null };
 type HistoricalReport = { id: string; fecha_trabajo: string | null; horas_trabajadas: number | null; notas: string | null; trabajo_realizado: string | null; material_utilizado: string | null; fotos_urls: string[] | null; creado_en: string | null; tecnico_id: string | null; tecnico_nombre: string | null };
-type HistoricalOrderDetail = ArchiveOrder & { direccion: string | null; codigo_postal: string | null; localidad: string | null; reportes: HistoricalReport[] };
+type HistoricalOrderDetail = ArchiveOrder & { direccion: string | null; reportes: HistoricalReport[] };
 type TrabajadorDirectoryRow = { trabajador_id: string; auth_user_id: string | null; nombre: string; apellidos: string };
-type HistoricalDetailStage = 'order' | 'reports' | 'directory' | 'transform';
+type HistoricalDetailStage = 'order' | 'reports' | 'directory' | 'client' | 'transform';
 type HistoricalDetailError = { code?: string | null; message?: string | null; details?: string | null; hint?: string | null };
 const activeMediaStates: MediaBackupJob['estado'][] = ['pending', 'preparing', 'downloading', 'compressing', 'verifying'];
 const provisionalMediaJob = (): MediaBackupJob => ({ id: '', estado: 'pending', total_items: 0, processed_items: 0, failed_items: 0, total_bytes: 0, processed_bytes: 0, progreso: 0, disponibilidad: false, error_code: null, error_summary: null, created_at: null, started_at: null, finished_at: null, expires_at: null });
@@ -252,14 +252,26 @@ export default function BackupCenter() {
         });
       }
 
+      let resolvedAddress = order.direccion?.trim() || null;
+      if (!resolvedAddress && order.cliente?.trim()) {
+        const { data: customer, error: customerError } = await supabase
+          .from('aseguradoras')
+          .select('direccion')
+          .eq('nombre', order.cliente)
+          .limit(1)
+          .maybeSingle();
+        if (customerError) logHistoricalDetailError('client', customerError);
+        else resolvedAddress = customer?.direccion?.trim() || null;
+      }
+
       try {
         const historicalReports = reports
           .map((report) => ({ ...report, tecnico_nombre: report.tecnico_id ? technicianNames.get(report.tecnico_id) || 'Técnico Externo' : 'Técnico Externo' }))
           .sort((left, right) => ((left.fecha_trabajo || '').localeCompare(right.fecha_trabajo || '') || (left.creado_en || '').localeCompare(right.creado_en || '')));
-        setSelectedHistoricalOrder({ ...order, codigo_postal: null, localidad: null, reportes: historicalReports });
+        setSelectedHistoricalOrder({ ...order, direccion: resolvedAddress, reportes: historicalReports });
       } catch (transformError) {
         logHistoricalDetailError('transform', transformError);
-        setSelectedHistoricalOrder({ ...order, codigo_postal: null, localidad: null, reportes: [] });
+        setSelectedHistoricalOrder({ ...order, direccion: resolvedAddress, reportes: [] });
       }
     } catch (unexpectedError) {
       logHistoricalDetailError('order', unexpectedError);
@@ -341,7 +353,7 @@ export default function BackupCenter() {
     <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-center justify-between rounded-t-xl border-b bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-800/50"><div><h3 id="historical-order-title" className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white"><span className="material-symbols-outlined text-primary">inventory_2</span>Resumen de Obra Histórica</h3><p className="text-xs font-bold uppercase tracking-wider text-slate-500">{selectedHistoricalOrder.id_legible}</p></div><button type="button" onClick={() => setSelectedHistoricalOrder(null)} disabled={Boolean(restoringOrderId)} className="flex size-8 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-slate-200 disabled:opacity-40 dark:hover:bg-slate-800" aria-label="Cerrar"><span className="material-symbols-outlined">close</span></button></div>
       <div className="flex-1 space-y-8 overflow-y-auto p-8">
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2"><div className="space-y-4"><h4 className="border-b pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Información del Cliente</h4><div className="space-y-2"><p className="text-sm font-bold">{selectedHistoricalOrder.cliente || 'Sin nombre'}</p><p className="text-xs text-slate-500">{selectedHistoricalOrder.direccion || 'Sin dirección registrada'}</p><p className="text-xs text-slate-500">CP: {selectedHistoricalOrder.codigo_postal || '---'} | {selectedHistoricalOrder.localidad || '---'}</p></div></div><div className="space-y-4"><h4 className="border-b pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Datos Operativos</h4><div className="space-y-2 text-xs"><div className="flex justify-between gap-4"><span className="text-slate-400">Estado:</span><span className="font-bold">{selectedHistoricalOrder.estado}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Estado previo:</span><span className="font-bold">{selectedHistoricalOrder.estado_previo || 'Finalizada (legado)'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Cliente:</span><span className="font-bold">{selectedHistoricalOrder.cliente || '—'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Cierre:</span><span className="font-bold">{selectedHistoricalOrder.fecha_cierre?.slice(0, 10) || '—'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Creada el:</span><span className="font-bold">{selectedHistoricalOrder.creado_en?.slice(0, 10) || '—'}</span></div></div></div></div>
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2"><div className="space-y-4"><h4 className="border-b pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Información del Cliente</h4><div className="space-y-2"><p className="text-sm font-bold">{selectedHistoricalOrder.cliente || 'Sin nombre'}</p><p className="text-xs text-slate-500">{selectedHistoricalOrder.direccion || 'Sin dirección registrada'}</p></div></div><div className="space-y-4"><h4 className="border-b pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Datos Operativos</h4><div className="space-y-2 text-xs"><div className="flex justify-between gap-4"><span className="text-slate-400">Estado:</span><span className="font-bold">{selectedHistoricalOrder.estado}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Estado previo:</span><span className="font-bold">{selectedHistoricalOrder.estado_previo || 'Finalizada (legado)'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Cliente:</span><span className="font-bold">{selectedHistoricalOrder.cliente || '—'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Cierre:</span><span className="font-bold">{selectedHistoricalOrder.fecha_cierre?.slice(0, 10) || '—'}</span></div><div className="flex justify-between gap-4"><span className="text-slate-400">Creada el:</span><span className="font-bold">{selectedHistoricalOrder.creado_en?.slice(0, 10) || '—'}</span></div></div></div></div>
         <section className="space-y-4"><div className="flex items-center justify-between border-b pb-1"><h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Intervenciones Realizadas</h4><span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">{selectedHistoricalOrder.reportes.length} Reportes</span></div><p className="text-xs font-bold text-slate-700 dark:text-slate-200">Tiempo total: {formatWorkHours(historicalTotalHours)}</p>{historicalReportsContent}</section>
       </div>
       <div className="flex items-center justify-between rounded-b-xl border-t bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-800/50"><p className="max-w-[250px] text-[10px] text-slate-400">Restaurar devolverá esta obra al circuito operativo.</p><button type="button" onClick={() => void restoreArchivedOrder(selectedHistoricalOrder.id)} disabled={Boolean(restoringOrderId) || archiveBusy} className="flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-2 text-xs font-bold text-slate-950 shadow-md transition-all hover:bg-amber-600 disabled:opacity-40"><span className="material-symbols-outlined text-lg">settings_backup_restore</span>{restoringOrderId === selectedHistoricalOrder.id ? 'RESTAURANDO...' : 'RESTAURAR AHORA'}</button></div>
