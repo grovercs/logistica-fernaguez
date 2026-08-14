@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { notifyNewOrder } from '../../lib/notifications';
 import { useUserRole } from '../../hooks/useUserRole';
+import { createOrderAssignment } from '../../lib/orderAssignments';
 
 interface TrabajadorDirectoryRow {
   trabajador_id: string;
@@ -229,7 +230,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
          direccion: formData.direccion,
          descripcion: formData.observaciones,
          estado: formData.esUrgente ? 'Urgente' : (formData.estado || 'Pendiente'),
-         tecnico_id: selectedTecnico ? (selectedTecnico.auth_user_id || selectedTecnico.id) : null,
+         tecnico_id: null,
          fecha_programada: formData.fecha,
          hora_programada: formData.hora,
          creado_en: now
@@ -240,13 +241,31 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
     if (!error && newOrder) {
        // Crear asignación oficial en la tabla de asignaciones
        if (selectedTecnico) {
-         await supabase.from('orden_asignaciones').insert({
-           orden_id: newOrder.id,
-           trabajador_id: selectedTecnico.id,
-           fecha_asignacion: formData.fecha,
-           hora_programada: formData.hora,
-           estado: 'pendiente'
-         });
+         try {
+           const assignmentResult = await createOrderAssignment({
+             orderId: newOrder.id,
+             worker: selectedTecnico,
+             fechaAsignacion: formData.fecha,
+             horaProgramada: formData.hora,
+           });
+           if (assignmentResult.legacySyncError) {
+             console.error('order_assignment_legacy_sync_failed', {
+               order_id: newOrder.id,
+               code: assignmentResult.legacySyncError.code || 'unknown',
+             });
+             alert(`La asignación de la orden ${newOrder.id_legible} se ha creado, pero no se pudo sincronizar el técnico legado.`);
+           }
+         } catch (assignmentError: any) {
+           console.error('order_assignment_create_failed', {
+             order_id: newOrder.id,
+             code: assignmentError?.code || 'unknown',
+           });
+           alert(`La orden ${newOrder.id_legible} se ha creado, pero no pudo asignarse al técnico. Abre la orden y crea la asignación manualmente.`);
+           onCreated?.();
+           onClose();
+           setLoading(false);
+           return;
+         }
        }
 
        // Notificación Telegram al técnico con el ID interno para el link
