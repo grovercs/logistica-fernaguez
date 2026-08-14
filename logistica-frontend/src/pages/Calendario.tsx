@@ -123,6 +123,7 @@ export default function Calendario() {
           id,
           id_legible,
           cliente,
+          nombre_obra,
           estado,
           direccion
         )
@@ -317,6 +318,7 @@ export default function Calendario() {
       if (searchTerm) {
         const lower = searchTerm.toLowerCase();
         if (
+          !(orden?.nombre_obra || '').toLowerCase().includes(lower) &&
           !(orden?.cliente || '').toLowerCase().includes(lower) &&
           !(orden?.id_legible || '').toLowerCase().includes(lower)
         ) return false;
@@ -373,6 +375,7 @@ export default function Calendario() {
       if (searchTerm) {
         const lower = searchTerm.toLowerCase();
         if (
+          !(o.nombre_obra || '').toLowerCase().includes(lower) &&
           !(o.cliente || '').toLowerCase().includes(lower) &&
           !(o.id_legible || '').toLowerCase().includes(lower)
         ) return false;
@@ -630,10 +633,10 @@ export default function Calendario() {
                                       navigate(`/ordenes/${rep.orden_id}`);
                                     }}
                                     className={`text-[10px] p-1.5 rounded border-l-4 font-semibold truncate cursor-pointer hover:opacity-80 transition-opacity ${getBadgeTheme(rep.ordenes?.estado)}`}
-                                    title={`${rep.ordenes?.id_legible} · ${rep.ordenes?.cliente} · ${rep.horas_trabajadas}h`}
+                                    title={`${rep.ordenes?.id_legible} · ${rep.ordenes?.nombre_obra || rep.ordenes?.cliente || rep.ordenes?.id_legible} · Cliente: ${rep.ordenes?.cliente || '—'} · ${rep.horas_trabajadas}h`}
                                  >
                                      <span className="material-symbols-outlined text-[10px] mr-0.5 align-middle">engineering</span>
-                                     {rep.ordenes?.id_legible} · {rep.ordenes?.cliente}
+                                     {rep.ordenes?.id_legible} · {rep.ordenes?.nombre_obra || rep.ordenes?.cliente || rep.ordenes?.id_legible}
                                      {rep.horas_trabajadas ? <span className="ml-1 opacity-70">({rep.horas_trabajadas}h)</span> : ''}
                                  </div>
                              ))}
@@ -646,10 +649,10 @@ export default function Calendario() {
                                       navigate(`/ordenes/${orden.id}`);
                                     }}
                                     className={`text-[10px] p-1.5 rounded border-l-4 font-semibold truncate cursor-pointer hover:shadow-sm hover:opacity-90 active:opacity-70 transition-all ${getBadgeTheme(orden.estado)}`}
-                                    title={`${orden.id_legible} - ${orden.cliente}`}
+                                    title={`${orden.id_legible} - ${orden.nombre_obra || orden.cliente || orden.id_legible} · Cliente: ${orden.cliente || '—'}`}
                                  >
                                      <span className="material-symbols-outlined text-[10px] mr-0.5 align-middle">folder_open</span>
-                                     {orden.id_legible} · {orden.cliente}
+                                     {orden.id_legible} · {orden.nombre_obra || orden.cliente || orden.id_legible}
                                  </div>
                              ))}
                          </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { notifyNewOrder } from '../lib/notifications';
 import { useUserRole } from '../hooks/useUserRole';
+import { createOrderAssignment } from '../lib/orderAssignments';
 
 interface Asignacion {
   id: string;
@@ -190,37 +191,21 @@ export default function AsignacionesSection({ ordenId, orden, onUpdate }: Props)
       }
 
       // 1. Insertamos la nueva asignación (FK apunta a trabajadores.id)
-      const insertPayload = {
-        orden_id: ordenId,
-        trabajador_id: selectedWorker.id,
-        fecha_asignacion: formFecha,
-        hora_programada: formHora,
+      const assignmentResult = await createOrderAssignment({
+        orderId: ordenId,
+        worker: selectedWorker,
+        fechaAsignacion: formFecha,
+        horaProgramada: formHora,
         notas: formNotas,
-        estado: 'pendiente'
-      };
-      console.log('[Asignacion] insertPayload:', insertPayload);
-      console.log('[Asignacion] typeof trabajador_id:', typeof insertPayload.trabajador_id, '| value:', JSON.stringify(insertPayload.trabajador_id));
-
-      const { error: assignError } = await supabase
-        .from('orden_asignaciones')
-        .insert(insertPayload);
-
-      console.log('[Asignacion] assignError:', assignError);
-      if (assignError) throw assignError;
-
-      // 2. Sincronizamos la tabla principal de ordenes (tecnico_id suele ser auth_user_id)
-      // Si la orden estaba cerrada, la reabrimos a En Curso para el nuevo tecnico
-      const updates: any = { tecnico_id: selectedWorker.auth_user_id || selectedWorker.id };
-      if (orden?.estado === 'En revisión' || orden?.estado === 'Finalizada' || orden?.estado === 'Archivado') {
-        updates.estado = 'En Curso';
+        reopenClosedOrder: orden?.estado === 'En revisión' || orden?.estado === 'Finalizada' || orden?.estado === 'Archivado',
+      });
+      if (assignmentResult.legacySyncError) {
+        console.error('assignment_legacy_sync_failed', {
+          order_id: ordenId,
+          code: assignmentResult.legacySyncError.code || 'unknown',
+        });
+        alert('La asignación se ha creado, pero no se pudo sincronizar el técnico legado.');
       }
-
-      const { error: updateError } = await supabase
-        .from('ordenes')
-        .update(updates)
-        .eq('id', ordenId);
-
-      if (updateError) throw updateError;
 
       console.log("✅ Asignación completada con éxito");
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { notifyNewOrder } from '../../lib/notifications';
 import { useUserRole } from '../../hooks/useUserRole';
+import { createOrderAssignment } from '../../lib/orderAssignments';
 
 interface TrabajadorDirectoryRow {
   trabajador_id: string;
@@ -30,6 +31,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
   const [formData, setFormData] = useState({
     referencia: '',
     cliente: '',
+    nombre_obra: '',
     cif_nif: '',
     tecnico: '',
     fecha: '',
@@ -59,7 +61,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
        fetchAseguradoras();
        fetchTareasFrecuentes();
        setFormData({
-         referencia: '', cliente: '', cif_nif: '', tecnico: '',
+         referencia: '', cliente: '', nombre_obra: '', cif_nif: '', tecnico: '',
          fecha: fechaInicial || new Date().toLocaleDateString('en-CA'),
          hora: '10:00', observaciones: '', esUrgente: false,
          asegurado: '', telefono_asegurado: '', email: '',
@@ -218,6 +220,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
          id_legible,
          cliente: formData.cliente,
          aseguradora: formData.cliente, // Usamos el nombre del cliente como aseguradora para compatibilidad
+         nombre_obra: formData.nombre_obra,
          poliza: formData.referencia,
          asegurado: formData.asegurado,
          telefono_asegurado: formData.telefono_asegurado,
@@ -227,7 +230,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
          direccion: formData.direccion,
          descripcion: formData.observaciones,
          estado: formData.esUrgente ? 'Urgente' : (formData.estado || 'Pendiente'),
-         tecnico_id: selectedTecnico ? (selectedTecnico.auth_user_id || selectedTecnico.id) : null,
+         tecnico_id: null,
          fecha_programada: formData.fecha,
          hora_programada: formData.hora,
          creado_en: now
@@ -238,13 +241,31 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
     if (!error && newOrder) {
        // Crear asignación oficial en la tabla de asignaciones
        if (selectedTecnico) {
-         await supabase.from('orden_asignaciones').insert({
-           orden_id: newOrder.id,
-           trabajador_id: selectedTecnico.id,
-           fecha_asignacion: formData.fecha,
-           hora_programada: formData.hora,
-           estado: 'pendiente'
-         });
+         try {
+           const assignmentResult = await createOrderAssignment({
+             orderId: newOrder.id,
+             worker: selectedTecnico,
+             fechaAsignacion: formData.fecha,
+             horaProgramada: formData.hora,
+           });
+           if (assignmentResult.legacySyncError) {
+             console.error('order_assignment_legacy_sync_failed', {
+               order_id: newOrder.id,
+               code: assignmentResult.legacySyncError.code || 'unknown',
+             });
+             alert(`La asignación de la orden ${newOrder.id_legible} se ha creado, pero no se pudo sincronizar el técnico legado.`);
+           }
+         } catch (assignmentError: any) {
+           console.error('order_assignment_create_failed', {
+             order_id: newOrder.id,
+             code: assignmentError?.code || 'unknown',
+           });
+           alert(`La orden ${newOrder.id_legible} se ha creado, pero no pudo asignarse al técnico. Abre la orden y crea la asignación manualmente.`);
+           onCreated?.();
+           onClose();
+           setLoading(false);
+           return;
+         }
        }
 
        // Notificación Telegram al técnico con el ID interno para el link
@@ -390,7 +411,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
               <div className="space-y-1.5 md:col-span-2">
                 <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <span className="material-symbols-outlined text-[16px] text-slate-400">corporate_fare</span>
-                  Nombre del Cliente o Empresa *
+                  CLIENTE / EMPRESA *
                 </label>
                 <input
                   type="text"
@@ -406,6 +427,21 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
                     <option key={a.id} value={a.nombre} />
                   ))}
                 </datalist>
+              </div>
+
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-slate-400">construction</span>
+                  NOMBRE DE LA OBRA
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Local Av. Castiero 15"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm font-bold"
+                  value={formData.nombre_obra || ''}
+                  onChange={(e) => setFormData({ ...formData, nombre_obra: e.target.value })}
+                />
               </div>
 
               {/* DNI / CIF y Dirección Fiscal */}
