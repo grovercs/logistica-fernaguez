@@ -570,6 +570,7 @@ RETURNS TABLE (
   horas_totales numeric,
   importe_calculado numeric,
   importe_aplicado numeric,
+  total_bonus numeric,
   total_liquidar numeric
 )
 LANGUAGE plpgsql
