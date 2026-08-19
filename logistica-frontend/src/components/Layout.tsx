@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import type { Session } from '@supabase/supabase-js';
 import {
   LayoutDashboard, Users, CalendarClock, Briefcase, UserPlus,
   Database, ClipboardList, Settings, LogOut,
@@ -7,15 +8,17 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../hooks/useTheme';
+import { useLiquidacionesAccess } from '../hooks/useLiquidacionesAccess';
 
 const Layout = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<{ nombre_completo: string; rol: string } | null>(null);
   const { isDark, toggle: toggleTheme } = useTheme();
+  const { isAllowed: canAccessLiquidaciones } = useLiquidacionesAccess();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -43,7 +46,7 @@ const Layout = () => {
           if (data) {
             setUserProfile({
               nombre_completo: data.nombre_completo || 'Usuario',
-              rol: (data.roles as any)?.nombre || 'Sin rol'
+              rol: (data.roles as { nombre: string }[] | null)?.[0]?.nombre || 'Sin rol'
             });
           }
         });
@@ -52,6 +55,7 @@ const Layout = () => {
 
   // Close sidebar on navigation (mobile)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: collapse mobile sidebar when route changes
     setIsSidebarOpen(false);
   }, [location]);
 
@@ -166,17 +170,19 @@ const Layout = () => {
               Órdenes de Trabajo
             </NavLink>
             
-            <NavLink
-              to="/liquidaciones"
-              className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`
-              }
-            >
-              <Briefcase className="w-5 h-5 mr-3" />
-              {userProfile?.rol === 'Técnico' || userProfile?.rol === 'Visualizador' ? 'Mis Liquidaciones' : 'Liquidaciones'}
-            </NavLink>
+            {canAccessLiquidaciones && (
+              <NavLink
+                to="/liquidaciones"
+                className={({ isActive }) =>
+                  `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                    isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`
+                }
+              >
+                <Briefcase className="w-5 h-5 mr-3" />
+                Liquidaciones
+              </NavLink>
+            )}
 
             {(userProfile?.rol === 'Administrador' || userProfile?.rol === 'Editor') && (
               <>
