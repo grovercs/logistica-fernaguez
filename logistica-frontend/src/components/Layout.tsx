@@ -174,6 +174,7 @@ const Layout = () => {
               <>
                 <NavLink
                   to="/liquidaciones/gestion"
+                  end
                   className={({ isActive }) =>
                     `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
                       isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
@@ -185,6 +186,7 @@ const Layout = () => {
                 </NavLink>
                 <NavLink
                   to="/liquidaciones/estadisticas"
+                  end
                   className={({ isActive }) =>
                     `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
                       isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'

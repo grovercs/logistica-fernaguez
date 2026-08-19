@@ -31,7 +31,7 @@ function App() {
           <Route path="ordenes" element={<Ordenes />} />
           <Route path="ordenes/:id" element={<OrdenDetalle />} />
           <Route path="liquidaciones" element={<RequireLiquidacionesAccess><Liquidaciones /></RequireLiquidacionesAccess>}>
-            <Route index element={<Navigate to="gestion" replace />} />
+            <Route index element={<Navigate to="estadisticas" replace />} />
             <Route path="gestion" element={<LiquidacionesGestion />} />
             <Route path="estadisticas" element={<LiquidacionesEstadisticas />} />
           </Route>
