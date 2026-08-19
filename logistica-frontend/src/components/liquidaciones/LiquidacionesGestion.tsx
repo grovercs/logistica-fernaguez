@@ -9,6 +9,7 @@ interface Liquidacion {
   estado: 'abierta' | 'cerrada';
   horas_totales: number;
   tarifa_hora: number | null;
+  usar_tarifa_puntual: boolean;
   importe_calculado: number;
   importe_manual: number | null;
   importe_aplicado: number;
@@ -143,6 +144,7 @@ export default function LiquidacionesGestion() {
       estado: row.estado as 'abierta' | 'cerrada',
       horas_totales: (row.horas_totales as number | null) ?? 0,
       tarifa_hora: (row.tarifa_hora as number | null) ?? null,
+      usar_tarifa_puntual: (row.usar_tarifa_puntual as boolean) ?? false,
       importe_calculado: (row.importe_calculado as number | null) ?? 0,
       importe_manual: (row.importe_manual as number | null) ?? null,
       importe_aplicado: (row.importe_aplicado as number | null) ?? 0,
@@ -248,7 +250,7 @@ export default function LiquidacionesGestion() {
   };
 
   const handleCerrar = async (id: string) => {
-    if (!window.confirm('¿Cerrar la liquidación? Una vez cerrada no podrá editarse.')) return;
+    if (!window.confirm('¿Cerrar la liquidación? Podrás reabrirla más tarde si es necesario.')) return;
     const { error: rpcError } = await supabase.rpc('admin_cerrar_liquidacion', {
       p_liquidacion_id: id,
     });
@@ -258,6 +260,32 @@ export default function LiquidacionesGestion() {
     }
     setEditingId(null);
     await fetchLiquidaciones();
+  };
+
+  const handleReabrir = async (id: string) => {
+    if (!window.confirm('¿Reabrir la liquidación? Volverá a ser editable.')) return;
+    const { error: rpcError } = await supabase.rpc('admin_reabrir_liquidacion', {
+      p_liquidacion_id: id,
+    });
+    if (rpcError) {
+      alert(parseErrorMessage(rpcError));
+      return;
+    }
+    await fetchLiquidaciones();
+  };
+
+  const handleActualizarTarifaHabitual = async (trabajadorId: string, tarifa: number) => {
+    const { error: rpcError } = await supabase.rpc('admin_actualizar_tarifa_hora_trabajador', {
+      p_trabajador_id: trabajadorId,
+      p_tarifa_hora: tarifa,
+    });
+    if (rpcError) {
+      alert(parseErrorMessage(rpcError));
+      return false;
+    }
+    await fetchTrabajadores();
+    await fetchLiquidaciones();
+    return true;
   };
 
   const toggleEditRow = (id: string) => {
@@ -449,13 +477,21 @@ export default function LiquidacionesGestion() {
                               >
                                 <span className="material-symbols-outlined">{editingId === l.id ? 'expand_less' : 'edit'}</span>
                               </button>
-                              {l.estado === 'abierta' && (
+                              {l.estado === 'abierta' ? (
                                 <button
                                   onClick={() => handleCerrar(l.id)}
                                   className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
                                   title="Cerrar liquidación"
                                 >
                                   <span className="material-symbols-outlined">lock</span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleReabrir(l.id)}
+                                  className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                                  title="Reabrir liquidación"
+                                >
+                                  <span className="material-symbols-outlined">lock_open</span>
                                 </button>
                               )}
                             </div>
@@ -465,7 +501,7 @@ export default function LiquidacionesGestion() {
                           <tr key={`${l.id}-edit`}>
                             <td colSpan={11} className="px-5 py-4 bg-slate-50/70 dark:bg-slate-800/30">
                               <EditRowPanel
-                                key={l.id}
+                                key={`${l.id}-${l.actualizado_en}`}
                                 liquidacion={l}
                                 trabajadores={trabajadores}
                                 sessionBonus={sessionBonusMap[l.id] || []}
@@ -473,6 +509,8 @@ export default function LiquidacionesGestion() {
                                 onSaved={fetchLiquidaciones}
                                 onRecalcular={handleRecalcular}
                                 onCerrar={handleCerrar}
+                                onReabrir={handleReabrir}
+                                onActualizarTarifaHabitual={handleActualizarTarifaHabitual}
                               />
                             </td>
                           </tr>
@@ -559,28 +597,42 @@ interface EditRowPanelProps {
   onSaved: () => Promise<void>;
   onRecalcular: (id: string) => Promise<void>;
   onCerrar: (id: string) => Promise<void>;
+  onReabrir: (id: string) => Promise<void>;
+  onActualizarTarifaHabitual: (trabajadorId: string, tarifa: number) => Promise<boolean>;
 }
 
 function EditRowPanel({
   liquidacion,
+  trabajadores,
   sessionBonus,
   onUpdateBonusMap,
   onSaved,
   onRecalcular,
   onCerrar,
+  onReabrir,
+  onActualizarTarifaHabitual,
 }: EditRowPanelProps) {
   const isOpen = liquidacion.estado === 'abierta';
 
+  const trabajador = useMemo(() => trabajadores.find(t => t.id === liquidacion.trabajador_id), [trabajadores, liquidacion.trabajador_id]);
+
+  const [usarTarifaPuntual, setUsarTarifaPuntual] = useState(liquidacion.usar_tarifa_puntual);
   const [tarifaHora, setTarifaHora] = useState<string>(liquidacion.tarifa_hora?.toString() || '');
   const [useManualImporte, setUseManualImporte] = useState(liquidacion.importe_manual != null);
   const [importeManual, setImporteManual] = useState<string>(liquidacion.importe_manual?.toString() || '');
   const [importeNomina, setImporteNomina] = useState<string>(liquidacion.importe_nomina?.toString() || '');
   const [observaciones, setObservaciones] = useState(liquidacion.observaciones || '');
   const [saveLoading, setSaveLoading] = useState(false);
+  const [isTarifaModalOpen, setIsTarifaModalOpen] = useState(false);
+  const [tarifaHabitualInput, setTarifaHabitualInput] = useState('');
 
   const [newBonusConcepto, setNewBonusConcepto] = useState('');
   const [newBonusImporte, setNewBonusImporte] = useState('');
   const [newBonusOrdenId, setNewBonusOrdenId] = useState('');
+
+  // El panel se re-monta mediante key=`${l.id}-${l.actualizado_en}` para reflejar
+  // los datos actualizados tras recalcular/guardar, por lo que los useState iniciales
+  // siempre parten de la liquidación más reciente.
 
   const handleGuardar = async () => {
     setSaveLoading(true);
@@ -612,6 +664,7 @@ function EditRowPanel({
     const { error: rpcError } = await supabase.rpc('admin_update_liquidacion', {
       p_liquidacion_id: liquidacion.id,
       p_tarifa_hora: tarifaParsed.value,
+      p_usar_tarifa_puntual: usarTarifaPuntual,
       p_set_importe_manual: true,
       p_importe_manual: manualParsed.value,
       p_importe_nomina: nominaParsed.value === null ? 0 : nominaParsed.value,
@@ -750,16 +803,39 @@ function EditRowPanel({
         <>
           {/* Editable fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tarifa / hora</label>
+            <div className="space-y-1 lg:col-span-1">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tarifa / hora</label>
+                <button
+                  onClick={() => { setIsTarifaModalOpen(true); setTarifaHabitualInput(''); }}
+                  className="text-[10px] font-bold text-primary hover:text-primary/80 underline"
+                  title="Editar tarifa habitual del trabajador"
+                >
+                  Editar habitual
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id={`tarifa-puntual-${liquidacion.id}`}
+                  checked={usarTarifaPuntual}
+                  onChange={e => setUsarTarifaPuntual(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                />
+                <label htmlFor={`tarifa-puntual-${liquidacion.id}`} className="text-sm text-slate-700 dark:text-slate-300">Usar tarifa puntual</label>
+              </div>
               <input
                 type="number"
                 step="0.01"
                 value={tarifaHora}
+                disabled={!usarTarifaPuntual}
                 onChange={e => setTarifaHora(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none"
-                placeholder="Automático"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none disabled:opacity-50"
+                placeholder={usarTarifaPuntual ? 'Tarifa puntual' : 'Tarifa capturada'}
               />
+              {!usarTarifaPuntual && (
+                <p className="text-[11px] text-slate-400">Usa la tarifa capturada al generar la liquidación.</p>
+              )}
             </div>
 
             <div className="space-y-1 sm:col-span-2">
@@ -916,13 +992,72 @@ function EditRowPanel({
               onClick={() => onCerrar(liquidacion.id)}
               className="px-4 py-2 text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
             >
-              Cerrar liquidación
+              Cerrar
             </button>
           </div>
+
+          {/* Modal: editar tarifa habitual del trabajador */}
+          {isTarifaModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+              <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-xl shadow-2xl overflow-hidden">
+                <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Tarifa habitual del trabajador</h3>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm">
+                    {trabajador ? `${trabajador.nombre} ${trabajador.apellidos || ''}`.trim() : 'Trabajador'}
+                  </p>
+                </div>
+                <div className="p-5 space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nueva tarifa / hora habitual (€)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={tarifaHabitualInput}
+                      onChange={e => setTarifaHabitualInput(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Esta tarifa se aplicará a las nuevas liquidaciones que se generen. Las liquidaciones existentes no se verán afectadas.
+                  </p>
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <button
+                      onClick={() => setIsTarifaModalOpen(false)}
+                      className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const parsed = parseNumericInput(tarifaHabitualInput);
+                        if (parsed.error || parsed.value === null) {
+                          alert(parsed.error || 'Introduce una tarifa válida.');
+                          return;
+                        }
+                        const ok = await onActualizarTarifaHabitual(liquidacion.trabajador_id, parsed.value);
+                        if (ok) setIsTarifaModalOpen(false);
+                      }}
+                      className="px-4 py-2 text-sm font-bold bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors"
+                    >
+                      Guardar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       ) : (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 p-4 rounded-xl text-sm">
-          Liquidación cerrada. Solo lectura.
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 p-4 rounded-xl text-sm flex items-center justify-between">
+          <span>Liquidación cerrada. Solo lectura.</span>
+          <button
+            onClick={() => onReabrir(liquidacion.id)}
+            className="px-3 py-1.5 text-xs font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60 rounded-lg transition-colors"
+          >
+            Reabrir
+          </button>
         </div>
       )}
     </div>
