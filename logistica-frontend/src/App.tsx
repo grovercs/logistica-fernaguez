@@ -8,6 +8,7 @@ import OrdenDetalle from './pages/OrdenDetalle';
 import Liquidaciones from './pages/Liquidaciones';
 import LiquidacionesGestion from './components/liquidaciones/LiquidacionesGestion';
 import LiquidacionesEstadisticas from './components/liquidaciones/LiquidacionesEstadisticas';
+import LiquidacionPrintView from './components/liquidaciones/LiquidacionPrintView';
 import RequireLiquidacionesAccess from './components/RequireLiquidacionesAccess';
 import Aseguradoras from './pages/Aseguradoras';
 import Trabajadores from './pages/Trabajadores';
@@ -34,6 +35,7 @@ function App() {
             <Route index element={<Navigate to="estadisticas" replace />} />
             <Route path="gestion" element={<LiquidacionesGestion />} />
             <Route path="estadisticas" element={<LiquidacionesEstadisticas />} />
+            <Route path=":id/imprimir" element={<LiquidacionPrintView />} />
           </Route>
 
           {/* Rutas protegidas: solo Admin y Editor */}
