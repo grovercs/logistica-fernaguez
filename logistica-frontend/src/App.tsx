@@ -6,6 +6,7 @@ import Calendario from './pages/Calendario';
 import Ordenes from './pages/Ordenes';
 import OrdenDetalle from './pages/OrdenDetalle';
 import Liquidaciones from './pages/Liquidaciones';
+import RequireLiquidacionesAccess from './components/RequireLiquidacionesAccess';
 import Aseguradoras from './pages/Aseguradoras';
 import Trabajadores from './pages/Trabajadores';
 import Login from './pages/Login';
@@ -27,7 +28,7 @@ function App() {
           <Route path="calendario" element={<Calendario />} />
           <Route path="ordenes" element={<Ordenes />} />
           <Route path="ordenes/:id" element={<OrdenDetalle />} />
-          <Route path="liquidaciones" element={<RequireRole allowedRoles={['Administrador', 'Editor']}><Liquidaciones /></RequireRole>} />
+          <Route path="liquidaciones" element={<RequireLiquidacionesAccess><Liquidaciones /></RequireLiquidacionesAccess>} />
 
           {/* Rutas protegidas: solo Admin y Editor */}
           <Route path="trabajadores" element={<RequireRole allowedRoles={['Administrador', 'Editor']}><Trabajadores /></RequireRole>} />

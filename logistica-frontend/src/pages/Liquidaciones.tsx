@@ -1,65 +1,62 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import * as XLSX from 'xlsx';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface Reporte {
+interface Liquidacion {
   id: string;
-  orden_id: string;
-  tecnico_id: string;
-  horas_trabajadas: number;
-  creado_en: string;
-  fecha_trabajo: string | null;
-  estado_liquidacion: string;
-  ordenes: { id_legible: string; cliente: string; estado: string } | null;
-  perfiles: { nombre_completo: string; tarifa_hora: number } | null;
+  trabajador_id: string;
+  periodo: string;
+  estado: 'abierta' | 'cerrada';
+  horas_totales: number;
+  tarifa_hora: number | null;
+  importe_calculado: number;
+  importe_manual: number | null;
+  importe_aplicado: number;
+  total_bonus: number;
+  importe_nomina: number | null;
+  total_liquidar: number;
+  observaciones: string | null;
+  abierta_en: string;
+  cerrada_en: string | null;
+  actualizado_en: string;
 }
 
-interface LiquidacionReporteRpcRow {
-  reporte_id: string;
-  orden_id: string;
-  tecnico_id: string;
-  horas_trabajadas: number | null;
-  creado_en: string;
-  fecha_trabajo: string | null;
-  estado_liquidacion: string | null;
-  id_legible: string | null;
-  cliente: string | null;
-  estado_orden: string | null;
-  nombre_completo: string;
-  tarifa_hora: number;
+// Bonus mantenido en sesión actual. El backend V1 no expone aún una RPC de lectura
+// de bonus individuales; ver GAP documentado en el plan.
+interface SessionBonus {
+  id: string;
+  liquidacion_id: string;
+  concepto: string;
+  importe: number;
+  orden_id: string | null;
+  isNew: boolean;
+  isDeleted?: boolean;
 }
 
-type TabType = 'obra' | 'trabajador' | 'global';
+interface TrabajadorOption {
+  id: string;
+  nombre: string;
+  apellidos: string | null;
+  auth_user_id: string | null;
+  especialidad: string | null;
+  estado: string;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const fmtCurrency = (n: number) =>
-  new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n);
-
-const formatWorkDate = (fechaTrabajo: string | null) => {
-  const match = fechaTrabajo?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return 'Fecha no informada';
-
-  const [, year, month, day] = match;
-  // fecha_trabajo is a calendar date, not a UTC timestamp. Formatting in UTC
-  // prevents a browser timezone from moving the displayed day.
-  return new Intl.DateTimeFormat('es-ES', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))));
+const fmtCurrency = (n: number | null | undefined) => {
+  if (n == null) return '-';
+  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n);
 };
 
-const isFutureWorkDate = (fechaTrabajo: string | null) => {
-  if (!fechaTrabajo) return false;
-  const today = new Date();
-  const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  return fechaTrabajo > localToday;
+const fmtNumber = (n: number | null | undefined, decimals = 2) => {
+  if (n == null) return '-';
+  return n.toFixed(decimals);
 };
 
-const sortByWorkDateDesc = (a: Reporte, b: Reporte) =>
-  (b.fecha_trabajo || '').localeCompare(a.fecha_trabajo || '');
+const periodoLabel = (periodo: string) => {
+  const [year, month] = periodo.split('-');
+  return `${month}/${year}`;
+};
 
 const getInitials = (name: string) =>
   name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
@@ -71,182 +68,205 @@ const AVATAR_COLORS = [
 ];
 const avatarColor = (name: string) => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
 
+const parseErrorMessage = (error: { message?: string } | null | undefined): string => {
+  const msg = error?.message || '';
+  if (msg.includes('TRABAJADOR_AUTH_NOT_LINKED')) return 'El trabajador no tiene usuario vinculado.';
+  if (msg.includes('LIQUIDACION_ALREADY_EXISTS')) return 'Ya existe una liquidación para este trabajador y periodo.';
+  if (msg.includes('FORBIDDEN')) return 'No tienes permiso para realizar esta acción.';
+  if (msg.includes('AUTH_REQUIRED')) return 'Debes iniciar sesión para continuar.';
+  if (msg.includes('LIQUIDACION_NOT_FOUND')) return 'Liquidación no encontrada.';
+  if (msg.includes('LIQUIDACION_ALREADY_CLOSED')) return 'La liquidación ya está cerrada.';
+  return msg || 'Ocurrió un error inesperado.';
+};
+
+const monthInputToPeriodo = (monthValue: string): string | null => {
+  if (!monthValue) return null;
+  return `${monthValue}-01`;
+};
+
+const todayMonthInput = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+// Parsea un input numérico. Devuelve null solo si el string está vacío.
+// Rechaza NaN. Permite 0.
+const parseNumericInput = (value: string): { value: number | null; error?: string } => {
+  const trimmed = value.trim();
+  if (trimmed === '') return { value: null };
+  const parsed = Number(trimmed);
+  if (Number.isNaN(parsed)) return { value: null, error: `Valor numérico no válido: "${value}"` };
+  return { value: parsed };
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Liquidaciones() {
-  const [tab, setTab] = useState<TabType>('obra');
-  const [reportes, setReportes] = useState<Reporte[]>([]);
-  const [perfilesMap, setPerfilesMap] = useState<Record<string, { nombre: string; tarifa: number }>>({});
+  const [liquidaciones, setLiquidaciones] = useState<Liquidacion[]>([]);
+  const [trabajadores, setTrabajadores] = useState<TrabajadorOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Filters
-  const [desde, setDesde] = useState('');
-  const [hasta, setHasta] = useState('');
   const [trabajadorFilter, setTrabajadorFilter] = useState('');
-  const [obraFilter, setObraFilter] = useState('');
-  const [estadoFilter, setEstadoFilter] = useState('');
+  const [periodoFilter, setPeriodoFilter] = useState('');
+  const [estadoFilter, setEstadoFilter] = useState<'' | 'abierta' | 'cerrada'>('');
 
-  useEffect(() => { fetchData(); }, []);
+  // Create modal
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createTrabajadorId, setCreateTrabajadorId] = useState('');
+  const [createPeriodoInput, setCreatePeriodoInput] = useState(todayMonthInput());
+  const [createLoading, setCreateLoading] = useState(false);
 
-  const fetchData = async () => {
-    setLoading(true);
+  // Expanded editing row
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [sessionBonusMap, setSessionBonusMap] = useState<Record<string, SessionBonus[]>>({});
 
-    const { data, error } = await supabase
-      .rpc('get_liquidaciones_reportes');
+  const fetchLiquidaciones = useCallback(async () => {
+    const { data, error: rpcError } = await supabase.rpc('admin_get_liquidaciones', {
+      p_trabajador_id: null,
+      p_periodo: null,
+      p_estado: null,
+      p_limit: 200,
+      p_offset: 0,
+    });
 
-    if (!error && data) {
-      const merged: Reporte[] = (data as LiquidacionReporteRpcRow[])
-          .filter(row => row.estado_orden !== 'Archivado')
-          .map(row => ({
-        id: row.reporte_id,
-        orden_id: row.orden_id,
-        tecnico_id: row.tecnico_id,
-        horas_trabajadas: row.horas_trabajadas ?? 0,
-        creado_en: row.creado_en,
-        fecha_trabajo: row.fecha_trabajo,
-        estado_liquidacion: row.estado_liquidacion ?? 'Pendiente',
-        ordenes: {
-          id_legible: row.id_legible ?? '',
-          cliente: row.cliente ?? '',
-          estado: row.estado_orden ?? '',
-        },
-        perfiles: {
-          nombre_completo: row.nombre_completo || 'Desconocido',
-          tarifa_hora: row.tarifa_hora ?? 0,
-        },
-      }));
-
-      setReportes(merged);
-
-      // Build worker filter dropdown map
-      const map: Record<string, { nombre: string; tarifa: number }> = {};
-      merged.forEach(r => {
-        if (r.tecnico_id && r.perfiles?.nombre_completo) {
-          map[r.tecnico_id] = { nombre: r.perfiles.nombre_completo, tarifa: r.perfiles.tarifa_hora || 0 };
-        }
-      });
-      setPerfilesMap(map);
-    } else if (error) {
-      console.error('Error loading liquidation reports:', error.message);
+    if (rpcError) {
+      setError(parseErrorMessage(rpcError));
+      return;
     }
 
-    setLoading(false);
+    const rows = (data || []) as Record<string, unknown>[];
+    const mapped: Liquidacion[] = rows.map(row => ({
+      id: row.id as string,
+      trabajador_id: row.trabajador_id as string,
+      periodo: row.periodo as string,
+      estado: row.estado as 'abierta' | 'cerrada',
+      horas_totales: (row.horas_totales as number | null) ?? 0,
+      tarifa_hora: (row.tarifa_hora as number | null) ?? null,
+      importe_calculado: (row.importe_calculado as number | null) ?? 0,
+      importe_manual: (row.importe_manual as number | null) ?? null,
+      importe_aplicado: (row.importe_aplicado as number | null) ?? 0,
+      total_bonus: (row.total_bonus as number | null) ?? 0,
+      importe_nomina: (row.importe_nomina as number | null) ?? null,
+      total_liquidar: (row.total_liquidar as number | null) ?? 0,
+      observaciones: (row.observaciones as string | null) ?? null,
+      abierta_en: row.abierta_en as string,
+      cerrada_en: (row.cerrada_en as string | null) ?? null,
+      actualizado_en: row.actualizado_en as string,
+    }));
+
+    setLiquidaciones(mapped);
+  }, []);
+
+  const fetchTrabajadores = useCallback(async () => {
+    const { data, error: rpcError } = await supabase.rpc('get_trabajadores_directory');
+    if (rpcError) {
+      console.error('Error loading trabajadores directory:', rpcError);
+      return;
+    }
+    const rows = (data || []) as Record<string, unknown>[];
+    const mapped: TrabajadorOption[] = rows
+      .filter(row => row.estado !== 'Baja')
+      .map(row => ({
+        id: row.trabajador_id as string,
+        nombre: (row.nombre as string) || '',
+        apellidos: (row.apellidos as string | null) || null,
+        auth_user_id: (row.auth_user_id as string | null) || null,
+        especialidad: (row.especialidad as string | null) || null,
+        estado: (row.estado as string) || '',
+      }))
+      .sort((a, b) => `${a.nombre} ${a.apellidos || ''}`.localeCompare(`${b.nombre} ${b.apellidos || ''}`));
+
+    setTrabajadores(mapped);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      await Promise.all([fetchLiquidaciones(), fetchTrabajadores()]);
+      if (mounted) setLoading(false);
+    };
+    load();
+    return () => { mounted = false; };
+  }, [fetchLiquidaciones, fetchTrabajadores]);
+
+  const trabajadorName = (id: string) => {
+    const t = trabajadores.find(x => x.id === id);
+    if (!t) return 'Desconocido';
+    return `${t.nombre} ${t.apellidos || ''}`.trim();
   };
 
-  // ─── Filtered data ───────────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    return reportes
-      .filter(r => {
-        // Liquidation periods are based on the day worked, never the audit timestamp.
-        if (desde && (!r.fecha_trabajo || r.fecha_trabajo < desde)) return false;
-        if (hasta && (!r.fecha_trabajo || r.fecha_trabajo > hasta)) return false;
-        if (trabajadorFilter && r.tecnico_id !== trabajadorFilter) return false;
-        if (obraFilter) {
-          const q = obraFilter.toLowerCase();
-          const ref = r.ordenes?.id_legible?.toLowerCase() || '';
-          const obra = r.ordenes?.cliente?.toLowerCase() || '';
-          if (!ref.includes(q) && !obra.includes(q)) return false;
-        }
-        if (estadoFilter && r.estado_liquidacion !== estadoFilter) return false;
-        return true;
-      })
-      .sort(sortByWorkDateDesc);
-  }, [reportes, desde, hasta, trabajadorFilter, obraFilter, estadoFilter]);
-
-  // ─── Aggregations ─────────────────────────────────────────────────────────
-  const totalHoras = filtered.reduce((s, r) => s + (r.horas_trabajadas || 0), 0);
-  const totalCoste = filtered.reduce((s, r) => s + (r.horas_trabajadas || 0) * (r.perfiles?.tarifa_hora || 0), 0);
-
-  // Group by obra
-  const byObra = useMemo(() => {
-    const m: Record<string, Reporte[]> = {};
-    filtered.forEach(r => {
-      const key = r.ordenes?.id_legible || r.orden_id;
-      if (!m[key]) m[key] = [];
-      m[key].push(r);
+    return liquidaciones.filter(l => {
+      if (trabajadorFilter && l.trabajador_id !== trabajadorFilter) return false;
+      if (periodoFilter && l.periodo !== periodoFilter) return false;
+      if (estadoFilter && l.estado !== estadoFilter) return false;
+      return true;
     });
-    return m;
-  }, [filtered]);
+  }, [liquidaciones, trabajadorFilter, periodoFilter, estadoFilter]);
 
-  // Group by worker
-  const byWorker = useMemo(() => {
-    const m: Record<string, { nombre: string; tarifa: number; reportes: Reporte[] }> = {};
-    filtered.forEach(r => {
-      const key = r.tecnico_id;
-      if (!m[key]) m[key] = { nombre: r.perfiles?.nombre_completo || 'Desconocido', tarifa: r.perfiles?.tarifa_hora || 0, reportes: [] };
-      m[key].reportes.push(r);
+  const handleGenerar = async () => {
+    if (!createTrabajadorId) {
+      alert('Selecciona un trabajador.');
+      return;
+    }
+    const periodo = monthInputToPeriodo(createPeriodoInput);
+    if (!periodo) {
+      alert('Selecciona un periodo válido.');
+      return;
+    }
+
+    setCreateLoading(true);
+    const { error: rpcError } = await supabase.rpc('admin_generar_liquidacion', {
+      p_trabajador_id: createTrabajadorId,
+      p_periodo: periodo,
     });
-    return m;
-  }, [filtered]);
+    setCreateLoading(false);
 
-  // ─── Actions ─────────────────────────────────────────────────────────────
-  const toggleEstado = async (id: string, current: string) => {
-    const next = current === 'Procesada' ? 'Pendiente' : 'Procesada';
-    await supabase.from('reportes').update({ estado_liquidacion: next }).eq('id', id);
-    setReportes(prev => prev.map(r => r.id === id ? { ...r, estado_liquidacion: next } : r));
+    if (rpcError) {
+      alert(parseErrorMessage(rpcError));
+      return;
+    }
+
+    await fetchLiquidaciones();
+    setIsCreateOpen(false);
+    setCreateTrabajadorId('');
+    setCreatePeriodoInput(todayMonthInput());
   };
 
-  const exportToExcel = () => {
-    const wb = XLSX.utils.book_new();
-
-    // Sheet 1: Raw data
-    const rawData = filtered.map((r, i) => ({
-      'Nº': i + 1,
-      'Referencia': r.ordenes?.id_legible || '-',
-      'Obra': r.ordenes?.cliente || '-',
-      'Fecha Intervención': formatWorkDate(r.fecha_trabajo),
-      'Trabajador': r.perfiles?.nombre_completo || '-',
-      'Horas': r.horas_trabajadas || 0,
-      'Tarifa €/h': r.perfiles?.tarifa_hora || 0,
-      'Subtotal (€)': ((r.horas_trabajadas || 0) * (r.perfiles?.tarifa_hora || 0)).toFixed(2),
-      'Estado': r.estado_liquidacion || 'Pendiente',
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rawData), 'Datos Completos');
-
-    // Sheet 2: Per worker summary
-    const workerData = Object.values(byWorker).map(w => ({
-      'Trabajador': w.nombre,
-      'Tarifa €/h': w.tarifa,
-      'Total Horas': w.reportes.reduce((s, r) => s + (r.horas_trabajadas || 0), 0).toFixed(2),
-      'Total €': (w.reportes.reduce((s, r) => s + (r.horas_trabajadas || 0), 0) * w.tarifa).toFixed(2),
-      'Intervenciones': w.reportes.length,
-      'Procesadas': w.reportes.filter(r => r.estado_liquidacion === 'Procesada').length,
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(workerData), 'Por Trabajador');
-
-    // Sheet 3: Per obra summary
-    const obraData = Object.entries(byObra).map(([ref, rs]) => ({
-      'Referencia': ref,
-      'Obra': rs[0]?.ordenes?.cliente || '-',
-      'Estado Orden': rs[0]?.ordenes?.estado || '-',
-      'Total Horas': rs.reduce((s, r) => s + (r.horas_trabajadas || 0), 0).toFixed(2),
-      'Total Coste €': rs.reduce((s, r) => s + (r.horas_trabajadas || 0) * (r.perfiles?.tarifa_hora || 0), 0).toFixed(2),
-      'Intervenciones': rs.length,
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(obraData), 'Por Obra');
-
-    XLSX.writeFile(wb, `Liquidaciones_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  const handleRecalcular = async (id: string) => {
+    const { error: rpcError } = await supabase.rpc('admin_recalcular_liquidacion', {
+      p_liquidacion_id: id,
+    });
+    if (rpcError) {
+      alert(parseErrorMessage(rpcError));
+      return;
+    }
+    await fetchLiquidaciones();
   };
 
-  // ─── UI ──────────────────────────────────────────────────────────────────
-  const tabs: { key: TabType; label: string; icon: string }[] = [
-    { key: 'obra', label: 'Por Obra', icon: 'construction' },
-    { key: 'trabajador', label: 'Por Trabajador', icon: 'engineering' },
-    { key: 'global', label: 'Global', icon: 'bar_chart' },
-  ];
+  const handleCerrar = async (id: string) => {
+    if (!window.confirm('¿Cerrar la liquidación? Una vez cerrada no podrá editarse.')) return;
+    const { error: rpcError } = await supabase.rpc('admin_cerrar_liquidacion', {
+      p_liquidacion_id: id,
+    });
+    if (rpcError) {
+      alert(parseErrorMessage(rpcError));
+      return;
+    }
+    setEditingId(null);
+    await fetchLiquidaciones();
+  };
 
-  const EstadoBadge = ({ estado, id }: { estado: string; id: string }) => (
-    <button
-      onClick={() => toggleEstado(id, estado)}
-      title="Clic para cambiar estado"
-      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer transition-all hover:scale-105 ${
-        estado === 'Procesada'
-          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-          : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
-      }`}
-    >
-      {estado === 'Procesada' ? '✓ Procesada' : '⏳ Pendiente'}
-    </button>
-  );
+  const toggleEditRow = (id: string) => {
+    setEditingId(prev => (prev === id ? null : id));
+  };
+
+  // ─── Summary cards ──────────────────────────────────────────────────────────
+  const totalHoras = filtered.reduce((s, l) => s + (l.horas_totales || 0), 0);
+  const totalLiquidar = filtered.reduce((s, l) => s + (l.total_liquidar || 0), 0);
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 h-full">
@@ -254,51 +274,61 @@ export default function Liquidaciones() {
       <header className="h-16 flex-shrink-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 sticky top-0 z-10 w-full backdrop-blur-md">
         <h2 className="text-xl font-bold">Liquidaciones</h2>
         <div className="flex items-center gap-3">
-          <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg transition-colors shadow-sm">
-            <span className="material-symbols-outlined text-lg">table_view</span>
-            Exportar Excel
-          </button>
-          <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
-            <span className="material-symbols-outlined">notifications</span>
+          <button
+            onClick={() => setIsCreateOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
+          >
+            <span className="material-symbols-outlined text-lg">add</span>
+            Nueva liquidación
           </button>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-5 max-w-7xl mx-auto w-full">
-
         {/* Filters */}
         <section className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Desde</label>
-              <input value={desde} onChange={e => setDesde(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none" type="date" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hasta</label>
-              <input value={hasta} onChange={e => setHasta(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none" type="date" />
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Trabajador</label>
-              <select value={trabajadorFilter} onChange={e => setTrabajadorFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none">
+              <select
+                value={trabajadorFilter}
+                onChange={e => setTrabajadorFilter(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none"
+              >
                 <option value="">Todos los trabajadores</option>
-                {Object.entries(perfilesMap).map(([id, { nombre }]) => (
-                  <option key={id} value={id}>{nombre}</option>
+                {trabajadores.map(t => (
+                  <option key={t.id} value={t.id}>{`${t.nombre} ${t.apellidos || ''}`.trim()}</option>
                 ))}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Obra / Referencia</label>
-              <input value={obraFilter} onChange={e => setObraFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none" placeholder="Ej: OT-2023-0041" type="text" />
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Periodo</label>
+              <input
+                type="month"
+                value={periodoFilter ? periodoFilter.slice(0, 7) : ''}
+                onChange={e => {
+                  const v = e.target.value;
+                  setPeriodoFilter(v ? `${v}-01` : '');
+                }}
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none"
+              />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estado Pago</label>
-              <select value={estadoFilter} onChange={e => setEstadoFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estado</label>
+              <select
+                value={estadoFilter}
+                onChange={e => setEstadoFilter(e.target.value as '' | 'abierta' | 'cerrada')}
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none"
+              >
                 <option value="">Todos</option>
-                <option value="Pendiente">Pendiente</option>
-                <option value="Procesada">Procesada</option>
+                <option value="abierta">Abierta</option>
+                <option value="cerrada">Cerrada</option>
               </select>
             </div>
-            <button onClick={() => { setDesde(''); setHasta(''); setTrabajadorFilter(''); setObraFilter(''); setEstadoFilter(''); }} className="h-10 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-1.5">
+            <button
+              onClick={() => { setTrabajadorFilter(''); setPeriodoFilter(''); setEstadoFilter(''); }}
+              className="h-10 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-1.5"
+            >
               <span className="material-symbols-outlined text-sm">filter_alt_off</span>
               Limpiar
             </button>
@@ -308,12 +338,12 @@ export default function Liquidaciones() {
         {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Intervenciones</p>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Liquidaciones</p>
             <div className="flex items-baseline gap-1.5">
               <span className="text-2xl font-black">{filtered.length}</span>
               <span className="text-sm text-slate-400">registros</span>
             </div>
-            <p className="text-[10px] text-slate-400 mt-1">{filtered.filter(r => r.estado_liquidacion === 'Procesada').length} procesadas</p>
+            <p className="text-[10px] text-slate-400 mt-1">{filtered.filter(l => l.estado === 'cerrada').length} cerradas · {filtered.filter(l => l.estado === 'abierta').length} abiertas</p>
           </div>
           <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Total Horas</p>
@@ -321,249 +351,580 @@ export default function Liquidaciones() {
               <span className="text-2xl font-black">{totalHoras.toFixed(1)}</span>
               <span className="text-sm font-bold uppercase">horas</span>
             </div>
-            <p className="text-[10px] text-slate-400 mt-1">Suma de todas las intervenciones</p>
           </div>
           <div className="bg-primary p-5 rounded-xl shadow-lg shadow-primary/20 text-white relative overflow-hidden">
             <div className="relative z-10">
-              <p className="text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1">Total Coste Mano de Obra</p>
-              <span className="text-2xl font-black">{fmtCurrency(totalCoste)}</span>
-              <p className="text-[10px] text-white/60 mt-1">Basado en tarifas por trabajador</p>
+              <p className="text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1">Total a Liquidar</p>
+              <span className="text-2xl font-black">{fmtCurrency(totalLiquidar)}</span>
             </div>
             <span className="material-symbols-outlined absolute -right-4 -bottom-4 text-[90px] opacity-10 leading-none">account_balance_wallet</span>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-fit">
-          {tabs.map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                tab === t.key
-                  ? 'bg-white dark:bg-slate-900 text-primary shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
-            >
-              <span className="material-symbols-outlined text-base">{t.icon}</span>
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {/* Error */}
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 p-4 rounded-xl text-sm">
+            {error}
+          </div>
+        )}
 
-        {/* Tab Content */}
+        {/* Table */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
-            <p className="text-slate-400 font-medium">Cargando datos de liquidaciones...</p>
+            <p className="text-slate-400 font-medium">Cargando liquidaciones...</p>
           </div>
         ) : (
-          <>
-            {/* ── TAB: POR OBRA ─────────────────────────────────────────── */}
-            {tab === 'obra' && (
-              <div className="space-y-6">
-                {Object.keys(byObra).length === 0 ? (
-                  <div className="text-center py-16 text-slate-400 italic">No hay intervenciones que coincidan con los filtros.</div>
-                ) : (
-                  Object.entries(byObra).map(([ref, rs]) => {
-                    const obraHoras = rs.reduce((s, r) => s + (r.horas_trabajadas || 0), 0);
-                    const obraCoste = rs.reduce((s, r) => s + (r.horas_trabajadas || 0) * (r.perfiles?.tarifa_hora || 0), 0);
-                    return (
-                      <div key={ref} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                        {/* Obra header */}
-                        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-800/30">
-                          <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">construction</span>
-                            <div>
-                              <span className="font-bold text-primary">{ref}</span>
-                              <span className="text-slate-600 dark:text-slate-400 font-medium"> — {rs[0]?.ordenes?.cliente}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm">
-                            <span className="text-slate-500">{obraHoras.toFixed(1)} h</span>
-                            <span className="font-bold text-slate-800 dark:text-white">{fmtCurrency(obraCoste)}</span>
-                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${rs[0]?.ordenes?.estado === 'Completada' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                              {rs[0]?.ordenes?.estado || 'Activa'}
-                            </span>
-                          </div>
-                        </div>
-                        {/* Table */}
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left text-sm min-w-[700px]">
-                            <thead>
-                              <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
-                                <th className="px-6 py-3">Trabajador</th>
-                                <th className="px-6 py-3">Fecha</th>
-                                <th className="px-6 py-3 text-center">Horas</th>
-                                <th className="px-6 py-3 text-right">Tarifa</th>
-                                <th className="px-6 py-3 text-right">Subtotal</th>
-                                <th className="px-6 py-3 text-center">Estado</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                              {rs.map(r => (
-                                <tr key={r.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
-                                  <td className="px-6 py-3.5">
-                                    <div className="flex items-center gap-2.5">
-                                      <div className={`size-7 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 ${avatarColor(r.perfiles?.nombre_completo || '')}`}>
-                                        {getInitials(r.perfiles?.nombre_completo || '?')}
-                                      </div>
-                                      <span className="font-medium">{r.perfiles?.nombre_completo || 'Desconocido'}</span>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-3.5 text-slate-500">
-                                    {formatWorkDate(r.fecha_trabajo)}
-                                    {isFutureWorkDate(r.fecha_trabajo) && (
-                                      <span className="ml-2 text-[10px] font-bold text-amber-600" title="Review the work date">Fecha de trabajo futura</span>
-                                    )}
-                                  </td>
-                                  <td className="px-6 py-3.5 text-center font-bold">{(r.horas_trabajadas || 0).toFixed(1)}</td>
-                                  <td className="px-6 py-3.5 text-right text-slate-500">{fmtCurrency(r.perfiles?.tarifa_hora || 0)}</td>
-                                  <td className="px-6 py-3.5 text-right font-bold">{fmtCurrency((r.horas_trabajadas || 0) * (r.perfiles?.tarifa_hora || 0))}</td>
-                                  <td className="px-6 py-3.5 text-center">
-                                    <EstadoBadge estado={r.estado_liquidacion || 'Pendiente'} id={r.id} />
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-
-            {/* ── TAB: POR TRABAJADOR ───────────────────────────────────── */}
-            {tab === 'trabajador' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                {Object.keys(byWorker).length === 0 ? (
-                  <div className="col-span-3 text-center py-16 text-slate-400 italic">No hay intervenciones que coincidan con los filtros.</div>
-                ) : (
-                  Object.entries(byWorker).map(([tid, w]) => {
-                    const ttlH = w.reportes.reduce((s, r) => s + (r.horas_trabajadas || 0), 0);
-                    const ttlE = ttlH * w.tarifa;
-                    const procesadas = w.reportes.filter(r => r.estado_liquidacion === 'Procesada').length;
-                    return (
-                      <div key={tid} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 space-y-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`size-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${avatarColor(w.nombre)}`}>
-                            {getInitials(w.nombre)}
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900 dark:text-white">{w.nombre}</p>
-                            <p className="text-xs text-slate-400">{fmtCurrency(w.tarifa)}/h · {w.reportes.length} intervenciones</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 text-center">
-                            <p className="text-[10px] text-slate-400 uppercase font-bold">Horas</p>
-                            <p className="text-lg font-black text-primary">{ttlH.toFixed(1)}</p>
-                          </div>
-                          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 text-center">
-                            <p className="text-[10px] text-slate-400 uppercase font-bold">Total</p>
-                            <p className="text-lg font-black">{fmtCurrency(ttlE)}</p>
-                          </div>
-                          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 text-center">
-                            <p className="text-[10px] text-slate-400 uppercase font-bold">Obras</p>
-                            <p className="text-lg font-black">{new Set(w.reportes.map(r => r.orden_id)).size}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-1.5">
-                            <span className="size-2 rounded-full bg-emerald-500"></span>
-                            <span className="text-slate-500">{procesadas} procesadas</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="size-2 rounded-full bg-amber-500"></span>
-                            <span className="text-slate-500">{w.reportes.length - procesadas} pendientes</span>
-                          </div>
-                        </div>
-                        {/* Breakdown list */}
-                        <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-2 max-h-48 overflow-y-auto">
-                          {w.reportes.map(r => (
-                            <div key={r.id} className="flex items-center justify-between gap-2 text-xs">
-                              <span className="text-slate-500 truncate flex-1">{r.ordenes?.id_legible || '-'} · {formatWorkDate(r.fecha_trabajo)}</span>
-                              <span className="font-bold shrink-0">{(r.horas_trabajadas || 0).toFixed(1)}h</span>
-                              <EstadoBadge estado={r.estado_liquidacion || 'Pendiente'} id={r.id} />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-
-            {/* ── TAB: GLOBAL ───────────────────────────────────────────── */}
-            {tab === 'global' && (
-              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm min-w-[900px]">
-                    <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
-                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Trabajador</th>
-                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Referencia</th>
-                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Obra</th>
-                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
-                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Horas</th>
-                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Tarifa</th>
-                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Subtotal</th>
-                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                      {filtered.length === 0 ? (
-                        <tr><td colSpan={8} className="px-5 py-12 text-center text-slate-400 italic">No hay registros que coincidan.</td></tr>
-                      ) : (
-                        filtered.map(r => (
-                          <tr key={r.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
-                            <td className="px-5 py-3.5">
-                              <div className="flex items-center gap-2">
-                                <div className={`size-6 rounded-full flex items-center justify-center font-bold text-[9px] shrink-0 ${avatarColor(r.perfiles?.nombre_completo || '')}`}>
-                                  {getInitials(r.perfiles?.nombre_completo || '?')}
-                                </div>
-                                <span className="font-medium">{r.perfiles?.nombre_completo || 'Desconocido'}</span>
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm min-w-[900px]">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+                    <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Trabajador</th>
+                    <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Periodo</th>
+                    <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Estado</th>
+                    <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Horas</th>
+                    <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Tarifa/h</th>
+                    <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Importe calculado</th>
+                    <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Importe aplicado</th>
+                    <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Bonus</th>
+                    <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Nómina</th>
+                    <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Total</th>
+                    <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={11} className="px-5 py-12 text-center text-slate-400 italic">
+                        No hay liquidaciones que coincidan con los filtros.
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map(l => (
+                      <>
+                        <tr key={l.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-2">
+                              <div className={`size-6 rounded-full flex items-center justify-center font-bold text-[9px] shrink-0 ${avatarColor(trabajadorName(l.trabajador_id))}`}>
+                                {getInitials(trabajadorName(l.trabajador_id))}
                               </div>
-                            </td>
-                            <td className="px-5 py-3.5 text-primary font-medium">{r.ordenes?.id_legible || '-'}</td>
-                            <td className="px-5 py-3.5 text-slate-600 dark:text-slate-400 max-w-[180px] truncate">{r.ordenes?.cliente || '-'}</td>
-                            <td className="px-5 py-3.5 text-slate-500 whitespace-nowrap">
-                              {formatWorkDate(r.fecha_trabajo)}
-                              {isFutureWorkDate(r.fecha_trabajo) && (
-                                <span className="ml-2 text-[10px] font-bold text-amber-600" title="Review the work date">Fecha de trabajo futura</span>
+                              <span className="font-medium">{trabajadorName(l.trabajador_id)}</span>
+                            </div>
+                          </td>
+                          <td className="px-5 py-3.5 text-slate-600 dark:text-slate-400">{periodoLabel(l.periodo)}</td>
+                          <td className="px-5 py-3.5 text-center">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+                              l.estado === 'cerrada'
+                                ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+                            }`}>
+                              {l.estado === 'cerrada' ? 'Cerrada' : 'Abierta'}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-center font-bold">{fmtNumber(l.horas_totales, 1)}</td>
+                          <td className="px-5 py-3.5 text-right text-slate-500">{fmtCurrency(l.tarifa_hora)}</td>
+                          <td className="px-5 py-3.5 text-right text-slate-500">{fmtCurrency(l.importe_calculado)}</td>
+                          <td className="px-5 py-3.5 text-right">
+                            <div className="flex flex-col items-end">
+                              <span className="font-bold">{fmtCurrency(l.importe_aplicado)}</span>
+                              <span className={`text-[10px] font-bold ${
+                                l.importe_manual == null
+                                  ? 'text-emerald-600'
+                                  : 'text-blue-600'
+                              }`}>
+                                {l.importe_manual == null ? 'AUTO' : 'MANUAL'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-5 py-3.5 text-right font-bold">{fmtCurrency(l.total_bonus)}</td>
+                          <td className="px-5 py-3.5 text-right text-slate-500">{fmtCurrency(l.importe_nomina)}</td>
+                          <td className="px-5 py-3.5 text-right font-black text-primary">{fmtCurrency(l.total_liquidar)}</td>
+                          <td className="px-5 py-3.5 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => toggleEditRow(l.id)}
+                                className="p-1.5 text-slate-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                                title={editingId === l.id ? 'Ocultar detalle' : 'Editar'}
+                              >
+                                <span className="material-symbols-outlined">{editingId === l.id ? 'expand_less' : 'edit'}</span>
+                              </button>
+                              {l.estado === 'abierta' && (
+                                <button
+                                  onClick={() => handleCerrar(l.id)}
+                                  className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
+                                  title="Cerrar liquidación"
+                                >
+                                  <span className="material-symbols-outlined">lock</span>
+                                </button>
                               )}
-                            </td>
-                            <td className="px-5 py-3.5 text-center font-bold">{(r.horas_trabajadas || 0).toFixed(1)}</td>
-                            <td className="px-5 py-3.5 text-right text-slate-500">{fmtCurrency(r.perfiles?.tarifa_hora || 0)}</td>
-                            <td className="px-5 py-3.5 text-right font-bold">{fmtCurrency((r.horas_trabajadas || 0) * (r.perfiles?.tarifa_hora || 0))}</td>
-                            <td className="px-5 py-3.5 text-center">
-                              <EstadoBadge estado={r.estado_liquidacion || 'Pendiente'} id={r.id} />
+                            </div>
+                          </td>
+                        </tr>
+                        {editingId === l.id && (
+                          <tr key={`${l.id}-edit`}>
+                            <td colSpan={11} className="px-5 py-4 bg-slate-50/70 dark:bg-slate-800/30">
+                              <EditRowPanel
+                                key={l.id}
+                                liquidacion={l}
+                                trabajadores={trabajadores}
+                                sessionBonus={sessionBonusMap[l.id] || []}
+                                onUpdateBonusMap={next => setSessionBonusMap(prev => ({ ...prev, [l.id]: next }))}
+                                onSaved={fetchLiquidaciones}
+                                onRecalcular={handleRecalcular}
+                                onCerrar={handleCerrar}
+                              />
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                    {filtered.length > 0 && (
-                      <tfoot>
-                        <tr className="bg-slate-50 dark:bg-slate-800/50 border-t-2 border-slate-200 dark:border-slate-700 font-bold">
-                          <td className="px-5 py-4 text-sm" colSpan={4}>Total ({filtered.length} registros)</td>
-                          <td className="px-5 py-4 text-center text-primary">{totalHoras.toFixed(1)}</td>
-                          <td></td>
-                          <td className="px-5 py-4 text-right text-primary">{fmtCurrency(totalCoste)}</td>
-                          <td></td>
-                        </tr>
-                      </tfoot>
-                    )}
-                  </table>
-                </div>
-              </div>
-            )}
-          </>
+                        )}
+                      </>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
       </div>
+
+      {/* Create Modal */}
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Nueva liquidación</h3>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">Generar liquidación por trabajador y mes</p>
+              </div>
+              <button
+                onClick={() => setIsCreateOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Trabajador</label>
+                <select
+                  value={createTrabajadorId}
+                  onChange={e => setCreateTrabajadorId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none"
+                >
+                  <option value="">Selecciona un trabajador</option>
+                  {trabajadores.map(t => (
+                    <option key={t.id} value={t.id}>{`${t.nombre} ${t.apellidos || ''}`.trim()}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Periodo</label>
+                <input
+                  type="month"
+                  value={createPeriodoInput}
+                  onChange={e => setCreatePeriodoInput(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none"
+                />
+              </div>
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setIsCreateOpen(false)}
+                  className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleGenerar}
+                  disabled={createLoading || !createTrabajadorId || !createPeriodoInput}
+                  className="px-4 py-2 text-sm font-bold bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-lg transition-colors"
+                >
+                  {createLoading ? 'Generando...' : 'Generar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Edit Row Panel ───────────────────────────────────────────────────────────
+interface EditRowPanelProps {
+  liquidacion: Liquidacion;
+  trabajadores: TrabajadorOption[];
+  sessionBonus: SessionBonus[];
+  onUpdateBonusMap: (bonus: SessionBonus[]) => void;
+  onSaved: () => Promise<void>;
+  onRecalcular: (id: string) => Promise<void>;
+  onCerrar: (id: string) => Promise<void>;
+}
+
+function EditRowPanel({
+  liquidacion,
+  sessionBonus,
+  onUpdateBonusMap,
+  onSaved,
+  onRecalcular,
+  onCerrar,
+}: EditRowPanelProps) {
+  const isOpen = liquidacion.estado === 'abierta';
+
+  const [tarifaHora, setTarifaHora] = useState<string>(liquidacion.tarifa_hora?.toString() || '');
+  const [useManualImporte, setUseManualImporte] = useState(liquidacion.importe_manual != null);
+  const [importeManual, setImporteManual] = useState<string>(liquidacion.importe_manual?.toString() || '');
+  const [importeNomina, setImporteNomina] = useState<string>(liquidacion.importe_nomina?.toString() || '');
+  const [observaciones, setObservaciones] = useState(liquidacion.observaciones || '');
+  const [saveLoading, setSaveLoading] = useState(false);
+
+  const [newBonusConcepto, setNewBonusConcepto] = useState('');
+  const [newBonusImporte, setNewBonusImporte] = useState('');
+  const [newBonusOrdenId, setNewBonusOrdenId] = useState('');
+
+  const handleGuardar = async () => {
+    setSaveLoading(true);
+
+    const tarifaParsed = parseNumericInput(tarifaHora);
+    if (tarifaParsed.error) {
+      setSaveLoading(false);
+      alert(tarifaParsed.error);
+      return;
+    }
+
+    let manualParsed: ReturnType<typeof parseNumericInput> = { value: null };
+    if (useManualImporte) {
+      manualParsed = parseNumericInput(importeManual);
+      if (manualParsed.error || manualParsed.value === null) {
+        setSaveLoading(false);
+        alert(manualParsed.error || 'El importe manual es obligatorio cuando está activado.');
+        return;
+      }
+    }
+
+    const nominaParsed = parseNumericInput(importeNomina);
+    if (nominaParsed.error) {
+      setSaveLoading(false);
+      alert(nominaParsed.error);
+      return;
+    }
+
+    const { error: rpcError } = await supabase.rpc('admin_update_liquidacion', {
+      p_liquidacion_id: liquidacion.id,
+      p_tarifa_hora: tarifaParsed.value,
+      p_set_importe_manual: true,
+      p_importe_manual: manualParsed.value,
+      p_importe_nomina: nominaParsed.value === null ? 0 : nominaParsed.value,
+      p_set_observaciones: true,
+      p_observaciones: observaciones || null,
+    });
+
+    if (rpcError) {
+      setSaveLoading(false);
+      alert(parseErrorMessage(rpcError));
+      return;
+    }
+
+    await onSaved();
+    setSaveLoading(false);
+  };
+
+  const handleAgregarBonus = async () => {
+    if (!newBonusConcepto.trim()) {
+      alert('El concepto del bonus es obligatorio.');
+      return;
+    }
+    const bonusParsed = parseNumericInput(newBonusImporte);
+    if (bonusParsed.error || bonusParsed.value === null) {
+      alert(bonusParsed.error || 'El importe del bonus es obligatorio.');
+      return;
+    }
+    const importe = bonusParsed.value;
+
+    const { data, error: rpcError } = await supabase.rpc('admin_agregar_bonus', {
+      p_liquidacion_id: liquidacion.id,
+      p_concepto: newBonusConcepto.trim(),
+      p_importe: importe,
+      p_orden_id: newBonusOrdenId || null,
+    });
+
+    if (rpcError) {
+      alert(parseErrorMessage(rpcError));
+      return;
+    }
+
+    const bonusId = (data as { bonus_id: string }[] | null)?.[0]?.bonus_id;
+    if (bonusId) {
+      const nuevo: SessionBonus = {
+        id: bonusId,
+        liquidacion_id: liquidacion.id,
+        concepto: newBonusConcepto.trim(),
+        importe,
+        orden_id: newBonusOrdenId || null,
+        isNew: true,
+      };
+      onUpdateBonusMap([...sessionBonus, nuevo]);
+    }
+
+    setNewBonusConcepto('');
+    setNewBonusImporte('');
+    setNewBonusOrdenId('');
+    await onSaved();
+  };
+
+  const handleUpdateBonus = async (bonus: SessionBonus) => {
+    const concepto = bonus.concepto.trim();
+    if (!concepto) {
+      alert('El concepto del bonus es obligatorio.');
+      return;
+    }
+    if (bonus.importe < 0) {
+      alert('El importe del bonus debe ser mayor o igual a 0.');
+      return;
+    }
+
+    const { error: rpcError } = await supabase.rpc('admin_update_liquidacion_bonus', {
+      p_bonus_id: bonus.id,
+      p_set_concepto: true,
+      p_concepto: concepto,
+      p_set_importe: true,
+      p_importe: bonus.importe,
+      p_set_orden_id: bonus.orden_id !== undefined,
+      p_orden_id: bonus.orden_id || null,
+    });
+
+    if (rpcError) {
+      alert(parseErrorMessage(rpcError));
+      return;
+    }
+
+    await onSaved();
+  };
+
+  const handleEliminarBonus = async (bonusId: string) => {
+    if (!window.confirm('¿Eliminar este bonus?')) return;
+    const { error: rpcError } = await supabase.rpc('admin_eliminar_bonus', {
+      p_bonus_id: bonusId,
+    });
+    if (rpcError) {
+      alert(parseErrorMessage(rpcError));
+      return;
+    }
+    onUpdateBonusMap(sessionBonus.filter(b => b.id !== bonusId));
+    await onSaved();
+  };
+
+  const updateSessionBonusField = (id: string, field: keyof SessionBonus, value: unknown) => {
+    onUpdateBonusMap(sessionBonus.map(b => (b.id === id ? { ...b, [field]: value } : b)));
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Breakdown */}
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">Desglose</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="space-y-1">
+            <p className="text-xs text-slate-500">Horas × tarifa</p>
+            <p className="font-bold text-slate-900 dark:text-slate-100">
+              {fmtNumber(liquidacion.horas_totales, 1)} × {fmtCurrency(liquidacion.tarifa_hora)} = {fmtCurrency(liquidacion.importe_calculado)}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-slate-500">Importe aplicado</p>
+            <p className="font-bold text-slate-900 dark:text-slate-100">{fmtCurrency(liquidacion.importe_aplicado)}</p>
+            <p className="text-[10px] font-bold text-slate-400">{liquidacion.importe_manual == null ? 'Automático' : 'Manual'}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-slate-500">Total a liquidar</p>
+            <p className="text-xl font-black text-primary">{fmtCurrency(liquidacion.total_liquidar)}</p>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500">
+          <span>+ Bonus: <strong className="text-slate-700 dark:text-slate-300">{fmtCurrency(liquidacion.total_bonus)}</strong></span>
+          <span>- Nómina: <strong className="text-slate-700 dark:text-slate-300">{fmtCurrency(liquidacion.importe_nomina)}</strong></span>
+        </div>
+      </div>
+
+      {isOpen ? (
+        <>
+          {/* Editable fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tarifa / hora</label>
+              <input
+                type="number"
+                step="0.01"
+                value={tarifaHora}
+                onChange={e => setTarifaHora(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none"
+                placeholder="Automático"
+              />
+            </div>
+
+            <div className="space-y-1 sm:col-span-2">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Importe manual</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id={`manual-${liquidacion.id}`}
+                  checked={useManualImporte}
+                  onChange={e => {
+                    const checked = e.target.checked;
+                    setUseManualImporte(checked);
+                    if (!checked) setImporteManual('');
+                  }}
+                  className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                />
+                <label htmlFor={`manual-${liquidacion.id}`} className="text-sm text-slate-700 dark:text-slate-300">Usar importe manual</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={importeManual}
+                  disabled={!useManualImporte}
+                  onChange={e => setImporteManual(e.target.value)}
+                  className="flex-1 min-w-[120px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none disabled:opacity-50"
+                  placeholder={useManualImporte ? 'Importe' : 'Automático'}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nómina</label>
+              <input
+                type="number"
+                step="0.01"
+                value={importeNomina}
+                onChange={e => setImporteNomina(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Observaciones</label>
+            <textarea
+              value={observaciones}
+              onChange={e => setObservaciones(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm p-3 focus:ring-2 focus:ring-primary outline-none min-h-[80px]"
+              placeholder="Notas internas..."
+            />
+          </div>
+
+          {/* Bonus section */}
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Bonus de esta sesión</p>
+              <p className="text-xs text-slate-400">Los bonus históricos no están disponibles hasta resolver el GAP de backend.</p>
+            </div>
+
+            {sessionBonus.length > 0 && (
+              <div className="space-y-2">
+                {sessionBonus.map(b => (
+                  <div key={b.id} className="flex flex-wrap items-end gap-2">
+                    <input
+                      type="text"
+                      value={b.concepto}
+                      onChange={e => updateSessionBonusField(b.id, 'concepto', e.target.value)}
+                      className="flex-1 min-w-[150px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-9 px-3 focus:ring-2 focus:ring-primary outline-none"
+                      placeholder="Concepto"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={b.importe}
+                      onChange={e => updateSessionBonusField(b.id, 'importe', parseFloat(e.target.value) || 0)}
+                      className="w-28 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-9 px-3 focus:ring-2 focus:ring-primary outline-none"
+                      placeholder="Importe"
+                    />
+                    <input
+                      type="text"
+                      value={b.orden_id || ''}
+                      onChange={e => updateSessionBonusField(b.id, 'orden_id', e.target.value || null)}
+                      className="w-40 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-9 px-3 focus:ring-2 focus:ring-primary outline-none"
+                      placeholder="Orden ID (opcional)"
+                    />
+                    <button
+                      onClick={() => handleUpdateBonus(b)}
+                      className="p-2 text-slate-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                      title="Guardar cambios"
+                    >
+                      <span className="material-symbols-outlined">save</span>
+                    </button>
+                    <button
+                      onClick={() => handleEliminarBonus(b.id)}
+                      className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      title="Eliminar bonus"
+                    >
+                      <span className="material-symbols-outlined">delete</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <input
+                type="text"
+                value={newBonusConcepto}
+                onChange={e => setNewBonusConcepto(e.target.value)}
+                className="flex-1 min-w-[150px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-9 px-3 focus:ring-2 focus:ring-primary outline-none"
+                placeholder="Nuevo concepto"
+              />
+              <input
+                type="number"
+                step="0.01"
+                value={newBonusImporte}
+                onChange={e => setNewBonusImporte(e.target.value)}
+                className="w-28 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-9 px-3 focus:ring-2 focus:ring-primary outline-none"
+                placeholder="Importe"
+              />
+              <input
+                type="text"
+                value={newBonusOrdenId}
+                onChange={e => setNewBonusOrdenId(e.target.value)}
+                className="w-40 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-9 px-3 focus:ring-2 focus:ring-primary outline-none"
+                placeholder="Orden ID (opcional)"
+              />
+              <button
+                onClick={handleAgregarBonus}
+                className="px-3 py-2 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                Añadir bonus
+              </button>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+            <button
+              onClick={() => onRecalcular(liquidacion.id)}
+              className="px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm align-middle mr-1">replay</span>
+              Recalcular
+            </button>
+            <button
+              onClick={handleGuardar}
+              disabled={saveLoading}
+              className="px-4 py-2 text-sm font-bold bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-lg transition-colors"
+            >
+              {saveLoading ? 'Guardando...' : 'Guardar cambios'}
+            </button>
+            <button
+              onClick={() => onCerrar(liquidacion.id)}
+              className="px-4 py-2 text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+            >
+              Cerrar liquidación
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 p-4 rounded-xl text-sm">
+          Liquidación cerrada. Solo lectura.
+        </div>
+      )}
     </div>
   );
 }
