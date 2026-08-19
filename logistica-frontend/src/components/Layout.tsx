@@ -46,7 +46,7 @@ const Layout = () => {
           if (data) {
             setUserProfile({
               nombre_completo: data.nombre_completo || 'Usuario',
-              rol: (data.roles as { nombre: string }[] | null)?.[0]?.nombre || 'Sin rol'
+              rol: (data.roles as unknown as { nombre: string } | null)?.nombre || 'Sin rol'
             });
           }
         });
