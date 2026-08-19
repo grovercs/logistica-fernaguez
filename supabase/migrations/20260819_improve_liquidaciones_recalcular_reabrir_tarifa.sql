@@ -4,7 +4,7 @@
 --
 -- Ajustes:
 --   1. Añade flag usar_tarifa_puntual en liquidaciones.
---   2. Actualiza admin_get_liquidaciones para devolver el flag.
+--   2. Actualiza admin_get_liquidaciones para devolver el flag y actualizado_en.
 --   3. Actualiza admin_generar_liquidacion para inicializar el flag.
 --   4. Actualiza admin_update_liquidacion para permitir cambiar el flag
 --      y la tarifa puntual.
@@ -27,8 +27,13 @@ COMMENT ON COLUMN public.liquidaciones.usar_tarifa_puntual IS
   'TRUE = la tarifa_hora de esta liquidación es una tarifa puntual editada manualmente. FALSE = usa la tarifa capturada al generar (habitual del trabajador en ese momento).';
 
 -- ---------------------------------------------------------------------------
--- 2. Listado: devolver usar_tarifa_puntual
+-- 2. Listado: devolver usar_tarifa_puntual y actualizado_en
 -- ---------------------------------------------------------------------------
+-- CREATE OR REPLACE FUNCTION no permite cambiar el tipo de retorno (RETURNS TABLE).
+-- Eliminamos primero la función antigua para evitar dejar una versión incompatible.
+DROP FUNCTION IF EXISTS public.admin_get_liquidaciones(
+  uuid, date, text, integer, integer
+);
 
 CREATE OR REPLACE FUNCTION public.admin_get_liquidaciones(
   p_trabajador_id uuid DEFAULT NULL,
@@ -53,7 +58,8 @@ RETURNS TABLE (
   total_liquidar numeric,
   observaciones text,
   abierta_en timestamptz,
-  cerrada_en timestamptz
+  cerrada_en timestamptz,
+  actualizado_en timestamptz
 )
 LANGUAGE plpgsql
 STABLE
@@ -86,7 +92,8 @@ BEGIN
     l.total_liquidar,
     l.observaciones,
     l.abierta_en,
-    l.cerrada_en
+    l.cerrada_en,
+    l.actualizado_en
   FROM public.liquidaciones AS l
   WHERE (p_trabajador_id IS NULL OR l.trabajador_id = p_trabajador_id)
     AND (p_periodo IS NULL OR l.periodo = p_periodo)
@@ -219,6 +226,14 @@ GRANT EXECUTE ON FUNCTION public.admin_generar_liquidacion(uuid, date)
 -- ---------------------------------------------------------------------------
 -- 4. Actualizar liquidación: permitir cambiar flag y tarifa puntual
 -- ---------------------------------------------------------------------------
+-- Eliminamos ambas firmas posibles de la versión anterior para evitar
+-- sobrecargas incompatibles.
+DROP FUNCTION IF EXISTS public.admin_update_liquidacion(
+  uuid, numeric, boolean, numeric, numeric, boolean, text
+);
+DROP FUNCTION IF EXISTS public.admin_update_liquidacion(
+  uuid, numeric, boolean, boolean, numeric, numeric, boolean, text
+);
 
 CREATE OR REPLACE FUNCTION public.admin_update_liquidacion(
   p_liquidacion_id uuid,
