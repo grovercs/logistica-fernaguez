@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import RequireRole from './components/RequireRole';
 import Dashboard from './pages/Dashboard';
@@ -6,6 +6,8 @@ import Calendario from './pages/Calendario';
 import Ordenes from './pages/Ordenes';
 import OrdenDetalle from './pages/OrdenDetalle';
 import Liquidaciones from './pages/Liquidaciones';
+import LiquidacionesGestion from './components/liquidaciones/LiquidacionesGestion';
+import LiquidacionesEstadisticas from './components/liquidaciones/LiquidacionesEstadisticas';
 import RequireLiquidacionesAccess from './components/RequireLiquidacionesAccess';
 import Aseguradoras from './pages/Aseguradoras';
 import Trabajadores from './pages/Trabajadores';
@@ -28,7 +30,11 @@ function App() {
           <Route path="calendario" element={<Calendario />} />
           <Route path="ordenes" element={<Ordenes />} />
           <Route path="ordenes/:id" element={<OrdenDetalle />} />
-          <Route path="liquidaciones" element={<RequireLiquidacionesAccess><Liquidaciones /></RequireLiquidacionesAccess>} />
+          <Route path="liquidaciones" element={<RequireLiquidacionesAccess><Liquidaciones /></RequireLiquidacionesAccess>}>
+            <Route index element={<Navigate to="gestion" replace />} />
+            <Route path="gestion" element={<LiquidacionesGestion />} />
+            <Route path="estadisticas" element={<LiquidacionesEstadisticas />} />
+          </Route>
 
           {/* Rutas protegidas: solo Admin y Editor */}
           <Route path="trabajadores" element={<RequireRole allowedRoles={['Administrador', 'Editor']}><Trabajadores /></RequireRole>} />

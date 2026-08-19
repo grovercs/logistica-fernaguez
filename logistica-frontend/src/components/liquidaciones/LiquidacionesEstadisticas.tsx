@@ -1,0 +1,563 @@
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { supabase } from '../../lib/supabase';
+import * as XLSX from 'xlsx';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface Reporte {
+  id: string;
+  orden_id: string;
+  tecnico_id: string;
+  horas_trabajadas: number;
+  creado_en: string;
+  fecha_trabajo: string | null;
+  estado_liquidacion: string;
+  ordenes: { id_legible: string; cliente: string; estado: string } | null;
+  perfiles: { nombre_completo: string; tarifa_hora: number } | null;
+}
+
+interface LiquidacionReporteRpcRow {
+  reporte_id: string;
+  orden_id: string;
+  tecnico_id: string;
+  horas_trabajadas: number | null;
+  creado_en: string;
+  fecha_trabajo: string | null;
+  estado_liquidacion: string | null;
+  id_legible: string | null;
+  cliente: string | null;
+  estado_orden: string | null;
+  nombre_completo: string;
+  tarifa_hora: number;
+}
+
+type TabType = 'obra' | 'trabajador' | 'global';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const fmtCurrency = (n: number) =>
+  new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n);
+
+const formatWorkDate = (fechaTrabajo: string | null) => {
+  const match = fechaTrabajo?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return 'Fecha no informada';
+
+  const [, year, month, day] = match;
+  // fecha_trabajo is a calendar date, not a UTC timestamp. Formatting in UTC
+  // prevents a browser timezone from moving the displayed day.
+  return new Intl.DateTimeFormat('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))));
+};
+
+const isFutureWorkDate = (fechaTrabajo: string | null) => {
+  if (!fechaTrabajo) return false;
+  const today = new Date();
+  const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  return fechaTrabajo > localToday;
+};
+
+const sortByWorkDateDesc = (a: Reporte, b: Reporte) =>
+  (b.fecha_trabajo || '').localeCompare(a.fecha_trabajo || '');
+
+const getInitials = (name: string) =>
+  name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+
+const AVATAR_COLORS = [
+  'bg-blue-100 text-blue-700', 'bg-emerald-100 text-emerald-700',
+  'bg-violet-100 text-violet-700', 'bg-amber-100 text-amber-700',
+  'bg-rose-100 text-rose-700', 'bg-cyan-100 text-cyan-700',
+];
+const avatarColor = (name: string) => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
+
+// ─── Component ────────────────────────────────────────────────────────────────
+export default function LiquidacionesEstadisticas() {
+  const [tab, setTab] = useState<TabType>('obra');
+  const [reportes, setReportes] = useState<Reporte[]>([]);
+  const [perfilesMap, setPerfilesMap] = useState<Record<string, { nombre: string; tarifa: number }>>({});
+  const [loading, setLoading] = useState(true);
+
+  // Filters
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
+  const [trabajadorFilter, setTrabajadorFilter] = useState('');
+  const [obraFilter, setObraFilter] = useState('');
+  const [estadoFilter, setEstadoFilter] = useState('');
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .rpc('get_liquidaciones_reportes');
+
+    if (!error && data) {
+      const merged: Reporte[] = (data as LiquidacionReporteRpcRow[])
+          .filter(row => row.estado_orden !== 'Archivado')
+          .map(row => ({
+        id: row.reporte_id,
+        orden_id: row.orden_id,
+        tecnico_id: row.tecnico_id,
+        horas_trabajadas: row.horas_trabajadas ?? 0,
+        creado_en: row.creado_en,
+        fecha_trabajo: row.fecha_trabajo,
+        estado_liquidacion: row.estado_liquidacion ?? 'Pendiente',
+        ordenes: {
+          id_legible: row.id_legible ?? '',
+          cliente: row.cliente ?? '',
+          estado: row.estado_orden ?? '',
+        },
+        perfiles: {
+          nombre_completo: row.nombre_completo || 'Desconocido',
+          tarifa_hora: row.tarifa_hora ?? 0,
+        },
+      }));
+
+      setReportes(merged);
+
+      // Build worker filter dropdown map
+      const map: Record<string, { nombre: string; tarifa: number }> = {};
+      merged.forEach(r => {
+        if (r.tecnico_id && r.perfiles?.nombre_completo) {
+          map[r.tecnico_id] = { nombre: r.perfiles.nombre_completo, tarifa: r.perfiles.tarifa_hora || 0 };
+        }
+      });
+      setPerfilesMap(map);
+    } else if (error) {
+      console.error('Error loading liquidation reports:', error.message);
+    }
+
+    setLoading(false);
+  }, []);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional initial data load on mount
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // ─── Filtered data ───────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    return reportes
+      .filter(r => {
+        // Liquidation periods are based on the day worked, never the audit timestamp.
+        if (desde && (!r.fecha_trabajo || r.fecha_trabajo < desde)) return false;
+        if (hasta && (!r.fecha_trabajo || r.fecha_trabajo > hasta)) return false;
+        if (trabajadorFilter && r.tecnico_id !== trabajadorFilter) return false;
+        if (obraFilter) {
+          const q = obraFilter.toLowerCase();
+          const ref = r.ordenes?.id_legible?.toLowerCase() || '';
+          const obra = r.ordenes?.cliente?.toLowerCase() || '';
+          if (!ref.includes(q) && !obra.includes(q)) return false;
+        }
+        if (estadoFilter && r.estado_liquidacion !== estadoFilter) return false;
+        return true;
+      })
+      .sort(sortByWorkDateDesc);
+  }, [reportes, desde, hasta, trabajadorFilter, obraFilter, estadoFilter]);
+
+  // ─── Aggregations ─────────────────────────────────────────────────────────
+  const totalHoras = filtered.reduce((s, r) => s + (r.horas_trabajadas || 0), 0);
+  const totalCoste = filtered.reduce((s, r) => s + (r.horas_trabajadas || 0) * (r.perfiles?.tarifa_hora || 0), 0);
+
+  // Group by obra
+  const byObra = useMemo(() => {
+    const m: Record<string, Reporte[]> = {};
+    filtered.forEach(r => {
+      const key = r.ordenes?.id_legible || r.orden_id;
+      if (!m[key]) m[key] = [];
+      m[key].push(r);
+    });
+    return m;
+  }, [filtered]);
+
+  // Group by worker
+  const byWorker = useMemo(() => {
+    const m: Record<string, { nombre: string; tarifa: number; reportes: Reporte[] }> = {};
+    filtered.forEach(r => {
+      const key = r.tecnico_id;
+      if (!m[key]) m[key] = { nombre: r.perfiles?.nombre_completo || 'Desconocido', tarifa: r.perfiles?.tarifa_hora || 0, reportes: [] };
+      m[key].reportes.push(r);
+    });
+    return m;
+  }, [filtered]);
+
+  // ─── Actions ─────────────────────────────────────────────────────────────
+  const exportToExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Raw data
+    const rawData = filtered.map((r, i) => ({
+      'Nº': i + 1,
+      'Referencia': r.ordenes?.id_legible || '-',
+      'Obra': r.ordenes?.cliente || '-',
+      'Fecha Intervención': formatWorkDate(r.fecha_trabajo),
+      'Trabajador': r.perfiles?.nombre_completo || '-',
+      'Horas': r.horas_trabajadas || 0,
+      'Tarifa €/h': r.perfiles?.tarifa_hora || 0,
+      'Subtotal (€)': ((r.horas_trabajadas || 0) * (r.perfiles?.tarifa_hora || 0)).toFixed(2),
+      'Estado': r.estado_liquidacion || 'Pendiente',
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rawData), 'Datos Completos');
+
+    // Sheet 2: Per worker summary
+    const workerData = Object.values(byWorker).map(w => ({
+      'Trabajador': w.nombre,
+      'Tarifa €/h': w.tarifa,
+      'Total Horas': w.reportes.reduce((s, r) => s + (r.horas_trabajadas || 0), 0).toFixed(2),
+      'Total €': (w.reportes.reduce((s, r) => s + (r.horas_trabajadas || 0), 0) * w.tarifa).toFixed(2),
+      'Intervenciones': w.reportes.length,
+      'Procesadas': w.reportes.filter(r => r.estado_liquidacion === 'Procesada').length,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(workerData), 'Por Trabajador');
+
+    // Sheet 3: Per obra summary
+    const obraData = Object.entries(byObra).map(([ref, rs]) => ({
+      'Referencia': ref,
+      'Obra': rs[0]?.ordenes?.cliente || '-',
+      'Estado Orden': rs[0]?.ordenes?.estado || '-',
+      'Total Horas': rs.reduce((s, r) => s + (r.horas_trabajadas || 0), 0).toFixed(2),
+      'Total Coste €': rs.reduce((s, r) => s + (r.horas_trabajadas || 0) * (r.perfiles?.tarifa_hora || 0), 0).toFixed(2),
+      'Intervenciones': rs.length,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(obraData), 'Por Obra');
+
+    XLSX.writeFile(wb, `Liquidaciones_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  // ─── UI ──────────────────────────────────────────────────────────────────
+  const tabs: { key: TabType; label: string; icon: string }[] = [
+    { key: 'obra', label: 'Por Obra', icon: 'construction' },
+    { key: 'trabajador', label: 'Por Trabajador', icon: 'engineering' },
+    { key: 'global', label: 'Global', icon: 'bar_chart' },
+  ];
+
+  const EstadoBadge = ({ estado }: { estado: string }) => (
+    <span
+      title="Estado histórico de reporte"
+      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+        estado === 'Procesada'
+          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+          : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+      }`}
+    >
+      {estado === 'Procesada' ? '✓ Procesada' : '⏳ Pendiente'}
+    </span>
+  );
+
+  return (
+    <div className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 h-full">
+      {/* Header */}
+      <header className="h-16 flex-shrink-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 sticky top-0 z-10 w-full backdrop-blur-md">
+        <h2 className="text-xl font-bold">Liquidaciones</h2>
+        <div className="flex items-center gap-3">
+          <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg transition-colors shadow-sm">
+            <span className="material-symbols-outlined text-lg">table_view</span>
+            Exportar Excel
+          </button>
+          <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+            <span className="material-symbols-outlined">notifications</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-5 max-w-7xl mx-auto w-full">
+
+        {/* Filters */}
+        <section className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Desde</label>
+              <input value={desde} onChange={e => setDesde(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none" type="date" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hasta</label>
+              <input value={hasta} onChange={e => setHasta(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none" type="date" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Trabajador</label>
+              <select value={trabajadorFilter} onChange={e => setTrabajadorFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none">
+                <option value="">Todos los trabajadores</option>
+                {Object.entries(perfilesMap).map(([id, { nombre }]) => (
+                  <option key={id} value={id}>{nombre}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Obra / Referencia</label>
+              <input value={obraFilter} onChange={e => setObraFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none" placeholder="Ej: OT-2023-0041" type="text" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estado Pago</label>
+              <select value={estadoFilter} onChange={e => setEstadoFilter(e.target.value)} className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm h-10 px-3 focus:ring-2 focus:ring-primary outline-none">
+                <option value="">Todos</option>
+                <option value="Pendiente">Pendiente</option>
+                <option value="Procesada">Procesada</option>
+              </select>
+            </div>
+            <button onClick={() => { setDesde(''); setHasta(''); setTrabajadorFilter(''); setObraFilter(''); setEstadoFilter(''); }} className="h-10 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-1.5">
+              <span className="material-symbols-outlined text-sm">filter_alt_off</span>
+              Limpiar
+            </button>
+          </div>
+        </section>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Intervenciones</p>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-black">{filtered.length}</span>
+              <span className="text-sm text-slate-400">registros</span>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1">{filtered.filter(r => r.estado_liquidacion === 'Procesada').length} procesadas</p>
+          </div>
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Total Horas</p>
+            <div className="flex items-baseline gap-1.5 text-primary">
+              <span className="text-2xl font-black">{totalHoras.toFixed(1)}</span>
+              <span className="text-sm font-bold uppercase">horas</span>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1">Suma de todas las intervenciones</p>
+          </div>
+          <div className="bg-primary p-5 rounded-xl shadow-lg shadow-primary/20 text-white relative overflow-hidden">
+            <div className="relative z-10">
+              <p className="text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1">Total Coste Mano de Obra</p>
+              <span className="text-2xl font-black">{fmtCurrency(totalCoste)}</span>
+              <p className="text-[10px] text-white/60 mt-1">Basado en tarifas por trabajador</p>
+            </div>
+            <span className="material-symbols-outlined absolute -right-4 -bottom-4 text-[90px] opacity-10 leading-none">account_balance_wallet</span>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-fit">
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                tab === t.key
+                  ? 'bg-white dark:bg-slate-900 text-primary shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              <span className="material-symbols-outlined text-base">{t.icon}</span>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+            <p className="text-slate-400 font-medium">Cargando datos de liquidaciones...</p>
+          </div>
+        ) : (
+          <>
+            {/* ── TAB: POR OBRA ─────────────────────────────────────────── */}
+            {tab === 'obra' && (
+              <div className="space-y-6">
+                {Object.keys(byObra).length === 0 ? (
+                  <div className="text-center py-16 text-slate-400 italic">No hay intervenciones que coincidan con los filtros.</div>
+                ) : (
+                  Object.entries(byObra).map(([ref, rs]) => {
+                    const obraHoras = rs.reduce((s, r) => s + (r.horas_trabajadas || 0), 0);
+                    const obraCoste = rs.reduce((s, r) => s + (r.horas_trabajadas || 0) * (r.perfiles?.tarifa_hora || 0), 0);
+                    return (
+                      <div key={ref} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                        {/* Obra header */}
+                        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-800/30">
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">construction</span>
+                            <div>
+                              <span className="font-bold text-primary">{ref}</span>
+                              <span className="text-slate-600 dark:text-slate-400 font-medium"> — {rs[0]?.ordenes?.cliente}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="text-slate-500">{obraHoras.toFixed(1)} h</span>
+                            <span className="font-bold text-slate-800 dark:text-white">{fmtCurrency(obraCoste)}</span>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${rs[0]?.ordenes?.estado === 'Completada' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {rs[0]?.ordenes?.estado || 'Activa'}
+                            </span>
+                          </div>
+                        </div>
+                        {/* Table */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-sm min-w-[700px]">
+                            <thead>
+                              <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
+                                <th className="px-6 py-3">Trabajador</th>
+                                <th className="px-6 py-3">Fecha</th>
+                                <th className="px-6 py-3 text-center">Horas</th>
+                                <th className="px-6 py-3 text-right">Tarifa</th>
+                                <th className="px-6 py-3 text-right">Subtotal</th>
+                                <th className="px-6 py-3 text-center">Estado</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                              {rs.map(r => (
+                                <tr key={r.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                                  <td className="px-6 py-3.5">
+                                    <div className="flex items-center gap-2.5">
+                                      <div className={`size-7 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 ${avatarColor(r.perfiles?.nombre_completo || '')}`}>
+                                        {getInitials(r.perfiles?.nombre_completo || '?')}
+                                      </div>
+                                      <span className="font-medium">{r.perfiles?.nombre_completo || 'Desconocido'}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-3.5 text-slate-500">
+                                    {formatWorkDate(r.fecha_trabajo)}
+                                    {isFutureWorkDate(r.fecha_trabajo) && (
+                                      <span className="ml-2 text-[10px] font-bold text-amber-600" title="Review the work date">Fecha de trabajo futura</span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-3.5 text-center font-bold">{(r.horas_trabajadas || 0).toFixed(1)}</td>
+                                  <td className="px-6 py-3.5 text-right text-slate-500">{fmtCurrency(r.perfiles?.tarifa_hora || 0)}</td>
+                                  <td className="px-6 py-3.5 text-right font-bold">{fmtCurrency((r.horas_trabajadas || 0) * (r.perfiles?.tarifa_hora || 0))}</td>
+                                  <td className="px-6 py-3.5 text-center">
+                                    <EstadoBadge estado={r.estado_liquidacion || 'Pendiente'} />
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {/* ── TAB: POR TRABAJADOR ───────────────────────────────────── */}
+            {tab === 'trabajador' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {Object.keys(byWorker).length === 0 ? (
+                  <div className="col-span-3 text-center py-16 text-slate-400 italic">No hay intervenciones que coincidan con los filtros.</div>
+                ) : (
+                  Object.entries(byWorker).map(([tid, w]) => {
+                    const ttlH = w.reportes.reduce((s, r) => s + (r.horas_trabajadas || 0), 0);
+                    const ttlE = ttlH * w.tarifa;
+                    const procesadas = w.reportes.filter(r => r.estado_liquidacion === 'Procesada').length;
+                    return (
+                      <div key={tid} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 space-y-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`size-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${avatarColor(w.nombre)}`}>
+                            {getInitials(w.nombre)}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900 dark:text-white">{w.nombre}</p>
+                            <p className="text-xs text-slate-400">{fmtCurrency(w.tarifa)}/h · {w.reportes.length} intervenciones</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 text-center">
+                            <p className="text-[10px] text-slate-400 uppercase font-bold">Horas</p>
+                            <p className="text-lg font-black text-primary">{ttlH.toFixed(1)}</p>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 text-center">
+                            <p className="text-[10px] text-slate-400 uppercase font-bold">Total</p>
+                            <p className="text-lg font-black">{fmtCurrency(ttlE)}</p>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 text-center">
+                            <p className="text-[10px] text-slate-400 uppercase font-bold">Obras</p>
+                            <p className="text-lg font-black">{new Set(w.reportes.map(r => r.orden_id)).size}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <span className="size-2 rounded-full bg-emerald-500"></span>
+                            <span className="text-slate-500">{procesadas} procesadas</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="size-2 rounded-full bg-amber-500"></span>
+                            <span className="text-slate-500">{w.reportes.length - procesadas} pendientes</span>
+                          </div>
+                        </div>
+                        {/* Breakdown list */}
+                        <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-2 max-h-48 overflow-y-auto">
+                          {w.reportes.map(r => (
+                            <div key={r.id} className="flex items-center justify-between gap-2 text-xs">
+                              <span className="text-slate-500 truncate flex-1">{r.ordenes?.id_legible || '-'} · {formatWorkDate(r.fecha_trabajo)}</span>
+                              <span className="font-bold shrink-0">{(r.horas_trabajadas || 0).toFixed(1)}h</span>
+                              <EstadoBadge estado={r.estado_liquidacion || 'Pendiente'} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {/* ── TAB: GLOBAL ───────────────────────────────────────────── */}
+            {tab === 'global' && (
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm min-w-[900px]">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Trabajador</th>
+                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Referencia</th>
+                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Obra</th>
+                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
+                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Horas</th>
+                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Tarifa</th>
+                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Subtotal</th>
+                        <th className="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                      {filtered.length === 0 ? (
+                        <tr><td colSpan={8} className="px-5 py-12 text-center text-slate-400 italic">No hay registros que coincidan.</td></tr>
+                      ) : (
+                        filtered.map(r => (
+                          <tr key={r.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                            <td className="px-5 py-3.5">
+                              <div className="flex items-center gap-2">
+                                <div className={`size-6 rounded-full flex items-center justify-center font-bold text-[9px] shrink-0 ${avatarColor(r.perfiles?.nombre_completo || '')}`}>
+                                  {getInitials(r.perfiles?.nombre_completo || '?')}
+                                </div>
+                                <span className="font-medium">{r.perfiles?.nombre_completo || 'Desconocido'}</span>
+                              </div>
+                            </td>
+                            <td className="px-5 py-3.5 text-primary font-medium">{r.ordenes?.id_legible || '-'}</td>
+                            <td className="px-5 py-3.5 text-slate-600 dark:text-slate-400 max-w-[180px] truncate">{r.ordenes?.cliente || '-'}</td>
+                            <td className="px-5 py-3.5 text-slate-500 whitespace-nowrap">
+                              {formatWorkDate(r.fecha_trabajo)}
+                              {isFutureWorkDate(r.fecha_trabajo) && (
+                                <span className="ml-2 text-[10px] font-bold text-amber-600" title="Review the work date">Fecha de trabajo futura</span>
+                              )}
+                            </td>
+                            <td className="px-5 py-3.5 text-center font-bold">{(r.horas_trabajadas || 0).toFixed(1)}</td>
+                            <td className="px-5 py-3.5 text-right text-slate-500">{fmtCurrency(r.perfiles?.tarifa_hora || 0)}</td>
+                            <td className="px-5 py-3.5 text-right font-bold">{fmtCurrency((r.horas_trabajadas || 0) * (r.perfiles?.tarifa_hora || 0))}</td>
+                            <td className="px-5 py-3.5 text-center">
+                              <EstadoBadge estado={r.estado_liquidacion || 'Pendiente'} />
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {filtered.length > 0 && (
+                      <tfoot>
+                        <tr className="bg-slate-50 dark:bg-slate-800/50 border-t-2 border-slate-200 dark:border-slate-700 font-bold">
+                          <td className="px-5 py-4 text-sm" colSpan={4}>Total ({filtered.length} registros)</td>
+                          <td className="px-5 py-4 text-center text-primary">{totalHoras.toFixed(1)}</td>
+                          <td></td>
+                          <td className="px-5 py-4 text-right text-primary">{fmtCurrency(totalCoste)}</td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
