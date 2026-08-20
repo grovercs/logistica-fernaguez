@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -78,6 +79,7 @@ const parseErrorMessage = (error: { message?: string } | null | undefined): stri
   if (msg.includes('AUTH_REQUIRED')) return 'Debes iniciar sesión para continuar.';
   if (msg.includes('LIQUIDACION_NOT_FOUND')) return 'Liquidación no encontrada.';
   if (msg.includes('LIQUIDACION_ALREADY_CLOSED')) return 'La liquidación ya está cerrada.';
+  if (msg.includes('LIQUIDACION_NOT_OPEN')) return 'Solo se pueden eliminar liquidaciones abiertas. Reábrela primero.';
   return msg || 'Ocurrió un error inesperado.';
 };
 
@@ -123,6 +125,8 @@ export default function LiquidacionesGestion() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sessionBonusMap, setSessionBonusMap] = useState<Record<string, SessionBonus[]>>({});
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const navigate = useNavigate();
 
   const fetchLiquidaciones = useCallback(async () => {
     const { data, error: rpcError } = await supabase.rpc('admin_get_liquidaciones', {
@@ -288,6 +292,31 @@ export default function LiquidacionesGestion() {
     }
     await fetchLiquidaciones();
     setRefreshKey(k => k + 1);
+  };
+
+  const handleEliminar = async (id: string) => {
+    const l = liquidaciones.find(x => x.id === id);
+    if (l?.estado === 'cerrada') {
+      alert('Primero hay que reabrir la liquidación.');
+      return;
+    }
+
+    if (!window.confirm('¿Eliminar esta liquidación? Se borrarán sus líneas y bonus, pero no los partes, órdenes ni trabajadores originales.')) return;
+
+    const { error: rpcError } = await supabase.rpc('admin_eliminar_liquidacion', {
+      p_liquidacion_id: id,
+    });
+    if (rpcError) {
+      alert(parseErrorMessage(rpcError));
+      return;
+    }
+    setEditingId(prev => (prev === id ? null : prev));
+    await fetchLiquidaciones();
+    setRefreshKey(k => k + 1);
+  };
+
+  const handleImprimir = (id: string) => {
+    navigate(`/liquidaciones/${id}/imprimir`);
   };
 
   const handleActualizarTarifaHabitual = async (trabajadorId: string, tarifa: number) => {
@@ -510,6 +539,21 @@ export default function LiquidacionesGestion() {
                                   <span className="material-symbols-outlined">lock_open</span>
                                 </button>
                               )}
+                              <button
+                                onClick={() => handleImprimir(l.id)}
+                                className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                title="Imprimir / guardar PDF"
+                              >
+                                <span className="material-symbols-outlined">print</span>
+                              </button>
+                              <button
+                                onClick={() => handleEliminar(l.id)}
+                                disabled={l.estado === 'cerrada'}
+                                className="p-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                title={l.estado === 'cerrada' ? 'Primero hay que reabrir la liquidación.' : 'Eliminar liquidación'}
+                              >
+                                <span className="material-symbols-outlined">delete</span>
+                              </button>
                             </div>
                           </td>
                         </tr>
