@@ -8,7 +8,9 @@ import OrdenDetalle from './pages/OrdenDetalle';
 import Liquidaciones from './pages/Liquidaciones';
 import LiquidacionesGestion from './components/liquidaciones/LiquidacionesGestion';
 import LiquidacionesEstadisticas from './components/liquidaciones/LiquidacionesEstadisticas';
+import LiquidacionPrintView from './components/liquidaciones/LiquidacionPrintView';
 import RequireLiquidacionesAccess from './components/RequireLiquidacionesAccess';
+import RequireLiquidacionesEstadisticasAccess from './components/RequireLiquidacionesEstadisticasAccess';
 import Aseguradoras from './pages/Aseguradoras';
 import Trabajadores from './pages/Trabajadores';
 import Login from './pages/Login';
@@ -30,10 +32,20 @@ function App() {
           <Route path="calendario" element={<Calendario />} />
           <Route path="ordenes" element={<Ordenes />} />
           <Route path="ordenes/:id" element={<OrdenDetalle />} />
-          <Route path="liquidaciones" element={<RequireLiquidacionesAccess><Liquidaciones /></RequireLiquidacionesAccess>}>
-            <Route index element={<Navigate to="estadisticas" replace />} />
-            <Route path="gestion" element={<LiquidacionesGestion />} />
-            <Route path="estadisticas" element={<LiquidacionesEstadisticas />} />
+          <Route path="liquidaciones" element={<Liquidaciones />}>
+            <Route index element={<Navigate to="gestion" replace />} />
+            <Route
+              path="estadisticas"
+              element={<RequireLiquidacionesEstadisticasAccess><LiquidacionesEstadisticas /></RequireLiquidacionesEstadisticasAccess>}
+            />
+            <Route
+              path="gestion"
+              element={<RequireLiquidacionesAccess><LiquidacionesGestion /></RequireLiquidacionesAccess>}
+            />
+            <Route
+              path=":id/imprimir"
+              element={<RequireLiquidacionesAccess><LiquidacionPrintView /></RequireLiquidacionesAccess>}
+            />
           </Route>
 
           {/* Rutas protegidas: solo Admin y Editor */}

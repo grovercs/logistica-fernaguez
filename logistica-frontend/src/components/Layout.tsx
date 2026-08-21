@@ -9,6 +9,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../hooks/useTheme';
 import { useLiquidacionesAccess } from '../hooks/useLiquidacionesAccess';
+import { useLiquidacionesEstadisticasAccess } from '../hooks/useLiquidacionesEstadisticasAccess';
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ const Layout = () => {
   const [userProfile, setUserProfile] = useState<{ nombre_completo: string; rol: string } | null>(null);
   const { isDark, toggle: toggleTheme } = useTheme();
   const { isAllowed: canAccessLiquidaciones } = useLiquidacionesAccess();
+  const { isAllowed: canAccessEstadisticas } = useLiquidacionesEstadisticasAccess();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -170,33 +172,42 @@ const Layout = () => {
               Órdenes de Trabajo
             </NavLink>
             
-            {canAccessLiquidaciones && (
-              <>
-                <NavLink
-                  to="/liquidaciones/estadisticas"
-                  end
-                  className={({ isActive }) =>
-                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`
-                  }
-                >
-                  <BarChart3 className="w-5 h-5 mr-3" />
-                  Estadísticas
-                </NavLink>
-                <NavLink
-                  to="/liquidaciones/gestion"
-                  end
-                  className={({ isActive }) =>
-                    `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`
-                  }
-                >
-                  <Briefcase className="w-5 h-5 mr-3" />
+            {(canAccessEstadisticas || canAccessLiquidaciones) && (
+              <div className="pt-6 pb-2">
+                <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
                   Liquidaciones
-                </NavLink>
-              </>
+                </p>
+              </div>
+            )}
+
+            {canAccessEstadisticas && (
+              <NavLink
+                to="/liquidaciones/estadisticas"
+                end
+                className={({ isActive }) =>
+                  `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                    isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`
+                }
+              >
+                <BarChart3 className="w-5 h-5 mr-3" />
+                Estadísticas
+              </NavLink>
+            )}
+
+            {canAccessLiquidaciones && (
+              <NavLink
+                to="/liquidaciones/gestion"
+                end
+                className={({ isActive }) =>
+                  `flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                    isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`
+                }
+              >
+                <Briefcase className="w-5 h-5 mr-3" />
+                Liquidaciones
+              </NavLink>
             )}
 
             {(userProfile?.rol === 'Administrador' || userProfile?.rol === 'Editor') && (
