@@ -275,7 +275,7 @@ export default function LiquidacionesGestion() {
   };
 
   const handleCerrar = async (id: string) => {
-    if (!window.confirm('¿Cerrar la liquidación? Una vez cerrada no podrá editarse.')) return;
+    if (!window.confirm('¿Cerrar la liquidación? Podrás reabrirla más tarde si es necesario.')) return;
     const { error: rpcError } = await supabase.rpc('admin_cerrar_liquidacion', {
       p_liquidacion_id: id,
     });
@@ -284,6 +284,19 @@ export default function LiquidacionesGestion() {
       return;
     }
     setExpandedId(null);
+    await fetchLiquidaciones();
+    setRefreshKey(k => k + 1);
+  };
+
+  const handleReabrir = async (id: string) => {
+    if (!window.confirm('¿Reabrir la liquidación? Volverá a ser editable.')) return;
+    const { error: rpcError } = await supabase.rpc('admin_reabrir_liquidacion', {
+      p_liquidacion_id: id,
+    });
+    if (rpcError) {
+      alert(parseErrorMessage(rpcError));
+      return;
+    }
     await fetchLiquidaciones();
     setRefreshKey(k => k + 1);
   };
@@ -523,13 +536,21 @@ export default function LiquidacionesGestion() {
                               >
                                 <span className="material-symbols-outlined">{expandedId === l.id ? 'expand_less' : 'expand_more'}</span>
                               </button>
-                              {l.estado === 'abierta' && (
+                              {l.estado === 'abierta' ? (
                                 <button
                                   onClick={() => handleCerrar(l.id)}
                                   className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
                                   title="Cerrar liquidación"
                                 >
                                   <span className="material-symbols-outlined">lock</span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleReabrir(l.id)}
+                                  className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                                  title="Reabrir liquidación"
+                                >
+                                  <span className="material-symbols-outlined">lock_open</span>
                                 </button>
                               )}
                               <button
@@ -562,6 +583,7 @@ export default function LiquidacionesGestion() {
                                 onRefresh={async () => { await fetchLiquidaciones(); setRefreshKey(k => k + 1); }}
                                 onRecalcular={handleRecalcular}
                                 onCerrar={handleCerrar}
+                                onReabrir={handleReabrir}
                                 onActualizarTarifaHabitual={handleActualizarTarifaHabitual}
                                 onLoadBonus={() => fetchBonus(l.id)}
                               />
@@ -650,6 +672,7 @@ interface DetailPanelProps {
   onRefresh: () => Promise<void>;
   onRecalcular: (id: string) => Promise<void>;
   onCerrar: (id: string) => Promise<void>;
+  onReabrir: (id: string) => Promise<void>;
   onActualizarTarifaHabitual: (trabajadorId: string, tarifa: number) => Promise<boolean>;
   onLoadBonus: () => Promise<void>;
 }
@@ -662,6 +685,7 @@ function DetailPanel({
   onRefresh,
   onRecalcular,
   onCerrar,
+  onReabrir,
   onActualizarTarifaHabitual,
   onLoadBonus,
 }: DetailPanelProps) {
@@ -1146,6 +1170,12 @@ function DetailPanel({
       ) : (
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 p-4 rounded-xl text-sm flex items-center justify-between">
           <span>Liquidación cerrada. Solo lectura.</span>
+          <button
+            onClick={() => onReabrir(liquidacion.id)}
+            className="px-3 py-1.5 text-xs font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60 rounded-lg transition-colors"
+          >
+            Reabrir
+          </button>
         </div>
       )}
     </div>
