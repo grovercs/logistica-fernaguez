@@ -9,6 +9,7 @@ interface Liquidacion {
   estado: 'abierta' | 'cerrada';
   horas_totales: number;
   tarifa_hora: number | null;
+  tarifa_hora_capturada?: number | null;
   usar_tarifa_puntual: boolean;
   importe_calculado: number;
   importe_manual: number | null;
@@ -22,17 +23,15 @@ interface Liquidacion {
   actualizado_en: string;
 }
 
-// Bonus mantenido en sesión actual. El backend V1 no expone aún una RPC de lectura
-// de bonus individuales; ver GAP documentado en el plan.
-interface SessionBonus {
+interface LiquidacionBonus {
   id: string;
   liquidacion_id: string;
   concepto: string;
   importe: number;
   orden_id: string | null;
-  isNew: boolean;
-  isDeleted?: boolean;
-  isDirty?: boolean;
+  orden_numero: string | null;
+  orden_descripcion: string | null;
+  creado_en: string;
 }
 
 interface TrabajadorOption {
@@ -78,6 +77,9 @@ const parseErrorMessage = (error: { message?: string } | null | undefined): stri
   if (msg.includes('AUTH_REQUIRED')) return 'Debes iniciar sesión para continuar.';
   if (msg.includes('LIQUIDACION_NOT_FOUND')) return 'Liquidación no encontrada.';
   if (msg.includes('LIQUIDACION_ALREADY_CLOSED')) return 'La liquidación ya está cerrada.';
+  if (msg.includes('LIQUIDACION_NOT_OPEN')) return 'Solo se pueden eliminar liquidaciones abiertas.';
+  if (msg.includes('TARIFA_PUNTUAL_REQUERIDA')) return 'Debes indicar la tarifa puntual cuando está activada.';
+  if (msg.includes('IMPORTE_MANUAL_REQUERIDO')) return 'Debes indicar el importe manual cuando está activado.';
   return msg || 'Ocurrió un error inesperado.';
 };
 
@@ -119,9 +121,10 @@ export default function LiquidacionesGestion() {
   const [createPeriodoInput, setCreatePeriodoInput] = useState(todayMonthInput());
   const [createLoading, setCreateLoading] = useState(false);
 
-  // Expanded editing row
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [sessionBonusMap, setSessionBonusMap] = useState<Record<string, SessionBonus[]>>({});
+  // Expanded detail row
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [bonusMap, setBonusMap] = useState<Record<string, LiquidacionBonus[]>>({});
+  const [bonusLoadingMap, setBonusLoadingMap] = useState<Record<string, boolean>>({});
   const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchLiquidaciones = useCallback(async () => {
@@ -146,6 +149,7 @@ export default function LiquidacionesGestion() {
       estado: row.estado as 'abierta' | 'cerrada',
       horas_totales: (row.horas_totales as number | null) ?? 0,
       tarifa_hora: (row.tarifa_hora as number | null) ?? null,
+      tarifa_hora_capturada: (row.tarifa_hora_capturada as number | null) ?? null,
       usar_tarifa_puntual: (row.usar_tarifa_puntual as boolean) ?? false,
       importe_calculado: (row.importe_calculado as number | null) ?? 0,
       importe_manual: (row.importe_manual as number | null) ?? null,
@@ -182,6 +186,20 @@ export default function LiquidacionesGestion() {
       .sort((a, b) => `${a.nombre} ${a.apellidos || ''}`.localeCompare(`${b.nombre} ${b.apellidos || ''}`));
 
     setTrabajadores(mapped);
+  }, []);
+
+  const fetchBonus = useCallback(async (liquidacionId: string) => {
+    setBonusLoadingMap(prev => ({ ...prev, [liquidacionId]: true }));
+    const { data, error: rpcError } = await supabase.rpc('admin_get_liquidacion_bonus', {
+      p_liquidacion_id: liquidacionId,
+    });
+    if (rpcError) {
+      console.error('Error loading bonus:', rpcError);
+      alert(parseErrorMessage(rpcError));
+    } else {
+      setBonusMap(prev => ({ ...prev, [liquidacionId]: (data || []) as LiquidacionBonus[] }));
+    }
+    setBonusLoadingMap(prev => ({ ...prev, [liquidacionId]: false }));
   }, []);
 
   useEffect(() => {
@@ -240,19 +258,9 @@ export default function LiquidacionesGestion() {
     setCreatePeriodoInput(todayMonthInput());
   };
 
-  const handleRecalcularConCambiosGuardados = async (payload: {
-    liquidacionId: string;
-    guardarLiquidacion: () => Promise<boolean>;
-    guardarBonusPendientes: () => Promise<boolean>;
-  }) => {
-    const ok = await payload.guardarLiquidacion();
-    if (!ok) return;
-
-    const bonusOk = await payload.guardarBonusPendientes();
-    if (!bonusOk) return;
-
+  const handleRecalcular = async (liquidacionId: string) => {
     const { error: rpcError } = await supabase.rpc('admin_recalcular_liquidacion', {
-      p_liquidacion_id: payload.liquidacionId,
+      p_liquidacion_id: liquidacionId,
     });
     if (rpcError) {
       alert(parseErrorMessage(rpcError));
@@ -264,7 +272,7 @@ export default function LiquidacionesGestion() {
   };
 
   const handleCerrar = async (id: string) => {
-    if (!window.confirm('¿Cerrar la liquidación? Podrás reabrirla más tarde si es necesario.')) return;
+    if (!window.confirm('¿Cerrar la liquidación? Una vez cerrada no podrá editarse.')) return;
     const { error: rpcError } = await supabase.rpc('admin_cerrar_liquidacion', {
       p_liquidacion_id: id,
     });
@@ -272,22 +280,34 @@ export default function LiquidacionesGestion() {
       alert(parseErrorMessage(rpcError));
       return;
     }
-    setEditingId(null);
+    setExpandedId(null);
     await fetchLiquidaciones();
     setRefreshKey(k => k + 1);
   };
 
-  const handleReabrir = async (id: string) => {
-    if (!window.confirm('¿Reabrir la liquidación? Volverá a ser editable.')) return;
-    const { error: rpcError } = await supabase.rpc('admin_reabrir_liquidacion', {
+  const handleEliminar = async (id: string) => {
+    const l = liquidaciones.find(x => x.id === id);
+    if (l?.estado === 'cerrada') {
+      alert('Solo se pueden eliminar liquidaciones abiertas.');
+      return;
+    }
+
+    if (!window.confirm('¿Eliminar esta liquidación? Se borrarán sus líneas y bonus, pero no los partes, órdenes ni trabajadores originales.')) return;
+
+    const { error: rpcError } = await supabase.rpc('admin_eliminar_liquidacion', {
       p_liquidacion_id: id,
     });
     if (rpcError) {
       alert(parseErrorMessage(rpcError));
       return;
     }
+    setExpandedId(prev => (prev === id ? null : prev));
     await fetchLiquidaciones();
     setRefreshKey(k => k + 1);
+  };
+
+  const handleImprimir = (id: string) => {
+    navigate(`/liquidaciones/${id}/imprimir`);
   };
 
   const handleActualizarTarifaHabitual = async (trabajadorId: string, tarifa: number) => {
@@ -304,8 +324,15 @@ export default function LiquidacionesGestion() {
     return true;
   };
 
-  const toggleEditRow = (id: string) => {
-    setEditingId(prev => (prev === id ? null : id));
+  const toggleExpandedRow = (id: string) => {
+    setExpandedId(prev => {
+      const next = prev === id ? null : id;
+      if (next && next !== prev) {
+        // Load bonus when expanding
+        fetchBonus(next);
+      }
+      return next;
+    });
   };
 
   // ─── Summary cards ──────────────────────────────────────────────────────────
@@ -487,13 +514,13 @@ export default function LiquidacionesGestion() {
                           <td className="px-5 py-3.5 text-center">
                             <div className="flex items-center justify-center gap-2">
                               <button
-                                onClick={() => toggleEditRow(l.id)}
+                                onClick={() => toggleExpandedRow(l.id)}
                                 className="p-1.5 text-slate-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                                title={editingId === l.id ? 'Ocultar detalle' : 'Editar'}
+                                title={expandedId === l.id ? 'Ocultar detalle' : 'Ver detalle'}
                               >
-                                <span className="material-symbols-outlined">{editingId === l.id ? 'expand_less' : 'edit'}</span>
+                                <span className="material-symbols-outlined">{expandedId === l.id ? 'expand_less' : 'expand_more'}</span>
                               </button>
-                              {l.estado === 'abierta' ? (
+                              {l.estado === 'abierta' && (
                                 <button
                                   onClick={() => handleCerrar(l.id)}
                                   className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
@@ -501,32 +528,39 @@ export default function LiquidacionesGestion() {
                                 >
                                   <span className="material-symbols-outlined">lock</span>
                                 </button>
-                              ) : (
-                                <button
-                                  onClick={() => handleReabrir(l.id)}
-                                  className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
-                                  title="Reabrir liquidación"
-                                >
-                                  <span className="material-symbols-outlined">lock_open</span>
-                                </button>
                               )}
+                              <button
+                                onClick={() => handleImprimir(l.id)}
+                                className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                title="Imprimir / guardar PDF"
+                              >
+                                <span className="material-symbols-outlined">print</span>
+                              </button>
+                              <button
+                                onClick={() => handleEliminar(l.id)}
+                                disabled={l.estado === 'cerrada'}
+                                className="p-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                title={l.estado === 'cerrada' ? 'Solo se pueden eliminar liquidaciones abiertas' : 'Eliminar liquidación'}
+                              >
+                                <span className="material-symbols-outlined">delete</span>
+                              </button>
                             </div>
                           </td>
                         </tr>
-                        {editingId === l.id && (
-                          <tr key={`${l.id}-edit`}>
+                        {expandedId === l.id && (
+                          <tr key={`${l.id}-detail`}>
                             <td colSpan={11} className="px-5 py-4 bg-slate-50/70 dark:bg-slate-800/30">
-                              <EditRowPanel
+                              <DetailPanel
                                 key={`${l.id}-${l.actualizado_en}-${refreshKey}`}
                                 liquidacion={l}
                                 trabajadores={trabajadores}
-                                sessionBonus={sessionBonusMap[l.id] || []}
-                                onUpdateBonusMap={next => setSessionBonusMap(prev => ({ ...prev, [l.id]: next }))}
-                                onSaved={async () => { await fetchLiquidaciones(); setRefreshKey(k => k + 1); }}
-                                onRecalcularConCambiosGuardados={handleRecalcularConCambiosGuardados}
+                                bonusList={bonusMap[l.id] || []}
+                                bonusLoading={bonusLoadingMap[l.id] || false}
+                                onRefresh={async () => { await fetchLiquidaciones(); setRefreshKey(k => k + 1); }}
+                                onRecalcular={handleRecalcular}
                                 onCerrar={handleCerrar}
-                                onReabrir={handleReabrir}
                                 onActualizarTarifaHabitual={handleActualizarTarifaHabitual}
+                                onLoadBonus={() => fetchBonus(l.id)}
                               />
                             </td>
                           </tr>
@@ -604,40 +638,43 @@ export default function LiquidacionesGestion() {
   );
 }
 
-// ─── Edit Row Panel ───────────────────────────────────────────────────────────
-interface EditRowPanelProps {
+// ─── Detail Panel ───────────────────────────────────────────────────────────
+interface DetailPanelProps {
   liquidacion: Liquidacion;
   trabajadores: TrabajadorOption[];
-  sessionBonus: SessionBonus[];
-  onUpdateBonusMap: (bonus: SessionBonus[]) => void;
-  onSaved: () => Promise<void>;
-  onRecalcularConCambiosGuardados: (payload: {
-    liquidacionId: string;
-    guardarLiquidacion: () => Promise<boolean>;
-    guardarBonusPendientes: () => Promise<boolean>;
-  }) => Promise<void>;
+  bonusList: LiquidacionBonus[];
+  bonusLoading: boolean;
+  onRefresh: () => Promise<void>;
+  onRecalcular: (id: string) => Promise<void>;
   onCerrar: (id: string) => Promise<void>;
-  onReabrir: (id: string) => Promise<void>;
   onActualizarTarifaHabitual: (trabajadorId: string, tarifa: number) => Promise<boolean>;
+  onLoadBonus: () => Promise<void>;
 }
 
-function EditRowPanel({
+function DetailPanel({
   liquidacion,
   trabajadores,
-  sessionBonus,
-  onUpdateBonusMap,
-  onSaved,
-  onRecalcularConCambiosGuardados,
+  bonusList,
+  bonusLoading,
+  onRefresh,
+  onRecalcular,
   onCerrar,
-  onReabrir,
   onActualizarTarifaHabitual,
-}: EditRowPanelProps) {
+  onLoadBonus,
+}: DetailPanelProps) {
   const isOpen = liquidacion.estado === 'abierta';
 
   const trabajador = useMemo(() => trabajadores.find(t => t.id === liquidacion.trabajador_id), [trabajadores, liquidacion.trabajador_id]);
 
+  const capturedRate = liquidacion.tarifa_hora_capturada ?? liquidacion.tarifa_hora ?? null;
+
   const [usarTarifaPuntual, setUsarTarifaPuntual] = useState(liquidacion.usar_tarifa_puntual);
-  const [tarifaHora, setTarifaHora] = useState<string>(liquidacion.tarifa_hora?.toString() || '');
+  const [tarifaHora, setTarifaHora] = useState<string>(() => {
+    if (liquidacion.usar_tarifa_puntual) {
+      return liquidacion.tarifa_hora?.toString() || '';
+    }
+    return capturedRate?.toString() || '';
+  });
   const [useManualImporte, setUseManualImporte] = useState(liquidacion.importe_manual != null);
   const [importeManual, setImporteManual] = useState<string>(liquidacion.importe_manual?.toString() || '');
   const [importeNomina, setImporteNomina] = useState<string>(liquidacion.importe_nomina?.toString() || '');
@@ -646,28 +683,39 @@ function EditRowPanel({
   const [isTarifaModalOpen, setIsTarifaModalOpen] = useState(false);
   const [tarifaHabitualInput, setTarifaHabitualInput] = useState('');
 
+  const [bonusEdits, setBonusEdits] = useState<Record<string, Partial<LiquidacionBonus>>>({});
+
   const [newBonusConcepto, setNewBonusConcepto] = useState('');
   const [newBonusImporte, setNewBonusImporte] = useState('');
   const [newBonusOrdenId, setNewBonusOrdenId] = useState('');
 
-  // El panel se re-monta mediante key=`${l.id}-${l.actualizado_en}` para reflejar
-  // los datos actualizados tras recalcular/guardar, por lo que los useState iniciales
-  // siempre parten de la liquidación más reciente.
+  // El panel se re-monta mediante key para reflejar los datos actualizados tras
+  // recalcular/guardar, por lo que los useState iniciales parten de la liquidación
+  // más reciente.
+
+  useEffect(() => {
+    onLoadBonus();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const guardarLiquidacion = async (): Promise<boolean> => {
-    const tarifaParsed = parseNumericInput(tarifaHora);
-    if (tarifaParsed.error) {
-      alert(tarifaParsed.error);
-      return false;
+    let p_tarifa_hora: number | null = null;
+    if (usarTarifaPuntual) {
+      const tarifaParsed = parseNumericInput(tarifaHora);
+      if (tarifaParsed.error || tarifaParsed.value === null) {
+        alert(tarifaParsed.error || 'La tarifa puntual es obligatoria cuando está activada.');
+        return false;
+      }
+      p_tarifa_hora = tarifaParsed.value;
     }
 
-    let manualParsed: ReturnType<typeof parseNumericInput> = { value: null };
+    let p_importe_manual: number | null = null;
     if (useManualImporte) {
-      manualParsed = parseNumericInput(importeManual);
+      const manualParsed = parseNumericInput(importeManual);
       if (manualParsed.error || manualParsed.value === null) {
         alert(manualParsed.error || 'El importe manual es obligatorio cuando está activado.');
         return false;
       }
+      p_importe_manual = manualParsed.value;
     }
 
     const nominaParsed = parseNumericInput(importeNomina);
@@ -676,13 +724,13 @@ function EditRowPanel({
       return false;
     }
 
-    const { error: rpcError } = await supabase.rpc('admin_update_liquidacion', {
+    const { error: rpcError } = await supabase.rpc('admin_update_liquidacion_v2', {
       p_liquidacion_id: liquidacion.id,
-      p_tarifa_hora: tarifaParsed.value,
       p_usar_tarifa_puntual: usarTarifaPuntual,
-      p_set_importe_manual: true,
-      p_importe_manual: manualParsed.value,
-      p_importe_nomina: nominaParsed.value === null ? 0 : nominaParsed.value,
+      p_tarifa_hora: p_tarifa_hora,
+      p_usar_importe_manual: useManualImporte,
+      p_importe_manual: p_importe_manual,
+      p_importe_nomina: nominaParsed.value ?? 0,
       p_set_observaciones: true,
       p_observaciones: observaciones || null,
     });
@@ -695,116 +743,88 @@ function EditRowPanel({
     return true;
   };
 
-  const guardarBonusPendientes = async (): Promise<boolean> => {
-    let currentBonus = [...sessionBonus];
-    const applyUpdate = (next: SessionBonus[]) => {
-      currentBonus = next;
-      onUpdateBonusMap(next);
-    };
-
-    const bonusToDelete = currentBonus.filter(b => b.isDeleted);
-    for (const b of bonusToDelete) {
-      const { error: rpcError } = await supabase.rpc('admin_eliminar_bonus', { p_bonus_id: b.id });
-      if (rpcError) {
-        alert(parseErrorMessage(rpcError));
-        return false;
-      }
-      applyUpdate(currentBonus.filter(x => x.id !== b.id));
-    }
-
-    const bonusToUpdate = currentBonus.filter(b => !b.isNew && !b.isDeleted);
-    for (const b of bonusToUpdate) {
-      const concepto = b.concepto.trim();
-      if (!concepto) {
-        alert('El concepto del bonus es obligatorio.');
-        return false;
-      }
-      if (b.importe < 0) {
-        alert('El importe del bonus debe ser mayor o igual a 0.');
-        return false;
-      }
-
-      const { error: rpcError } = await supabase.rpc('admin_update_liquidacion_bonus', {
-        p_bonus_id: b.id,
-        p_set_concepto: true,
-        p_concepto: concepto,
-        p_set_importe: true,
-        p_importe: b.importe,
-        p_set_orden_id: b.orden_id !== undefined,
-        p_orden_id: b.orden_id || null,
-      });
-      if (rpcError) {
-        alert(parseErrorMessage(rpcError));
-        return false;
-      }
-      applyUpdate(currentBonus.map(x => (x.id === b.id ? { ...x, isDirty: false } : x)));
-    }
-
-    const bonusToCreate = currentBonus.filter(b => b.isNew && !b.isDeleted);
-    for (const b of bonusToCreate) {
-      const concepto = b.concepto.trim();
-      if (!concepto) {
-        alert('El concepto del bonus es obligatorio.');
-        return false;
-      }
-      if (b.importe < 0) {
-        alert('El importe del bonus debe ser mayor o igual a 0.');
-        return false;
-      }
-
-      const { data, error: rpcError } = await supabase.rpc('admin_agregar_bonus', {
-        p_liquidacion_id: liquidacion.id,
-        p_concepto: concepto,
-        p_importe: b.importe,
-        p_orden_id: b.orden_id || null,
-      });
-      if (rpcError) {
-        alert(parseErrorMessage(rpcError));
-        return false;
-      }
-
-      const bonusId = (data as { bonus_id: string }[] | null)?.[0]?.bonus_id;
-      if (!bonusId) {
-        alert('No se pudo obtener el ID del bonus nuevo.');
-        return false;
-      }
-      applyUpdate(
-        currentBonus.map(x => (x.id === b.id ? { ...x, id: bonusId, isNew: false } : x))
-      );
-    }
-
-    const persistedBonus = currentBonus.map(b => ({ ...b, isNew: false, isDeleted: false, isDirty: false }));
-    applyUpdate(persistedBonus);
-    return true;
-  };
-
   const handleGuardar = async () => {
     setSaveLoading(true);
-
     const ok = await guardarLiquidacion();
-    if (!ok) {
-      setSaveLoading(false);
-      return;
+    if (ok) {
+      await onRefresh();
     }
-
-    const bonusOk = await guardarBonusPendientes();
-    if (!bonusOk) {
-      setSaveLoading(false);
-      return;
-    }
-
-    await onSaved();
     setSaveLoading(false);
   };
 
   const handleRecalcularClick = async () => {
     setSaveLoading(true);
-    await onRecalcularConCambiosGuardados({
-      liquidacionId: liquidacion.id,
-      guardarLiquidacion,
-      guardarBonusPendientes,
-    });
+    const ok = await guardarLiquidacion();
+    if (ok) {
+      await onRecalcular(liquidacion.id);
+    }
     setSaveLoading(false);
+  };
+
+  const handleToggleTarifaPuntual = (checked: boolean) => {
+    setUsarTarifaPuntual(checked);
+    if (!checked) {
+      setTarifaHora(capturedRate?.toString() || '');
+    } else {
+      setTarifaHora(liquidacion.tarifa_hora?.toString() || '');
+    }
+  };
+
+  const getBonusField = (bonus: LiquidacionBonus, field: keyof LiquidacionBonus) => {
+    const edit = bonusEdits[bonus.id];
+    if (!edit) return bonus[field];
+    return edit[field] !== undefined ? edit[field] : bonus[field];
+  };
+
+  const updateBonusEdit = (id: string, field: keyof LiquidacionBonus, value: unknown) => {
+    setBonusEdits(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+  };
+
+  const handleGuardarBonus = async (bonus: LiquidacionBonus) => {
+    const concepto = String(getBonusField(bonus, 'concepto')).trim();
+    if (!concepto) {
+      alert('El concepto del bonus es obligatorio.');
+      return;
+    }
+    const importe = Number(getBonusField(bonus, 'importe'));
+    if (Number.isNaN(importe) || importe < 0) {
+      alert('El importe del bonus debe ser mayor o igual a 0.');
+      return;
+    }
+    const ordenId = getBonusField(bonus, 'orden_id') as string | null;
+
+    const { error: rpcError } = await supabase.rpc('admin_update_liquidacion_bonus', {
+      p_bonus_id: bonus.id,
+      p_set_concepto: true,
+      p_concepto: concepto,
+      p_set_importe: true,
+      p_importe: importe,
+      p_set_orden_id: true,
+      p_orden_id: ordenId || null,
+    });
+    if (rpcError) {
+      alert(parseErrorMessage(rpcError));
+      return;
+    }
+
+    setBonusEdits(prev => {
+      const next = { ...prev };
+      delete next[bonus.id];
+      return next;
+    });
+    await onLoadBonus();
+    await onRefresh();
+  };
+
+  const handleEliminarBonus = async (bonusId: string) => {
+    if (!window.confirm('¿Eliminar este bonus?')) return;
+    const { error: rpcError } = await supabase.rpc('admin_eliminar_bonus', { p_bonus_id: bonusId });
+    if (rpcError) {
+      alert(parseErrorMessage(rpcError));
+      return;
+    }
+    await onLoadBonus();
+    await onRefresh();
   };
 
   const handleAgregarBonus = async () => {
@@ -817,30 +837,23 @@ function EditRowPanel({
       alert(bonusParsed.error || 'El importe del bonus es obligatorio.');
       return;
     }
-    const importe = bonusParsed.value;
 
-    const nuevo: SessionBonus = {
-      id: crypto.randomUUID(),
-      liquidacion_id: liquidacion.id,
-      concepto: newBonusConcepto.trim(),
-      importe,
-      orden_id: newBonusOrdenId || null,
-      isNew: true,
-    };
+    const { error: rpcError } = await supabase.rpc('admin_agregar_bonus', {
+      p_liquidacion_id: liquidacion.id,
+      p_concepto: newBonusConcepto.trim(),
+      p_importe: bonusParsed.value,
+      p_orden_id: newBonusOrdenId || null,
+    });
+    if (rpcError) {
+      alert(parseErrorMessage(rpcError));
+      return;
+    }
 
-    onUpdateBonusMap([...sessionBonus, nuevo]);
     setNewBonusConcepto('');
     setNewBonusImporte('');
     setNewBonusOrdenId('');
-  };
-
-  const handleEliminarBonus = (bonusId: string) => {
-    if (!window.confirm('¿Eliminar este bonus?')) return;
-    onUpdateBonusMap(sessionBonus.map(b => (b.id === bonusId ? { ...b, isDeleted: true } : b)));
-  };
-
-  const updateSessionBonusField = (id: string, field: keyof SessionBonus, value: unknown) => {
-    onUpdateBonusMap(sessionBonus.map(b => (b.id === id ? { ...b, [field]: value } : b)));
+    await onLoadBonus();
+    await onRefresh();
   };
 
   return (
@@ -891,7 +904,7 @@ function EditRowPanel({
                   type="checkbox"
                   id={`tarifa-puntual-${liquidacion.id}`}
                   checked={usarTarifaPuntual}
-                  onChange={e => setUsarTarifaPuntual(e.target.checked)}
+                  onChange={e => handleToggleTarifaPuntual(e.target.checked)}
                   className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
                 />
                 <label htmlFor={`tarifa-puntual-${liquidacion.id}`} className="text-sm text-slate-700 dark:text-slate-300">Usar tarifa puntual</label>
@@ -963,38 +976,38 @@ function EditRowPanel({
           {/* Bonus section */}
           <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Bonus de esta sesión</p>
-              <p className="text-xs text-slate-400">Los bonus históricos no están disponibles hasta resolver el GAP de backend.</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Bonus</p>
+              {bonusLoading && <p className="text-xs text-slate-400">Cargando bonus...</p>}
             </div>
 
-            {sessionBonus.length > 0 && (
+            {bonusList.length > 0 && (
               <div className="space-y-2">
-                {sessionBonus.map(b => (
+                {bonusList.map(b => (
                   <div key={b.id} className="flex flex-wrap items-end gap-2">
                     <input
                       type="text"
-                      value={b.concepto}
-                      onChange={e => updateSessionBonusField(b.id, 'concepto', e.target.value)}
+                      value={getBonusField(b, 'concepto') as string}
+                      onChange={e => updateBonusEdit(b.id, 'concepto', e.target.value)}
                       className="flex-1 min-w-[150px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-9 px-3 focus:ring-2 focus:ring-primary outline-none"
                       placeholder="Concepto"
                     />
                     <input
                       type="number"
                       step="0.01"
-                      value={b.importe}
-                      onChange={e => updateSessionBonusField(b.id, 'importe', parseFloat(e.target.value) || 0)}
+                      value={getBonusField(b, 'importe') as number}
+                      onChange={e => updateBonusEdit(b.id, 'importe', parseFloat(e.target.value) || 0)}
                       className="w-28 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-9 px-3 focus:ring-2 focus:ring-primary outline-none"
                       placeholder="Importe"
                     />
                     <input
                       type="text"
-                      value={b.orden_id || ''}
-                      onChange={e => updateSessionBonusField(b.id, 'orden_id', e.target.value || null)}
+                      value={(getBonusField(b, 'orden_id') as string | null) || ''}
+                      onChange={e => updateBonusEdit(b.id, 'orden_id', e.target.value || null)}
                       className="w-40 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm h-9 px-3 focus:ring-2 focus:ring-primary outline-none"
                       placeholder="Orden ID (opcional)"
                     />
                     <button
-                      onClick={() => guardarBonusPendientes()}
+                      onClick={() => handleGuardarBonus(b)}
                       className="p-2 text-slate-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                       title="Guardar cambios"
                     >
@@ -1007,6 +1020,11 @@ function EditRowPanel({
                     >
                       <span className="material-symbols-outlined">delete</span>
                     </button>
+                    {b.orden_numero && (
+                      <div className="w-full text-[11px] text-slate-400 -mt-1">
+                        Orden: {b.orden_numero}{b.orden_descripcion ? ` – ${b.orden_descripcion}` : ''}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1125,12 +1143,6 @@ function EditRowPanel({
       ) : (
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 p-4 rounded-xl text-sm flex items-center justify-between">
           <span>Liquidación cerrada. Solo lectura.</span>
-          <button
-            onClick={() => onReabrir(liquidacion.id)}
-            className="px-3 py-1.5 text-xs font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60 rounded-lg transition-colors"
-          >
-            Reabrir
-          </button>
         </div>
       )}
     </div>
