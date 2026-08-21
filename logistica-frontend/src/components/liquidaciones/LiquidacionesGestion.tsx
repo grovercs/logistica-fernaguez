@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -126,6 +127,8 @@ export default function LiquidacionesGestion() {
   const [bonusMap, setBonusMap] = useState<Record<string, LiquidacionBonus[]>>({});
   const [bonusLoadingMap, setBonusLoadingMap] = useState<Record<string, boolean>>({});
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const navigate = useNavigate();
 
   const fetchLiquidaciones = useCallback(async () => {
     const { data, error: rpcError } = await supabase.rpc('admin_get_liquidaciones', {
