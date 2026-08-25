@@ -21,7 +21,7 @@ interface TrabajadorDirectoryRow {
 export default function OrdenDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isEditor, isTrabajador } = useUserRole();
+  const { isEditor, isAdmin, isTrabajador } = useUserRole();
   const [orden, setOrden] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -155,40 +155,56 @@ export default function OrdenDetalle() {
       `- Todas las fotos y albaranes asociados de Cloudinary.`
     )) return;
 
+    const reason = window.prompt('Motivo del borrado (opcional):') || undefined;
+
     setLoading(true);
 
     try {
-      // 1. Fotos de todos los reportes de esta orden
-      const allUrls: string[] = [];
-      reportes.forEach(rep => {
-        if (rep.fotos_urls) allUrls.push(...rep.fotos_urls);
-        if (rep.facturas_urls) allUrls.push(...rep.facturas_urls);
+      const { data, error } = await supabase.rpc('admin_eliminar_ordenes', {
+        p_order_ids: [id],
+        p_reason: reason,
+        p_action: 'hard_delete_order'
       });
-
-      if (allUrls.length > 0) {
-        const result = await deleteCloudinaryImages(allUrls, supabase);
-        if (!result.success) {
-          console.error('Error borrando imágenes de Cloudinary:', result.error);
-        }
-      }
-
-      // 2. Borrar reportes
-      await supabase.from('reportes').delete().eq('orden_id', id);
-
-      // 3. Borrar asignaciones
-      await supabase.from('orden_asignaciones').delete().eq('orden_id', id);
-
-      // 4. Borrar la orden
-      const { error } = await supabase.from('ordenes').delete().eq('id', id);
 
       if (error) {
         console.error('Error al eliminar orden:', error);
-        alert('Hubo un error al eliminar la orden.');
+        const msg = error.message || '';
+        if (msg.includes('ADMINISTRATOR_REQUIRED')) {
+          alert('Solo los administradores pueden eliminar obras permanentemente.');
+        } else if (msg.includes('ORDERS_NOT_IN_TRASH')) {
+          alert('Solo se pueden eliminar obras que estén en la Papelera.');
+        } else if (msg.includes('ORDERS_BLOCKED_BY_LIQUIDACIONES')) {
+          const details = msg.split('ORDERS_BLOCKED_BY_LIQUIDACIONES:')[1] || '';
+          alert('No se puede eliminar porque algunos reportes están incluidos en liquidaciones:\n' + details);
+        } else {
+          alert('No se pudo eliminar la obra: ' + msg);
+        }
         setLoading(false);
-      } else {
-        alert('Orden eliminada permanentemente.');
-        navigate('/ordenes');
+        return;
       }
+
+      const result = data?.[0] as { deleted_count?: number; media_urls?: string[]; firma_urls?: string[] } | undefined;
+      const mediaUrls = result?.media_urls || [];
+      const firmaUrls = result?.firma_urls || [];
+
+      if (mediaUrls.length > 0) {
+        const cloudinaryResult = await deleteCloudinaryImages(mediaUrls, supabase);
+        if (!cloudinaryResult.success) {
+          console.error('Error borrando imágenes de Cloudinary:', cloudinaryResult.error);
+        }
+      }
+
+      if (firmaUrls.length > 0) {
+        console.log('Firmas digitales asociadas no se gestionan en Cloudinary:', firmaUrls);
+      }
+
+      const totalCloudinary = mediaUrls.length;
+      const totalFirmas = firmaUrls.length;
+      const cloudinaryMsg = totalCloudinary > 0 ? ` (${totalCloudinary} imagen${totalCloudinary === 1 ? '' : 'es'} de Cloudinary)` : '';
+      const firmasMsg = totalFirmas > 0 ? ` y ${totalFirmas} firma${totalFirmas === 1 ? '' : 's'} digital${totalFirmas === 1 ? '' : 'es'} por limpiar separadamente` : '';
+
+      alert(`Orden eliminada permanentemente.${cloudinaryMsg}${firmasMsg}`);
+      navigate('/ordenes');
     } catch (err) {
       console.error('Error durante el borrado:', err);
       alert('Ocurrió un error inesperado al eliminar la orden.');
@@ -536,12 +552,16 @@ export default function OrdenDetalle() {
                     <span className="material-symbols-outlined text-[16px]">touch_app</span>
                     <label className="text-xs font-bold uppercase tracking-wider">Acción</label>
                   </div>
-                  {isEditor && (
+                  {(isEditor || (orden.estado === 'Papelera' && isAdmin)) && (
                     <div className="pl-6 flex gap-2 flex-wrap">
                       {orden.estado === 'Papelera' ? (
                         <>
-                          <button onClick={handleRestaurarOrden} className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Restaurar</button>
-                          <button onClick={handleDeleteOrdenPermanentemente} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold transition-colors shadow-sm">Eliminar Permanentemente</button>
+                          {isEditor && (
+                            <button onClick={handleRestaurarOrden} className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs font-bold transition-colors shadow-sm">Restaurar</button>
+                          )}
+                          {isAdmin && (
+                            <button onClick={handleDeleteOrdenPermanentemente} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold transition-colors shadow-sm">Eliminar Permanentemente</button>
+                          )}
                         </>
                       ) : (
                         <>

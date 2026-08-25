@@ -29,7 +29,7 @@ const getOrderNumber = (idLegible: string | null | undefined) => {
 };
 
 export default function Ordenes() {
-  const { isEditor, isTrabajador } = useUserRole();
+  const { isEditor, isAdmin, isTrabajador } = useUserRole();
   const [ordenes, setOrdenes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -234,46 +234,56 @@ export default function Ordenes() {
       `- Todas las fotos y albaranes asociados de Cloudinary.`
     )) return;
 
+    const reason = window.prompt(`Motivo del borrado de ${idLegible} (opcional):`) || undefined;
+
     setLoading(true);
 
     try {
-      // 1. Obtener todos los reportes de la orden para borrar sus imágenes de Cloudinary
-      const { data: reportesData } = await supabase
-        .from('reportes')
-        .select('fotos_urls, facturas_urls')
-        .eq('orden_id', orderId);
+      const { data, error } = await supabase.rpc('admin_eliminar_ordenes', {
+        p_order_ids: [orderId],
+        p_reason: reason,
+        p_action: 'hard_delete_order'
+      });
 
-      if (reportesData && reportesData.length > 0) {
-        const allUrls: string[] = [];
-        reportesData.forEach(rep => {
-          if (rep.fotos_urls) allUrls.push(...rep.fotos_urls);
-          if (rep.facturas_urls) allUrls.push(...rep.facturas_urls);
-        });
+      if (error) {
+        console.error('Error al eliminar orden:', error);
+        const msg = error.message || '';
+        if (msg.includes('ADMINISTRATOR_REQUIRED')) {
+          alert('Solo los administradores pueden eliminar obras permanentemente.');
+        } else if (msg.includes('ORDERS_NOT_IN_TRASH')) {
+          alert('Solo se pueden eliminar obras que estén en la Papelera.');
+        } else if (msg.includes('ORDERS_BLOCKED_BY_LIQUIDACIONES')) {
+          const details = msg.split('ORDERS_BLOCKED_BY_LIQUIDACIONES:')[1] || '';
+          alert('No se puede eliminar porque algunos reportes están incluidos en liquidaciones:\n' + details);
+        } else {
+          alert('No se pudo eliminar la obra: ' + msg);
+        }
+        setLoading(false);
+        return;
+      }
 
-        if (allUrls.length > 0) {
-          const result = await deleteCloudinaryImages(allUrls, supabase);
-          if (!result.success) {
-            console.error('Error borrando imágenes de Cloudinary:', result.error);
-          }
+      const result = data?.[0] as { deleted_count?: number; media_urls?: string[]; firma_urls?: string[] } | undefined;
+      const mediaUrls = result?.media_urls || [];
+      const firmaUrls = result?.firma_urls || [];
+
+      if (mediaUrls.length > 0) {
+        const cloudinaryResult = await deleteCloudinaryImages(mediaUrls, supabase);
+        if (!cloudinaryResult.success) {
+          console.error('Error borrando imágenes de Cloudinary:', cloudinaryResult.error);
         }
       }
 
-      // 2. Borrar reportes
-      await supabase.from('reportes').delete().eq('orden_id', orderId);
-
-      // 3. Borrar asignaciones
-      await supabase.from('orden_asignaciones').delete().eq('orden_id', orderId);
-
-      // 4. Borrar la orden
-      const { error } = await supabase.from('ordenes').delete().eq('id', orderId);
-
-      if (error) {
-        console.error('Error al eliminar orden de la base de datos:', error);
-        alert('Hubo un error al eliminar la orden de la base de datos.');
-      } else {
-        alert('Orden eliminada permanentemente con éxito.');
-        fetchOrdenes();
+      if (firmaUrls.length > 0) {
+        console.log('Firmas digitales asociadas no se gestionan en Cloudinary:', firmaUrls);
       }
+
+      const totalCloudinary = mediaUrls.length;
+      const totalFirmas = firmaUrls.length;
+      const cloudinaryMsg = totalCloudinary > 0 ? ` (${totalCloudinary} imagen${totalCloudinary === 1 ? '' : 'es'} de Cloudinary)` : '';
+      const firmasMsg = totalFirmas > 0 ? ` y ${totalFirmas} firma${totalFirmas === 1 ? '' : 's'} digital${totalFirmas === 1 ? '' : 'es'} por limpiar separadamente` : '';
+
+      alert(`Orden ${idLegible} eliminada permanentemente con éxito.${cloudinaryMsg}${firmasMsg}`);
+      fetchOrdenes();
     } catch (err) {
       console.error('Error durante el borrado:', err);
       alert('Ocurrió un error inesperado al eliminar la orden.');
@@ -288,42 +298,57 @@ export default function Ordenes() {
       `con todas sus asignaciones, partes de trabajo y fotos asociadas en Cloudinary.`
     )) return;
 
+    const orderIds = filteredOrdenes.map(o => o.id);
+    if (orderIds.length === 0) return;
+
+    const reason = window.prompt(`Motivo del vaciado de papelera (${orderIds.length} órdenes) (opcional):`) || undefined;
+
     setLoading(true);
 
     try {
-      for (const orden of filteredOrdenes) {
-        // 1. Obtener todos los reportes de la orden
-        const { data: reportesData } = await supabase
-          .from('reportes')
-          .select('fotos_urls, facturas_urls')
-          .eq('orden_id', orden.id);
+      const { data, error } = await supabase.rpc('admin_eliminar_ordenes', {
+        p_order_ids: orderIds,
+        p_reason: reason,
+        p_action: 'empty_trash'
+      });
 
-        if (reportesData && reportesData.length > 0) {
-          const allUrls: string[] = [];
-          reportesData.forEach(rep => {
-            if (rep.fotos_urls) allUrls.push(...rep.fotos_urls);
-            if (rep.facturas_urls) allUrls.push(...rep.facturas_urls);
-          });
-
-          if (allUrls.length > 0) {
-            const result = await deleteCloudinaryImages(allUrls, supabase);
-            if (!result.success) {
-              console.error('Error borrando imágenes de Cloudinary:', result.error);
-            }
-          }
+      if (error) {
+        console.error('Error al vaciar papelera:', error);
+        const msg = error.message || '';
+        if (msg.includes('ADMINISTRATOR_REQUIRED')) {
+          alert('Solo los administradores pueden vaciar la papelera.');
+        } else if (msg.includes('ORDERS_NOT_IN_TRASH')) {
+          alert('Solo se pueden eliminar obras que estén en la Papelera.');
+        } else if (msg.includes('ORDERS_BLOCKED_BY_LIQUIDACIONES')) {
+          const details = msg.split('ORDERS_BLOCKED_BY_LIQUIDACIONES:')[1] || '';
+          alert('No se puede vaciar porque algunos reportes están incluidos en liquidaciones:\n' + details);
+        } else {
+          alert('No se pudo vaciar la papelera: ' + msg);
         }
-
-        // 2. Borrar reportes
-        await supabase.from('reportes').delete().eq('orden_id', orden.id);
-
-        // 3. Borrar asignaciones
-        await supabase.from('orden_asignaciones').delete().eq('orden_id', orden.id);
-
-        // 4. Borrar la orden
-        await supabase.from('ordenes').delete().eq('id', orden.id);
+        setLoading(false);
+        return;
       }
 
-      alert('Papelera vaciada con éxito.');
+      const result = data?.[0] as { deleted_count?: number; media_urls?: string[]; firma_urls?: string[] } | undefined;
+      const mediaUrls = result?.media_urls || [];
+      const firmaUrls = result?.firma_urls || [];
+      const deletedCount = result?.deleted_count || orderIds.length;
+
+      if (mediaUrls.length > 0) {
+        const cloudinaryResult = await deleteCloudinaryImages(mediaUrls, supabase);
+        if (!cloudinaryResult.success) {
+          console.error('Error borrando imágenes de Cloudinary:', cloudinaryResult.error);
+        }
+      }
+
+      if (firmaUrls.length > 0) {
+        console.log('Firmas digitales asociadas no se gestionan en Cloudinary:', firmaUrls);
+      }
+
+      const cloudinaryMsg = mediaUrls.length > 0 ? ` (${mediaUrls.length} imagen${mediaUrls.length === 1 ? '' : 'es'} de Cloudinary)` : '';
+      const firmasMsg = firmaUrls.length > 0 ? ` y ${firmaUrls.length} firma${firmaUrls.length === 1 ? '' : 's'} digital${firmaUrls.length === 1 ? '' : 'es'} por limpiar separadamente` : '';
+
+      alert(`Papelera vaciada con éxito: ${deletedCount} orden${deletedCount === 1 ? '' : 'es'} eliminada${deletedCount === 1 ? '' : 's'}.${cloudinaryMsg}${firmasMsg}`);
       fetchOrdenes();
     } catch (err) {
       console.error('Error al vaciar papelera:', err);
@@ -504,7 +529,7 @@ export default function Ordenes() {
             </button>
           </div>
 
-          {activeTab === 'papelera' && filteredOrdenes.length > 0 && isEditor && (
+          {activeTab === 'papelera' && filteredOrdenes.length > 0 && isAdmin && (
             <button
               onClick={handleVaciarPapelera}
               className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-red-600/20 transition-all active:scale-95 w-full sm:w-auto"
@@ -732,7 +757,7 @@ export default function Ordenes() {
                               >
                                 <span className="material-symbols-outlined text-[18px]">restore</span>
                               </button>
-                              {isEditor && (
+                              {isAdmin && (
                                 <button
                                   onClick={(e) => {
                                     e.preventDefault();
