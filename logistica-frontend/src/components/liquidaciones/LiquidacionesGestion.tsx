@@ -44,6 +44,11 @@ interface TrabajadorOption {
   estado: string;
 }
 
+interface PendingLiquidacion {
+  reportesPendientes: number;
+  horasPendientes: number;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtCurrency = (n: number | null | undefined) => {
   if (n == null) return '-';
@@ -126,6 +131,7 @@ export default function LiquidacionesGestion() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [bonusMap, setBonusMap] = useState<Record<string, LiquidacionBonus[]>>({});
   const [bonusLoadingMap, setBonusLoadingMap] = useState<Record<string, boolean>>({});
+  const [pendingMap, setPendingMap] = useState<Record<string, PendingLiquidacion>>({});
   const [refreshKey, setRefreshKey] = useState(0);
 
   const navigate = useNavigate();
@@ -205,6 +211,24 @@ export default function LiquidacionesGestion() {
     setBonusLoadingMap(prev => ({ ...prev, [liquidacionId]: false }));
   }, []);
 
+  const fetchReportesPendientes = useCallback(async (liquidacionId: string) => {
+    const { data, error: rpcError } = await supabase.rpc('admin_get_liquidacion_reportes_pendientes', {
+      p_liquidacion_id: liquidacionId,
+    });
+    if (rpcError) {
+      console.error('Error loading pending reports:', rpcError);
+      return;
+    }
+    const row = (data || [])[0] as { reportes_pendientes: number; horas_pendientes: number } | undefined;
+    setPendingMap(prev => ({
+      ...prev,
+      [liquidacionId]: {
+        reportesPendientes: Number(row?.reportes_pendientes ?? 0),
+        horasPendientes: Number(row?.horas_pendientes ?? 0),
+      },
+    }));
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     const load = async () => {
@@ -271,6 +295,7 @@ export default function LiquidacionesGestion() {
     }
 
     await fetchLiquidaciones();
+    await fetchReportesPendientes(liquidacionId);
     setRefreshKey(k => k + 1);
   };
 
@@ -344,8 +369,9 @@ export default function LiquidacionesGestion() {
     setExpandedId(prev => {
       const next = prev === id ? null : id;
       if (next && next !== prev) {
-        // Load bonus when expanding
+        // Load bonus and pending reports when expanding
         fetchBonus(next);
+        fetchReportesPendientes(next);
       }
       return next;
     });
@@ -580,6 +606,7 @@ export default function LiquidacionesGestion() {
                                 trabajadores={trabajadores}
                                 bonusList={bonusMap[l.id] || []}
                                 bonusLoading={bonusLoadingMap[l.id] || false}
+                                pending={pendingMap[l.id]}
                                 onRefresh={async () => { await fetchLiquidaciones(); setRefreshKey(k => k + 1); }}
                                 onRecalcular={handleRecalcular}
                                 onCerrar={handleCerrar}
@@ -669,6 +696,7 @@ interface DetailPanelProps {
   trabajadores: TrabajadorOption[];
   bonusList: LiquidacionBonus[];
   bonusLoading: boolean;
+  pending: PendingLiquidacion | undefined;
   onRefresh: () => Promise<void>;
   onRecalcular: (id: string) => Promise<void>;
   onCerrar: (id: string) => Promise<void>;
@@ -682,6 +710,7 @@ function DetailPanel({
   trabajadores,
   bonusList,
   bonusLoading,
+  pending,
   onRefresh,
   onRecalcular,
   onCerrar,
@@ -883,6 +912,8 @@ function DetailPanel({
     await onRefresh();
   };
 
+  const pendingAviso = isOpen && pending && pending.reportesPendientes > 0;
+
   return (
     <div className="space-y-5">
       {/* Breakdown */}
@@ -910,6 +941,13 @@ function DetailPanel({
           <span>- Nómina: <strong className="text-slate-700 dark:text-slate-300">{fmtCurrency(liquidacion.importe_nomina)}</strong></span>
         </div>
       </div>
+
+      {pendingAviso && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 p-4 rounded-xl text-sm">
+          Hay <strong>{pending.reportesPendientes}</strong> parte{pending.reportesPendientes > 1 ? 's' : ''} nuevo{pending.reportesPendientes > 1 ? 's' : ''} pendiente{pending.reportesPendientes > 1 ? 's' : ''} de incorporar
+          {' '}(+{fmtNumber(pending.horasPendientes, 1)} h)
+        </div>
+      )}
 
       {isOpen ? (
         <>
