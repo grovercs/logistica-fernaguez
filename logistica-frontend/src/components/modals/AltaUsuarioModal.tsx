@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { supabaseAdmin } from '../../lib/supabase-admin';
 
 interface AltaUsuarioModalProps {
   isOpen: boolean;
@@ -47,35 +46,10 @@ export default function AltaUsuarioModal({ isOpen, onClose, onCreated }: AltaUsu
     
     setIsSaving(true);
     try {
-        // 1. Create Auth User
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-            email,
-            password,
-            email_confirm: true,
-            user_metadata: { nombre_completo: nombre }
-        });
-
-        if (authError) throw authError;
-
-        const userId = authData.user?.id;
-        if (!userId) throw new Error('No se pudo obtener el ID del nuevo usuario.');
-
-        // 2. Create/Update Profile
-        // We use upsert because a DB trigger might have already created a basic profile
-        const { error: profileError } = await supabase.from('perfiles').upsert({
-            id: userId,
-            nombre_completo: nombre,
-            rol_id: rolId,
-            activo: activo,
-            telegram_chat_id: telegramChatId || null
-        }, { onConflict: 'id' });
-
-        if (profileError) throw profileError;
-
-        onCreated();
-        onClose();
-    } catch (err: any) {
-        alert('Error al crear usuario: ' + err.message);
+        void onCreated; // Caller hook kept for when function is restored via Netlify Functions.
+        alert('Función temporalmente deshabilitada; usa la gestión de usuarios segura.');
+        // Admin Auth operations must go through Netlify Edge Functions with SUPABASE_SERVICE_ROLE_KEY.
+        console.warn('[AltaUsuarioModal] Auth Admin createUser disabled.');
     } finally {
         setIsSaving(false);
     }

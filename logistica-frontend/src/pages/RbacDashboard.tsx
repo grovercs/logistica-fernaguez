@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { supabaseAdmin } from '../lib/supabase-admin';
 
 interface UserRole {
   id: string;
@@ -49,17 +48,14 @@ export default function RbacDashboard() {
       if (rError) throw rError;
       setRoles(rolesData || []);
 
-      // 2. Fetch emails using Admin API
-      const { data: { users: authUsers }, error: aError } = await supabaseAdmin.auth.admin.listUsers();
-      if (aError) throw aError;
-
-      const emailMap = new Map(authUsers.map(u => [u.id, u.email]));
+      // 2. Email fetching disabled in browser; use Netlify Functions for auth admin ops.
+      console.warn('[RBAC] Auth Admin listUsers disabled; email column shows "no disponible".');
 
       // 3. Merge
       const merged = (profiles || []).map(p => ({
         id: p.id,
         nombre: p.nombre,
-        email: emailMap.get(p.id) || 'N/A',
+        email: 'no disponible',
         roleId: p.rol_id,
         role: (p.roles as any)?.nombre || 'Sin Rol'
       }));

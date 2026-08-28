@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { supabaseAdmin } from '../../lib/supabase-admin';
 import { supabase } from '../../lib/supabase';
 
 interface Props {
@@ -40,86 +39,11 @@ export default function CrearAccesoModal({ isOpen, onClose, onCreated, trabajado
     setLoading(true);
 
     try {
-      // 0. Buscar si ya existe un usuario en Auth con este email
-      const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-      if (listError) throw listError;
-
-      const existingUser = listData.users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
-
-      let userId: string | undefined;
-
-      if (existingUser) {
-        const continuar = window.confirm(
-          `Ya existe un usuario registrado con el email "${email}".\n\n` +
-          `¿Quieres vincular este usuario existente a ${trabajador.nombre} ${trabajador.apellidos}?\n\n` +
-          `Pulsa Aceptar para vincularlo (se actualizará la contraseña si la has escrito).\n` +
-          `Pulsa Cancelar para detenerte y usar otro email.`
-        );
-        if (!continuar) {
-          setLoading(false);
-          return;
-        }
-        userId = existingUser.id;
-
-        // Actualizar password y metadata del usuario existente
-        const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-          password: password || undefined,
-          email_confirm: true,
-          user_metadata: {
-            nombre_completo: `${trabajador.nombre} ${trabajador.apellidos}`,
-            rol: rolSeleccionado.toLowerCase()
-          }
-        });
-        if (updateErr) throw updateErr;
-      } else {
-        // 1. Crear usuario en Supabase Auth usando la clave de servicio
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email: email,
-          password: password,
-          email_confirm: true,
-          user_metadata: {
-            nombre_completo: `${trabajador.nombre} ${trabajador.apellidos}`,
-            rol: rolSeleccionado.toLowerCase()
-          }
-        });
-
-        if (authError) throw authError;
-        userId = authData.user?.id;
-      }
-
-      if (!userId) throw new Error('No se pudo obtener el ID del usuario.');
-
-      // 2. Vincular el auth_user_id en la tabla trabajadores
-      const { error: trabError } = await supabase
-        .from('trabajadores')
-        .update({ auth_user_id: userId, email: email })
-        .eq('id', trabajador.id);
-
-      if (trabError) throw trabError;
-
-      // 3. Crear o actualizar perfil en la tabla perfiles con el rol seleccionado
-      const { data: rolData } = await supabase
-        .from('roles')
-        .select('id')
-        .eq('nombre', rolSeleccionado)
-        .single();
-
-      await supabase.from('perfiles').upsert({
-        id: userId,
-        nombre_completo: `${trabajador.nombre} ${trabajador.apellidos}`,
-        rol_id: rolData?.id || null,
-        telefono: trabajador.telefono || null,
-        activo: true
-      });
-
-      // 4. Mostrar pantalla de éxito
-      setCredentials({ email, password });
-      setPaso('exito');
-      if (onCreated) onCreated();
-
-    } catch (err: any) {
-      console.error('Error creating access:', err);
-      alert(`Error al crear el acceso: ${err.message}`);
+      void onCreated;
+      void setCredentials;
+      alert('Función temporalmente deshabilitada; usa la gestión de usuarios segura.');
+      // Admin Auth operations must go through Netlify Edge Functions with SUPABASE_SERVICE_ROLE_KEY.
+      console.warn('[CrearAccesoModal] Auth Admin listUsers/updateUserById/createUser disabled.');
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { supabaseAdmin } from '../../lib/supabase-admin';
 
 interface EditarUsuarioModalProps {
   isOpen: boolean;
@@ -70,18 +69,12 @@ export default function EditarUsuarioModal({ isOpen, onClose, usuario, roles, on
     }
 
     setIsResetting(true);
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(usuario.id, {
-        password: newPassword
-    });
+    alert('Función temporalmente deshabilitada; usa la gestión de usuarios segura.');
+    // Admin Auth operations must go through Netlify Edge Functions with SUPABASE_SERVICE_ROLE_KEY.
+    console.warn('[EditarUsuarioModal] Auth Admin updateUserById disabled.');
     setIsResetting(false);
-
-    if (!error) {
-        alert('Contraseña actualizada correctamente.');
-        setShowReset(false);
-        setNewPassword('');
-    } else {
-        alert('Error al actualizar contraseña: ' + error.message);
-    }
+    setShowReset(false);
+    setNewPassword('');
   };
 
   return (
