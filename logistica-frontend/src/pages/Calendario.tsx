@@ -14,7 +14,7 @@ interface TrabajadorDirectoryRow {
 }
 
 export default function Calendario() {
-  const { isEditor } = useUserRole();
+  const { isEditor, isTrabajador } = useUserRole();
   const [isNuevoReporteModalOpen, setIsNuevoReporteModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null); // Fecha preseleccionada para el modal
   // ordenes just for the list panel
@@ -47,11 +47,6 @@ export default function Calendario() {
     setSelectedDate(formatDateToISO(date));
     setIsNuevoReporteModalOpen(true);
   };
-
-  useEffect(() => {
-    fetchData();
-    fetchTecnicos();
-  }, []);
 
   // Auto-navegar al mes de la fecha "Desde" cuando se aplica un rango
   useEffect(() => {
@@ -90,28 +85,64 @@ export default function Calendario() {
     const workerId = workerData?.id;
     const isCurrentUserWorker = isRolWorker && !!workerData;
 
-    // Fetch all orders (or worker's orders)
-    let ordenesQuery = supabase
+    if (isCurrentUserWorker) {
+      // Calendario del trabajador: la asignación es la fuente de planificación.
+      // Se usa orden.fecha_programada; sin fallback a creado_en.
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from('orden_asignaciones')
+        .select(`
+          id,
+          orden_id,
+          trabajador_id,
+          fecha_asignacion,
+          hora_programada,
+          estado,
+          notas,
+          creado_en,
+          orden:ordenes!inner (
+            id,
+            id_legible,
+            estado,
+            cliente,
+            nombre_obra,
+            direccion,
+            tecnico_id,
+            descripcion,
+            fecha_programada,
+            hora_programada,
+            creado_en
+          )
+        `)
+        .eq('trabajador_id', workerId)
+        .neq('estado', 'cancelado')
+        .neq('ordenes.estado', 'Archivado')
+        .neq('ordenes.estado', 'Papelera');
+
+      if (assignmentsError) {
+        console.error('calendar_worker_assignments_load_failed', assignmentsError);
+      }
+
+      const mappedOrdenes = (assignmentsData || []).map((a: any) => ({
+        ...a.orden,
+        hora_programada: a.orden.hora_programada || a.hora_programada,
+        asignacion_id: a.id
+      }));
+      setOrdenes(mappedOrdenes);
+      setReportes([]); // evitar duplicados: la asignación representa la cita planificada
+      return;
+    }
+
+    // Fetch all orders (admin / editor)
+    const { data: ordenesData } = await supabase
       .from('ordenes')
       .select('*, orden_asignaciones(*)')
       .neq('estado', 'Archivado')
       .neq('estado', 'Papelera')
       .order('creado_en', { ascending: false });
-    if (isCurrentUserWorker) {
-      // Solo órdenes asignadas to this worker
-      const { data: asignaciones } = await supabase
-        .from('orden_asignaciones')
-        .select('orden_id')
-        .eq('trabajador_id', workerId)
-        .neq('estado', 'cancelado');
-      const assignedIds = (asignaciones || []).map(a => a.orden_id);
-      ordenesQuery = ordenesQuery.or(`tecnico_id.eq.${authId},tecnico_id.eq.${workerId},id.in.(${assignedIds.join(',')})`);
-    }
-    const { data: ordenesData } = await ordenesQuery;
     if (ordenesData) setOrdenes(ordenesData);
 
     // Fetch all reports joined to orders (for calendar display by work date)
-    let reportesQuery = supabase
+    const { data: reportesData } = await supabase
       .from('reportes')
       .select(`
         id,
@@ -131,10 +162,6 @@ export default function Calendario() {
       .neq('ordenes.estado', 'Archivado')
       .neq('ordenes.estado', 'Papelera')
       .order('fecha_trabajo', { ascending: false });
-    if (isCurrentUserWorker && authId) {
-      reportesQuery = reportesQuery.eq('tecnico_id', authId);
-    }
-    const { data: reportesData } = await reportesQuery;
     if (reportesData) setReportes(reportesData);
   };
 
@@ -147,6 +174,11 @@ export default function Calendario() {
       })));
     }
   };
+
+  useEffect(() => {
+    fetchData();
+    fetchTecnicos();
+  }, [isTrabajador]);
 
   const applyDatePreset = (preset: string) => {
     const hoy = new Date();
@@ -330,8 +362,8 @@ export default function Calendario() {
   // Orders always appear on their scheduled/creation date
   const getOrdenesForDay = (dayDate: Date) => {
     return ordenes.filter(o => {
-      // Prioridad: 1. fecha_programada, 2. creado_en (fallback para órdenes antiguas)
-      const dateStr = o.fecha_programada || o.creado_en;
+      // Para trabajador solo se usa fecha_programada; nunca creado_en como fallback.
+      const dateStr = isTrabajador ? o.fecha_programada : (o.fecha_programada || o.creado_en);
       if (!dateStr) return false;
 
       // Para fecha_programada (formato YYYY-MM-DD) parseamos como fecha local
@@ -399,7 +431,7 @@ export default function Calendario() {
       <header className="flex flex-col border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm z-10 w-full sticky top-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 py-4 gap-4">
           <div className="flex items-center gap-3 flex-1">
-            <h2 className="text-xl font-black tracking-tight whitespace-nowrap">Calendario</h2>
+            <h2 className="text-xl font-black tracking-tight whitespace-nowrap">{isTrabajador ? 'Mi Calendario' : 'Calendario'}</h2>
             <div className="relative flex-1 max-w-md">
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
                 <span className="material-symbols-outlined text-lg">search</span>
@@ -413,7 +445,7 @@ export default function Calendario() {
               />
             </div>
           </div>
-          {isEditor && (
+          {!isTrabajador && isEditor && (
             <button
               onClick={() => setIsNuevoReporteModalOpen(true)}
               className="w-full sm:w-auto bg-primary text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
@@ -539,16 +571,18 @@ export default function Calendario() {
                 <option value="Finalizada">🟢 Finalizada</option>
                 <option value="Cancelada">⚪ Cancelada</option>
              </select>
-             <select
-               className="w-full xs:w-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest focus:ring-2 focus:ring-primary/20 px-4 py-2.5 cursor-pointer shadow-sm appearance-none"
-               value={tecnicoFilter}
-               onChange={(e) => setTecnicoFilter(e.target.value)}
-             >
-                <option value="">Técnicos</option>
-                {tecnicos.map((t: any) => (
-                  <option key={t.id} value={t.id}>{t.nombre} {t.apellidos}</option>
-                ))}
-             </select>
+             {!isTrabajador && (
+               <select
+                 className="w-full xs:w-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest focus:ring-2 focus:ring-primary/20 px-4 py-2.5 cursor-pointer shadow-sm appearance-none"
+                 value={tecnicoFilter}
+                 onChange={(e) => setTecnicoFilter(e.target.value)}
+               >
+                  <option value="">Técnicos</option>
+                  {tecnicos.map((t: any) => (
+                    <option key={t.id} value={t.id}>{t.nombre} {t.apellidos}</option>
+                  ))}
+               </select>
+             )}
           </div>
         </div>
       </header>
@@ -614,13 +648,15 @@ export default function Calendario() {
                      <div
                         key={idx}
                         onClick={() => handleDayClick(dayObj.date)}
-                        className={`relative border-r border-b border-slate-100 dark:border-slate-800 p-2 flex flex-col gap-1 hover:bg-primary/5 dark:hover:bg-primary/10 cursor-pointer transition-colors ${!dayObj.isCurrentMonth ? 'bg-slate-50/50 dark:bg-slate-800/20 opacity-40' : ''} ${isToday ? 'bg-primary/5' : ''}`}
+                        className={`relative border-r border-b border-slate-100 dark:border-slate-800 p-2 flex flex-col gap-1 hover:bg-primary/5 dark:hover:bg-primary/10 transition-colors ${!isTrabajador ? 'cursor-pointer' : ''} ${!dayObj.isCurrentMonth ? 'bg-slate-50/50 dark:bg-slate-800/20 opacity-40' : ''} ${isToday ? 'bg-primary/5' : ''}`}
                      >
                          <div className="flex items-center justify-between">
                            <span className={`text-sm ${isToday ? 'font-bold text-primary underline' : 'font-medium'}`}>
                               {dayObj.date.getDate()} {isToday ? '(Hoy)' : ''}
                            </span>
-                           <span className="material-symbols-outlined text-[14px] text-slate-300 dark:text-slate-600 group-hover:text-primary/50">add</span>
+                           {!isTrabajador && (
+                             <span className="material-symbols-outlined text-[14px] text-slate-300 dark:text-slate-600 group-hover:text-primary/50">add</span>
+                           )}
                          </div>
 
                          <div className="flex-1 mx-1 overflow-y-auto space-y-1 mt-1 pb-1 scrollbar-thin">

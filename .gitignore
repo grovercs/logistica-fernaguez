@@ -42,3 +42,6 @@ antigravity_kit_temp/
 
 # Secrets / Cloudinary credentials
 cloudinary-imagenes/
+
+# Local Netlify folder
+.netlify

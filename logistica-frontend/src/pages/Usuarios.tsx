@@ -88,7 +88,11 @@ async function adminRequest<T>(path: string, method: 'GET' | 'POST', body?: unkn
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
-  const payload = await result.json().catch(() => ({})) as { error?: string; code?: string; requires_confirmation?: boolean; active_assignments?: number; active_assignments_count?: number } & T;
+  const contentType = result.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error('Respuesta inesperada del servidor. Asegúrate de usar "netlify dev" para probar funciones administrativas en local.');
+  }
+  const payload = await result.json() as { error?: string; code?: string; requires_confirmation?: boolean; active_assignments?: number; active_assignments_count?: number } & T;
   if (!result.ok) {
     const error = new Error(payload.error || 'No se pudo completar la operaci\u00f3n.') as Error & { code?: string; requiresConfirmation?: boolean; activeAssignments?: number };
     error.code = payload.code;

@@ -29,14 +29,14 @@ const getOrderNumber = (idLegible: string | null | undefined) => {
 };
 
 export default function Ordenes() {
-  const { isEditor, isAdmin, isTrabajador } = useUserRole();
+  const { isEditor, isAdmin, isTrabajador, loading: roleLoading } = useUserRole();
   const [ordenes, setOrdenes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRenotificarOpen, setIsRenotificarOpen] = useState(false);
   const [ordenParaRenotificar, setOrdenParaRenotificar] = useState<any>(null);
   const [tecnicos, setTecnicos] = useState<any[]>([]);
-  
+
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
@@ -46,21 +46,18 @@ export default function Ordenes() {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [showWorkerMenu, setShowWorkerMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'activas' | 'archivadas' | 'papelera'>('activas');
-
-  useEffect(() => {
-    fetchOrdenes();
-    fetchTecnicos();
-  }, [activeTab, isTrabajador, isEditor]);
+  const [workerTab, setWorkerTab] = useState<'pendientes' | 'en_proceso' | 'finalizadas'>('pendientes');
 
   const fetchOrdenes = async () => {
     setLoading(true);
 
-    // Si es trabajador, obtenemos su ID para filtrar
-    let workerDbId: string | null = null;
-    let authUserId: string | null = null;
+    // Cargamos el directorio de técnicos para cruzar datos en ambos roles.
+    const rawTecnicos = await fetchDirectorioTecnicos();
+
     if (isTrabajador) {
       const { data: sessionData } = await supabase.auth.getSession();
-      authUserId = sessionData?.session?.user?.id || null;
+      const authUserId = sessionData?.session?.user?.id || null;
+      let workerDbId: string | null = null;
       if (authUserId) {
         const { data: worker } = await supabase
           .from('trabajadores')
@@ -69,9 +66,66 @@ export default function Ordenes() {
           .maybeSingle();
         workerDbId = worker?.id || null;
       }
+
+      // Trabajador: fuente de verdad = sus asignaciones.
+      const { data: assignments, error } = await supabase
+        .from('orden_asignaciones')
+        .select(`
+          id,
+          orden_id,
+          trabajador_id,
+          fecha_asignacion,
+          hora_programada,
+          estado,
+          notas,
+          creado_en,
+          orden:ordenes!inner (
+            id,
+            id_legible,
+            estado,
+            cliente,
+            nombre_obra,
+            direccion,
+            tecnico_id,
+            descripcion,
+            fecha_programada,
+            hora_programada,
+            creado_en
+          )
+        `)
+        .eq('trabajador_id', workerDbId || '')
+        .neq('estado', 'cancelado')
+        .neq('ordenes.estado', 'Archivado')
+        .neq('ordenes.estado', 'Papelera')
+        .neq('ordenes.estado', 'Cancelada');
+
+      if (error) {
+        console.error('ordenes_worker_assignments_load_failed', error);
+      }
+
+      const mergedData = (assignments || []).map((a: any) => {
+        const orden = a.orden;
+        const tecnicoObj = rawTecnicos?.find(t => t.id === a.trabajador_id || t.auth_user_id === a.trabajador_id);
+        return {
+          ...orden,
+          tecnico: tecnicoObj,
+          asignacion_id: a.id
+        };
+      });
+
+      mergedData.sort((a, b) => {
+        const numA = getOrderNumber(a.id_legible);
+        const numB = getOrderNumber(b.id_legible);
+        if (numA !== numB) return numB - numA;
+        return (b.id_legible || '').localeCompare(a.id_legible || '', 'es');
+      });
+
+      setOrdenes(mergedData);
+      setLoading(false);
+      return;
     }
 
-    // 1. Cargamos las órdenes con sus asignaciones
+    // Admin / Editor / Visualizador: consulta global
     let query = supabase
       .from('ordenes')
       .select('*, orden_asignaciones(*)')
@@ -87,33 +141,8 @@ export default function Ordenes() {
 
     const { data: rawOrdenes, error } = await query;
 
-    // 2. Cargamos el directorio limitado. Los contactos privados sólo se
-    // consultan para Administrador o Editor.
-    const rawTecnicos = await fetchDirectorioTecnicos();
-
     if (!error && rawOrdenes) {
-      let visibleOrdenes = rawOrdenes;
-
-      // Si es trabajador, filtrar solo sus órdenes
-      if (isTrabajador && (workerDbId || authUserId)) {
-        // Obtener IDs de órdenes asignadas a este trabajador
-        const { data: asignaciones } = await supabase
-          .from('orden_asignaciones')
-          .select('orden_id')
-          .eq('trabajador_id', workerDbId || authUserId)
-          .neq('estado', 'cancelado');
-        const assignedIds = new Set((asignaciones || []).map(a => a.orden_id));
-
-        visibleOrdenes = rawOrdenes.filter(o =>
-          o.tecnico_id === authUserId ||
-          o.tecnico_id === workerDbId ||
-          assignedIds.has(o.id)
-        );
-      }
-
-      // 3. Cruzamos los datos manualmente (más fiable si no hay FKs en BD)
-      const mergedData = visibleOrdenes.map(orden => {
-        // Buscamos al técnico por su ID o por su AuthID (por si acaso hay mezclas)
+      const mergedData = rawOrdenes.map(orden => {
         const tecnicoObj = rawTecnicos?.find(t => t.id === orden.tecnico_id || t.auth_user_id === orden.tecnico_id);
         return {
           ...orden,
@@ -121,7 +150,6 @@ export default function Ordenes() {
         };
       });
 
-      // Ordenación estricta por número de orden (id_legible) decreciente
       mergedData.sort((a, b) => {
         const numA = getOrderNumber(a.id_legible);
         const numB = getOrderNumber(b.id_legible);
@@ -172,6 +200,13 @@ export default function Ordenes() {
     setTecnicos(await fetchDirectorioTecnicos());
   };
 
+  useEffect(() => {
+    if (!roleLoading) {
+      fetchOrdenes();
+      fetchTecnicos();
+    }
+  }, [activeTab, isTrabajador, isEditor, roleLoading]);
+
   const filteredOrdenes = ordenes.filter(o => {
     const searchLower = searchTerm.toLowerCase();
 
@@ -208,7 +243,17 @@ export default function Ordenes() {
       }
     }
 
-    return matchesSearch && matchesEstado && matchesTecnico && matchesFecha;
+    let matchesWorkerTab = true;
+    if (isTrabajador) {
+      const estadosPorTab = {
+        pendientes: ['Pendiente', 'Urgente'],
+        en_proceso: ['En Curso', 'En revisión', 'Pendiente de firma'],
+        finalizadas: ['Finalizada']
+      };
+      matchesWorkerTab = estadosPorTab[workerTab].includes(o.estado);
+    }
+
+    return matchesSearch && matchesEstado && matchesTecnico && matchesFecha && matchesWorkerTab;
   }).sort((a, b) => {
     const numA = getOrderNumber(a.id_legible);
     const numB = getOrderNumber(b.id_legible);
@@ -435,50 +480,54 @@ export default function Ordenes() {
                     <ClipboardList className="size-6" />
                 </div>
                 <div>
-                    <h1 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight">Órdenes de Trabajo</h1>
+                    <h1 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight">{isTrabajador ? 'Mis Obras' : 'Órdenes de Trabajo'}</h1>
                     <p className="text-xs sm:text-sm font-semibold text-slate-500 uppercase tracking-widest">{filteredOrdenes.length} Intervenciones Registradas</p>
                 </div>
             </div>
             <div className="flex items-center gap-2">
-              {/* Dropdown filtro por trabajador */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowWorkerMenu(!showWorkerMenu)}
-                  className="w-full sm:w-auto bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-4 py-3.5 rounded-2xl font-bold text-xs shadow-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
-                >
-                  <User className="size-4" />
-                  <span className="hidden sm:inline">{filterTecnico ? tecnicos.find(t => t.id === filterTecnico)?.nombre || 'Técnico' : 'Filtrar por Técnico'}</span>
-                  <span className="sm:hidden">Técnico</span>
-                  <ChevronDown className={`size-3 transition-transform ${showWorkerMenu ? 'rotate-180' : ''}`} />
-                </button>
+              {!isTrabajador && (
+                <>
+                  {/* Dropdown filtro por trabajador */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowWorkerMenu(!showWorkerMenu)}
+                      className="w-full sm:w-auto bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-4 py-3.5 rounded-2xl font-bold text-xs shadow-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
+                    >
+                      <User className="size-4" />
+                      <span className="hidden sm:inline">{filterTecnico ? tecnicos.find(t => t.id === filterTecnico)?.nombre || 'Técnico' : 'Filtrar por Técnico'}</span>
+                      <span className="sm:hidden">Técnico</span>
+                      <ChevronDown className={`size-3 transition-transform ${showWorkerMenu ? 'rotate-180' : ''}`} />
+                    </button>
 
-                {showWorkerMenu && (
-                  <>
-                    <div className="fixed inset-0 z-30" onClick={() => setShowWorkerMenu(false)} />
-                    <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-40 overflow-hidden">
-                      <div className="p-2 max-h-72 overflow-y-auto">
-                        <button
-                          onClick={() => { setFilterTecnico(''); setShowWorkerMenu(false); }}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 ${filterTecnico === '' ? 'bg-primary/10 text-primary' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                        >
-                          <span className="size-6 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px] font-black">T</span>
-                          Todos los técnicos
-                        </button>
-                        {tecnicos.map((t: any) => (
-                          <button
-                            key={t.id}
-                            onClick={() => { setFilterTecnico(t.id); setShowWorkerMenu(false); }}
-                            className={`w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 ${filterTecnico === t.id ? 'bg-primary/10 text-primary' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                          >
-                            <span className="size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-black uppercase">{t.nombre?.charAt(0)}</span>
-                            {t.nombre} {t.apellidos}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
+                    {showWorkerMenu && (
+                      <>
+                        <div className="fixed inset-0 z-30" onClick={() => setShowWorkerMenu(false)} />
+                        <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-40 overflow-hidden">
+                          <div className="p-2 max-h-72 overflow-y-auto">
+                            <button
+                              onClick={() => { setFilterTecnico(''); setShowWorkerMenu(false); }}
+                              className={`w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 ${filterTecnico === '' ? 'bg-primary/10 text-primary' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                            >
+                              <span className="size-6 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px] font-black">T</span>
+                              Todos los técnicos
+                            </button>
+                            {tecnicos.map((t: any) => (
+                              <button
+                                key={t.id}
+                                onClick={() => { setFilterTecnico(t.id); setShowWorkerMenu(false); }}
+                                className={`w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 ${filterTecnico === t.id ? 'bg-primary/10 text-primary' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                              >
+                                <span className="size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-black uppercase">{t.nombre?.charAt(0)}</span>
+                                {t.nombre} {t.apellidos}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
 
               {isEditor && (
                 <button
@@ -496,40 +545,75 @@ export default function Ordenes() {
       <div className="p-4 sm:p-8 max-w-7xl mx-auto w-full space-y-6">
         {/* Tabs Activas / Archivadas */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setActiveTab('activas')}
-              className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
-                activeTab === 'activas'
-                  ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                  : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              Activas
-            </button>
-            <button
-              onClick={() => setActiveTab('archivadas')}
-              className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
-                activeTab === 'archivadas'
-                  ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                  : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              Archivadas
-            </button>
-            <button
-              onClick={() => setActiveTab('papelera')}
-              className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
-                activeTab === 'papelera'
-                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/20'
-                  : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              Papelera
-            </button>
-          </div>
+          {isTrabajador ? (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setWorkerTab('pendientes')}
+                className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
+                  workerTab === 'pendientes'
+                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                    : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                Pendientes
+              </button>
+              <button
+                onClick={() => setWorkerTab('en_proceso')}
+                className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
+                  workerTab === 'en_proceso'
+                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                    : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                En Proceso
+              </button>
+              <button
+                onClick={() => setWorkerTab('finalizadas')}
+                className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
+                  workerTab === 'finalizadas'
+                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                    : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                Finalizadas
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setActiveTab('activas')}
+                className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
+                  activeTab === 'activas'
+                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                    : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                Activas
+              </button>
+              <button
+                onClick={() => setActiveTab('archivadas')}
+                className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
+                  activeTab === 'archivadas'
+                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                    : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                Archivadas
+              </button>
+              <button
+                onClick={() => setActiveTab('papelera')}
+                className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all ${
+                  activeTab === 'papelera'
+                    ? 'bg-red-600 text-white shadow-lg shadow-red-600/20'
+                    : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                Papelera
+              </button>
+            </div>
+          )}
 
-          {activeTab === 'papelera' && filteredOrdenes.length > 0 && isAdmin && (
+          {!isTrabajador && activeTab === 'papelera' && filteredOrdenes.length > 0 && isAdmin && (
             <button
               onClick={handleVaciarPapelera}
               className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-red-600/20 transition-all active:scale-95 w-full sm:w-auto"
@@ -771,16 +855,20 @@ export default function Ordenes() {
                               )}
                             </>
                           ) : (
-                            <button
-                              onClick={(e) => {
-                                  e.preventDefault();
-                                  openRenotificar(orden);
-                              }}
-                              className="size-9 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-all inline-flex items-center justify-center"
-                              title="Re-notificar al técnico"
-                            >
-                                <span className="material-symbols-outlined text-[18px]">chat</span>
-                            </button>
+                            <>
+                              {!isTrabajador && (
+                                <button
+                                  onClick={(e) => {
+                                      e.preventDefault();
+                                      openRenotificar(orden);
+                                  }}
+                                  className="size-9 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-all inline-flex items-center justify-center"
+                                  title="Re-notificar al técnico"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">chat</span>
+                                </button>
+                              )}
+                            </>
                           )}
                           <Link to={`/ordenes/${orden.id}`} className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-primary hover:bg-primary/10 transition-all inline-flex items-center justify-center">
                               <Search className="size-4" />

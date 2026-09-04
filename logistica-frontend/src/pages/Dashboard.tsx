@@ -14,7 +14,7 @@ interface TrabajadorDirectoryRow {
 }
 
 export default function Dashboard() {
-  const { isEditor } = useUserRole();
+  const { isEditor, isTrabajador, loading: roleLoading } = useUserRole();
   const [ordenes, setOrdenes] = useState<any[]>([]);
   const [counts, setCounts] = useState({ pendientes: 0, enCurso: 0, finalizadas: 0 });
   const [weeklyActivity, setWeeklyActivity] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
@@ -23,22 +23,125 @@ export default function Dashboard() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [workerAssignments, setWorkerAssignments] = useState<any[]>([]);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    fetchAll();
-  }, []);
 
   const fetchAll = async () => {
     setLoading(true);
-    await Promise.all([
-      fetchOrdenes(),
-      fetchStats(),
-      fetchWeeklyActivity(),
-      fetchDailyAgenda(),
-      fetchUrgentes()
-    ]);
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData?.session?.user || null;
+
+    if (isTrabajador && user) {
+      const assignments = await fetchWorkerAssignments();
+      setWorkerAssignments(assignments);
+
+      const { data: profile } = await supabase
+        .from('perfiles')
+        .select('nombre_completo')
+        .eq('id', user.id)
+        .maybeSingle();
+      const workerName = profile?.nombre_completo || user.email || 'Trabajador';
+
+      await Promise.all([
+        fetchOrdenesWorker(assignments),
+        fetchStatsWorker(assignments),
+        fetchDailyAgendaWorker(assignments, workerName),
+        fetchUrgentesWorker(assignments)
+      ]);
+    } else {
+      await Promise.all([
+        fetchOrdenes(),
+        fetchStats(),
+        fetchWeeklyActivity(),
+        fetchDailyAgenda(),
+        fetchUrgentes()
+      ]);
+    }
+
     setLoading(false);
+  };
+
+  useEffect(() => {
+    if (!roleLoading) fetchAll();
+  }, [roleLoading, isTrabajador]);
+
+  const fetchWorkerAssignments = async () => {
+    const { data, error } = await supabase
+      .from('orden_asignaciones')
+      .select(`
+        id,
+        orden_id,
+        trabajador_id,
+        fecha_asignacion,
+        hora_programada,
+        estado,
+        notas,
+        creado_en,
+        orden:ordenes!inner (
+          id,
+          id_legible,
+          estado,
+          cliente,
+          nombre_obra,
+          direccion,
+          tecnico_id,
+          descripcion,
+          fecha_programada,
+          hora_programada,
+          creado_en
+        )
+      `)
+      .neq('estado', 'cancelado')
+      .neq('ordenes.estado', 'Archivado')
+      .neq('ordenes.estado', 'Papelera');
+
+    if (error) {
+      console.error('dashboard_worker_assignments_load_failed', error);
+      return [];
+    }
+    return data || [];
+  };
+
+  const fetchOrdenesWorker = async (assignments: any[]) => {
+    const recientes = [...assignments]
+      .sort((a, b) => new Date(b.orden.creado_en).getTime() - new Date(a.orden.creado_en).getTime())
+      .slice(0, 5)
+      .map(a => a.orden);
+    setOrdenes(recientes);
+  };
+
+  const fetchStatsWorker = async (assignments: any[]) => {
+    const stats = {
+      pendientes: assignments.filter(a => a.orden.estado === 'Pendiente' || a.orden.estado === 'Urgente').length,
+      enCurso: assignments.filter(a => a.orden.estado === 'En Curso' || a.orden.estado === 'En revisión' || a.orden.estado === 'Pendiente de firma').length,
+      finalizadas: assignments.filter(a => a.orden.estado === 'Finalizada').length
+    };
+    setCounts(stats);
+  };
+
+  const fetchDailyAgendaWorker = async (assignments: any[], workerName: string) => {
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const agenda = assignments
+      .filter(a =>
+        a.orden.fecha_programada === todayStr &&
+        a.orden.estado !== 'Finalizada' &&
+        a.orden.estado !== 'Archivado' &&
+        a.orden.estado !== 'Papelera'
+      )
+      .map(a => ({
+        ...a.orden,
+        hora_programada: a.orden.hora_programada || a.hora_programada,
+        nombre_tecnico: workerName || 'Mi intervención'
+      }));
+    setDailyAgenda(agenda);
+  };
+
+  const fetchUrgentesWorker = async (assignments: any[]) => {
+    const urgentesWorker = assignments
+      .filter(a => a.orden.estado === 'Urgente')
+      .map(a => a.orden);
+    setUrgentes(urgentesWorker);
   };
 
   const fetchOrdenes = async () => {
@@ -142,12 +245,14 @@ export default function Dashboard() {
     <div className="flex-1 flex flex-col w-full min-h-screen">
       {/* Header */}
       <header className="h-auto min-h-[64px] flex flex-col sm:flex-row items-center justify-between px-4 sm:px-8 py-4 sm:py-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10 w-full gap-4">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white self-start sm:self-auto">Dashboard Principal</h2>
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white self-start sm:self-auto">{isTrabajador ? 'Inicio' : 'Dashboard Principal'}</h2>
         <div className="flex items-center gap-4 sm:gap-6 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
-            <input className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/50 placeholder:text-slate-500" placeholder="Buscar órdenes..." type="text"/>
-          </div>
+          {!isTrabajador && (
+            <div className="relative flex-1 sm:w-64">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+              <input className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/50 placeholder:text-slate-500" placeholder="Buscar órdenes..." type="text"/>
+            </div>
+          )}
           <div className="flex items-center gap-3 relative">
             <button 
               onClick={() => setShowNotifications(!showNotifications)}
@@ -248,43 +353,101 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
           {/* Activity & Table */}
           <div className="lg:col-span-2 space-y-6 sm:space-y-8">
-            {/* Chart */}
-            <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-base font-black text-slate-800 dark:text-white">Actividad Semanal</h3>
-                  <p className="text-xs text-slate-500 font-medium">Nuevas órdenes registradas</p>
+            {isTrabajador ? (
+              <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-base font-black text-slate-800 dark:text-white">Mis próximos trabajos</h3>
+                    <p className="text-xs text-slate-500 font-medium">Próximas intervenciones asignadas</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  {(() => {
+                    const proximos = workerAssignments
+                      .filter(a => {
+                        const e = a.orden.estado;
+                        return (e === 'Pendiente' || e === 'Urgente' || e === 'En Curso' || e === 'En revisión' || e === 'Pendiente de firma') && a.orden.fecha_programada;
+                      })
+                      .sort((a, b) => new Date(a.orden.fecha_programada).getTime() - new Date(b.orden.fecha_programada).getTime())
+                      .slice(0, 5)
+                      .map(a => a.orden);
+                    if (proximos.length === 0) {
+                      return <div className="text-center py-8 text-slate-400 text-sm">No tienes trabajos programados</div>;
+                    }
+                    return (
+                      <table className="w-full text-left text-sm">
+                        <thead className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">
+                          <tr>
+                            <th className="py-2 px-2">Obra</th>
+                            <th className="py-2 px-2">Cliente</th>
+                            <th className="py-2 px-2">Fecha</th>
+                            <th className="py-2 px-2">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {proximos.map(o => (
+                            <tr key={o.id} onClick={() => navigate(`/ordenes/${o.id}`)} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 cursor-pointer">
+                              <td className="py-3 px-2 font-black text-slate-800 dark:text-white">{o.id_legible}</td>
+                              <td className="py-3 px-2 text-slate-600 dark:text-slate-300">{o.cliente || '—'}</td>
+                              <td className="py-3 px-2 text-slate-500 text-xs">
+                                {o.fecha_programada ? new Date(o.fecha_programada + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : '—'}
+                                {o.hora_programada && ` · ${o.hora_programada.substring(0, 5)}`}
+                              </td>
+                              <td className="py-3 px-2">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                  o.estado === 'Urgente' ? 'bg-red-100 text-red-700' :
+                                  o.estado === 'Finalizada' ? 'bg-green-100 text-green-700' :
+                                  'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {o.estado}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    );
+                  })()}
                 </div>
               </div>
-              <div className="flex items-end justify-between h-40 gap-1.5 sm:gap-3 px-1">
-                {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day, i) => {
-                  const val = weeklyActivity[i];
-                  const max = Math.max(...weeklyActivity, 1);
-                  const height = (val / max) * 100;
-                  return (
-                    <div key={day} className="flex-1 flex flex-col items-center gap-3 group">
-                      <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-xl relative flex items-end overflow-hidden h-full">
-                        <div 
-                           className="w-full bg-primary/40 group-hover:bg-primary transition-all duration-500 rounded-t-lg" 
-                           style={{ height: `${height}%` }}
-                        ></div>
-                        {val > 0 && (
-                          <span className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all bg-slate-800 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">
-                            {val}
-                          </span>
-                        )}
+            ) : (
+              <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-base font-black text-slate-800 dark:text-white">Actividad Semanal</h3>
+                    <p className="text-xs text-slate-500 font-medium">Nuevas órdenes registradas</p>
+                  </div>
+                </div>
+                <div className="flex items-end justify-between h-40 gap-1.5 sm:gap-3 px-1">
+                  {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day, i) => {
+                    const val = weeklyActivity[i];
+                    const max = Math.max(...weeklyActivity, 1);
+                    const height = (val / max) * 100;
+                    return (
+                      <div key={day} className="flex-1 flex flex-col items-center gap-3 group">
+                        <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-xl relative flex items-end overflow-hidden h-full">
+                          <div
+                             className="w-full bg-primary/40 group-hover:bg-primary transition-all duration-500 rounded-t-lg"
+                             style={{ height: `${height}%` }}
+                          ></div>
+                          {val > 0 && (
+                            <span className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all bg-slate-800 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">
+                              {val}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{day}</span>
                       </div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{day}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Recent Orders Table */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
               <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <h3 className="text-base font-black text-slate-800 dark:text-white">Órdenes Recientes</h3>
+                <h3 className="text-base font-black text-slate-800 dark:text-white">{isTrabajador ? 'Mis obras recientes' : 'Órdenes Recientes'}</h3>
                 <Link to="/ordenes" className="text-xs font-bold text-primary hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-colors">Ver todas</Link>
               </div>
               <div className="overflow-x-auto">
@@ -337,28 +500,32 @@ export default function Dashboard() {
 
           {/* Right Column */}
           <div className="space-y-6 sm:space-y-8">
-            {/* Quick Actions Card */}
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 rounded-2xl shadow-xl shadow-blue-600/20 text-white relative overflow-hidden group">
-              <div className="relative z-10">
-                <div className="size-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <span className="material-symbols-outlined text-white text-2xl">add_task</span>
+            {!isTrabajador && (
+              <>
+                {/* Quick Actions Card */}
+                <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 rounded-2xl shadow-xl shadow-blue-600/20 text-white relative overflow-hidden group">
+                  <div className="relative z-10">
+                    <div className="size-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                      <span className="material-symbols-outlined text-white text-2xl">add_task</span>
+                    </div>
+                    <h3 className="text-xl font-black mb-2 tracking-tight">Nueva Orden</h3>
+                    <p className="text-white/70 text-sm mb-8 font-medium leading-relaxed">Asigna una nueva orden de trabajo ahora mismo de forma rápida y sencilla.</p>
+                    {isEditor && (
+                      <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="w-full bg-white text-blue-600 px-6 py-4 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-black/10 hover:bg-blue-50 hover:translate-y-[-2px] transition-all active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <span className="material-symbols-outlined font-bold">add</span>
+                        Crear Reporte
+                      </button>
+                    )}
+                  </div>
+                  {/* Background Shapes */}
+                  <div className="absolute top-[-20%] right-[-10%] size-40 bg-white/10 rounded-full blur-2xl"></div>
+                  <div className="absolute bottom-[-10%] left-[-10%] size-40 bg-indigo-400/20 rounded-full blur-2xl"></div>
                 </div>
-                <h3 className="text-xl font-black mb-2 tracking-tight">Nueva Orden</h3>
-                <p className="text-white/70 text-sm mb-8 font-medium leading-relaxed">Asigna una nueva orden de trabajo ahora mismo de forma rápida y sencilla.</p>
-                {isEditor && (
-                  <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="w-full bg-white text-blue-600 px-6 py-4 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-black/10 hover:bg-blue-50 hover:translate-y-[-2px] transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <span className="material-symbols-outlined font-bold">add</span>
-                    Crear Reporte
-                  </button>
-                )}
-              </div>
-              {/* Background Shapes */}
-              <div className="absolute top-[-20%] right-[-10%] size-40 bg-white/10 rounded-full blur-2xl"></div>
-              <div className="absolute bottom-[-10%] left-[-10%] size-40 bg-indigo-400/20 rounded-full blur-2xl"></div>
-            </div>
+              </>
+            )}
 
             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
               <h3 className="text-base font-black text-slate-800 dark:text-white mb-6 flex items-center gap-2">

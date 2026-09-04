@@ -69,6 +69,8 @@ const Layout = () => {
     return <Navigate to="/login" replace />;
   }
 
+  const isTrabajador = userProfile?.rol === 'Trabajador';
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
@@ -139,7 +141,7 @@ const Layout = () => {
               }
             >
               <LayoutDashboard className="w-5 h-5 mr-3" />
-              Dashboard Principal
+              {isTrabajador ? 'Inicio' : 'Dashboard Principal'}
             </NavLink>
 
             <div className="pt-6 pb-2">
@@ -157,7 +159,7 @@ const Layout = () => {
               }
             >
               <CalendarClock className="w-5 h-5 mr-3" />
-              Calendario Reportes
+              {isTrabajador ? 'Mi Calendario' : 'Calendario Reportes'}
             </NavLink>
             
             <NavLink
@@ -169,10 +171,10 @@ const Layout = () => {
               }
             >
               <ClipboardList className="w-5 h-5 mr-3" />
-              Órdenes de Trabajo
+              {isTrabajador ? 'Mis Obras' : 'Órdenes de Trabajo'}
             </NavLink>
             
-            {(canAccessEstadisticas || canAccessLiquidaciones) && (
+            {!isTrabajador && (canAccessEstadisticas || canAccessLiquidaciones) && (
               <div className="pt-6 pb-2">
                 <p className="px-4 text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase">
                   Liquidaciones
@@ -180,7 +182,7 @@ const Layout = () => {
               </div>
             )}
 
-            {canAccessEstadisticas && (
+            {!isTrabajador && canAccessEstadisticas && (
               <NavLink
                 to="/liquidaciones/estadisticas"
                 end
@@ -195,7 +197,7 @@ const Layout = () => {
               </NavLink>
             )}
 
-            {canAccessLiquidaciones && (
+            {!isTrabajador && canAccessLiquidaciones && (
               <NavLink
                 to="/liquidaciones/gestion"
                 end
@@ -210,7 +212,7 @@ const Layout = () => {
               </NavLink>
             )}
 
-            {(userProfile?.rol === 'Administrador' || userProfile?.rol === 'Editor') && (
+            {(!isTrabajador && (userProfile?.rol === 'Administrador' || userProfile?.rol === 'Editor')) && (
               <>
                 <NavLink
                   to="/trabajadores"
