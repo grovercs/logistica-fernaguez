@@ -198,7 +198,7 @@ const MobileDetalleOrden = () => {
 
         // 2. Fetch reports and workers using the REAL ID
         const [reportesReq, trabajadoresReq, asignacionesReq] = await Promise.all([
-            supabase.from('reportes').select('*').eq('orden_id', realId).order('creado_en', { ascending: false }),
+            supabase.from('reportes').select('*').eq('orden_id', realId).order('fecha_trabajo', { ascending: true, nullsFirst: false }).order('creado_en', { ascending: true }).order('id'),
             supabase.rpc('get_trabajadores_directory'),
             supabase.from('orden_asignaciones').select('*').eq('orden_id', realId)
         ]);
@@ -935,7 +935,7 @@ const MobileDetalleOrden = () => {
                                     >
                                         <div className="flex justify-between items-start mb-1">
                                             <div className="flex flex-col">
-                                                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">PARTE #{reportes.length - idx}</span>
+                                                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">PARTE #{idx + 1}</span>
                                                 <span className="text-[10px] font-bold text-primary flex items-center gap-1">
                                                     <span className="material-symbols-outlined text-[12px]">person</span>
                                                     {tecnicoName}

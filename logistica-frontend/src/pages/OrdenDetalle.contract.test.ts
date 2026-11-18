@@ -12,5 +12,12 @@ assert.match(source, /uppercase tracking-wider">Referencia<\/label>[\s\S]*\{orde
 assert.doesNotMatch(source, />yes<\/span>/i);
 assert.match(source, /const showOtherOrders = Boolean\(otherOrders && otherOrders !== '-'\)/);
 assert.match(source, /\{showOtherOrders && \([\s\S]*Otras Órdenes \/ Notas[\s\S]*\{otherOrders\}/);
+assert.match(source, /\.order\('fecha_trabajo', \{\s*ascending:\s*true,\s*nullsFirst:\s*false\s*\}\)/);
+assert.match(source, /\.order\('creado_en', \{\s*ascending:\s*true\s*\}\)/);
+assert.match(source, /\.order\('id'\)/);
+assert.match(source, /import \{ sortReportesByDate \} from '..\/lib\/utils';/);
+
+// Ensure no leftover ordering by creado_en desc remains in OrdenDetalle query
+assert.doesNotMatch(source, /from\('reportes'\)\.select\('\*'\)\.eq\('orden_id', orderId\)\.order\('creado_en', \{\s*ascending:\s*false\s*\}\)/);
 
 console.log('order detail display contract tests passed');

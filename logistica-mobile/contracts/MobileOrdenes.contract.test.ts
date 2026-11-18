@@ -33,6 +33,11 @@ assert.match(source, /Cliente: \{orden\.cliente \|\| 'No especificado'\}/);
 assert.match(detailSource, /orden\?\.nombre_obra \|\| orden\?\.cliente \|\| orden\?\.id_legible/);
 assert.match(detailSource, /Cliente: \{orden\?\.cliente \|\| 'No especificado'\}/);
 assert.match(detailSource, /orden\?\.descripcion \|\|/);
+assert.match(detailSource, /\.order\('fecha_trabajo', \{\s*ascending:\s*true,\s*nullsFirst:\s*false\s*\}\)/);
+assert.match(detailSource, /\.order\('creado_en', \{\s*ascending:\s*true\s*\}\)/);
+assert.match(detailSource, /\.order\('id'\)/);
+assert.match(detailSource, /PARTE #\{idx \+ 1\}/);
+assert.doesNotMatch(detailSource, /PARTE #\{reportes\.length - idx\}/);
 assert.doesNotMatch(source, /service_role/i);
 
 console.log('mobile worker assignment list contract tests passed');

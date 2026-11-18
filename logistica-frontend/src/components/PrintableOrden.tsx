@@ -1,4 +1,5 @@
 import React from 'react';
+import { sortReportesByDate } from '../lib/utils';
 
 interface Props {
   orden: any;
@@ -9,12 +10,14 @@ interface Props {
 export const PrintableOrden = React.forwardRef<HTMLDivElement, Props>(({ orden, reportes, trabajadores }, ref) => {
   if (!orden) return null;
 
-  const totalHoras = reportes.reduce((sum, r) => sum + (Number(r.horas_trabajadas) || 0), 0);
-  const firmReporte = [...reportes]
+  const sortedReportes = sortReportesByDate(reportes);
+
+  const totalHoras = sortedReportes.reduce((sum, r) => sum + (Number(r.horas_trabajadas) || 0), 0);
+  const firmReporte = sortedReportes
     .filter(r => r.firma_url && r.firma_url.length > 5)
     .sort((a, b) => new Date(b.creado_en || 0).getTime() - new Date(a.creado_en || 0).getTime())[0];
 
-  const hasAnexos = reportes.some(r => ((r.fotos_urls?.length || 0) + (r.facturas_urls?.length || 0)) > 0);
+  const hasAnexos = sortedReportes.some(r => ((r.fotos_urls?.length || 0) + (r.facturas_urls?.length || 0)) > 0);
 
   return (
     <div ref={ref} className="bg-white text-slate-900 w-[210mm] font-sans mx-auto printable-container">
@@ -220,9 +223,9 @@ export const PrintableOrden = React.forwardRef<HTMLDivElement, Props>(({ orden, 
         {/* ===== DETALLE DE TRABAJOS REALIZADOS ===== */}
         <div className="mb-6">
           <div className="section-title">Detalle de Trabajos Realizados</div>
-          {reportes.length > 0 ? (
+          {sortedReportes.length > 0 ? (
             <div className="space-y-3">
-              {reportes.map((rep, i) => {
+              {sortedReportes.map((rep, i) => {
                 const worker = trabajadores.find(
                   t => t.auth_user_id === rep.tecnico_id || t.id === rep.tecnico_id
                 );
@@ -304,7 +307,7 @@ export const PrintableOrden = React.forwardRef<HTMLDivElement, Props>(({ orden, 
             </div>
 
             <div className="space-y-8">
-              {reportes.map((rep, rIdx) => {
+              {sortedReportes.map((rep, rIdx) => {
                 const worker = trabajadores.find(
                   t => t.auth_user_id === rep.tecnico_id || t.id === rep.tecnico_id
                 );

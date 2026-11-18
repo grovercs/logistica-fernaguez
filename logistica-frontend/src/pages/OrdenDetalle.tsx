@@ -8,6 +8,7 @@ import AsignacionesSection from '../components/AsignacionesSection';
 import { PrintableOrden } from '../components/PrintableOrden';
 import { createPortal } from 'react-dom';
 import { useUserRole } from '../hooks/useUserRole';
+import { sortReportesByDate } from '../lib/utils';
 
 interface TrabajadorDirectoryRow {
   trabajador_id: string;
@@ -47,7 +48,7 @@ export default function OrdenDetalle() {
   const fetchOrden = async (orderId: string) => {
     const [ordenReq, reportesReq, trabReq] = await Promise.all([
       supabase.from('ordenes').select('*').eq('id', orderId).single(),
-      supabase.from('reportes').select('*').eq('orden_id', orderId),
+      supabase.from('reportes').select('*').eq('orden_id', orderId).order('fecha_trabajo', { ascending: true, nullsFirst: false }).order('creado_en', { ascending: true }).order('id'),
       supabase.rpc('get_trabajadores_directory')
     ]);
 
@@ -87,7 +88,7 @@ export default function OrdenDetalle() {
       setOrden(ordenData);
     }
     if (!reportesReq.error && reportesReq.data) {
-      setReportes(reportesReq.data);
+      setReportes(sortReportesByDate(reportesReq.data));
     }
     if (!trabReq.error && trabReq.data) {
       setTrabajadores(trabReq.data.map((t: TrabajadorDirectoryRow) => ({
