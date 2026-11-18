@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { notifyNewOrder } from '../../lib/notifications';
 import { useUserRole } from '../../hooks/useUserRole';
@@ -55,22 +55,27 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
   const [direccionCliente, setDireccionCliente] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-       fetchTecnicos();
-       fetchAseguradoras();
-       fetchTareasFrecuentes();
-       setFormData({
-         referencia: '', cliente: '', nombre_obra: '', cif_nif: '', tecnico: '',
-         fecha: fechaInicial || new Date().toLocaleDateString('en-CA'),
-         hora: '10:00', observaciones: '', esUrgente: false,
-         asegurado: '', telefono_asegurado: '', email: '',
-         persona_contacto: '', telefono_contacto: '', direccion: '',
-         direccion_fiscal: '',
-         estado: 'Pendiente',
-       });
-    }
-  }, [isOpen, fechaInicial]);
+  const requestIdRef = useRef(0);
+
+   useEffect(() => {
+     if (isOpen) {
+        fetchTecnicos();
+        fetchAseguradoras();
+        fetchTareasFrecuentes();
+        setFormData({
+          referencia: '', cliente: '', nombre_obra: '', cif_nif: '', tecnico: '',
+          fecha: fechaInicial || new Date().toLocaleDateString('en-CA'),
+          hora: '10:00', observaciones: '', esUrgente: false,
+          asegurado: '', telefono_asegurado: '', email: '',
+          persona_contacto: '', telefono_contacto: '', direccion: '',
+          direccion_fiscal: '',
+          estado: 'Pendiente',
+        });
+        setOrdenesPrevias([]);
+        setDireccionCliente('');
+        requestIdRef.current += 1;
+     }
+   }, [isOpen, fechaInicial]);
 
   const fetchTecnicos = async () => {
     const { data: directoryRows, error: directoryError } = await supabase
@@ -127,13 +132,16 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
       setOrdenesPrevias([]);
       return;
     }
+    const currentRequestId = ++requestIdRef.current;
     const { data } = await supabase
       .from('ordenes')
       .select('id, id_legible, creado_en, estado, descripcion, cliente, aseguradora')
       .eq('cliente', clienteNombre)
       .order('creado_en', { ascending: false })
       .limit(5);
-    if (data) setOrdenesPrevias(data);
+    if (data && currentRequestId === requestIdRef.current) {
+      setOrdenesPrevias(data);
+    }
   };
 
   const handleTareaFrecuente = (tareaNombre: string) => {
@@ -163,7 +171,18 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
       setDireccionCliente(existente.direccion || '');
       fetchOrdenesPrevias(existente.nombre);
     } else {
-      setFormData({ ...formData, cliente: nombre });
+      setFormData({
+        ...formData,
+        cliente: nombre,
+        cif_nif: '',
+        asegurado: '',
+        telefono_asegurado: '',
+        email: '',
+        direccion: '',
+        direccion_fiscal: '',
+      });
+      setDireccionCliente('');
+      setOrdenesPrevias([]);
     }
   };
 
@@ -381,7 +400,7 @@ export default function NuevoReporteModal({ isOpen, onClose, onCreated, fechaIni
 
 
               {/* Histórico de trabajos del cliente */}
-              {ordenesPrevias.length > 0 && (
+              {formData.cliente && ordenesPrevias.length > 0 && (
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                     <span className="material-symbols-outlined text-[16px] text-slate-400">history</span>
